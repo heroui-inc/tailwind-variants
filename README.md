@@ -141,7 +141,7 @@ Please adhere to this project's [CODE_OF_CONDUCT](./CODE_OF_CONDUCT.md).
 
 ## Authors
 
-- Junior garcia ([@jrgarciadev](https://github.com/jrgaciadev))
+- Junior garcia ([@jrgarciadev](https://github.com/jrgarciadev))
 - Tianen Pang ([@tianenpang](https://github.com/tianenpang))
 
 ## License
