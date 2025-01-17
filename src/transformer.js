@@ -44,7 +44,7 @@ const pickByKeys = (target, keys) => {
 };
 
 const printError = (message, error) => {
-  const newIssueLink = "https://github.com/nextui-org/tailwind-variants/issues/new/choose";
+  const newIssueLink = "https://github.com/frontio-ai/tailwind-variants/issues/new/choose";
 
   /* eslint-disable no-console */
   console.log("\x1b[31m%s\x1b[0m", `${message}: ${error.message}`);

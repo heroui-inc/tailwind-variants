@@ -12,7 +12,7 @@
   <a href="https://www.npmjs.com/package/tailwind-variants">
     <img alt="NPM Version" src="https://badgen.net/npm/v/tailwind-variants" />
   </a>
-  <a href="https://github.com/nextui-org/tailwind-variants/blob/main/LICENSE">
+  <a href="https://github.com/frontio-ai/tailwind-variants/blob/main/LICENSE">
     <img src="https://img.shields.io/npm/l/tailwind-variants?style=flat" alt="License">
   </a>
 </p>
@@ -125,11 +125,11 @@ module.exports = withTV(
 
 ## Community
 
-We're excited to see the community adopt NextUI, raise issues, and provide feedback. Whether it's a feature request, bug report, or a project to showcase, please get involved!
+We're excited to see the community adopt HeroUI, raise issues, and provide feedback. Whether it's a feature request, bug report, or a project to showcase, please get involved!
 
 - [Discord](https://discord.gg/9b6yyZKmH4)
 - [Twitter](https://twitter.com/getnextui)
-- [GitHub Discussions](https://github.com/nextui-org/tailwind-variants/discussions)
+- [GitHub Discussions](https://github.com/frontio-ai/tailwind-variants/discussions)
 
 ## Contributing
 
