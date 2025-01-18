@@ -9,10 +9,10 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/frontio-ai/tailwind-variants"
+    "url": "https://github.com/heroui-inc/tailwind-variants"
   },
   "bugs": {
-    "url": "https://github.com/frontio-ai/tailwind-variants/issues"
+    "url": "https://github.com/heroui-inc/tailwind-variants/issues"
   },
   "type": "module",
   "main": "dist/index.cjs",
