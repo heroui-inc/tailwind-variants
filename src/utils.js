@@ -1,3 +1,5 @@
+import {createDefu} from "defu";
+
 export const falsyToString = (value) =>
   typeof value === "boolean" ? `${value}` : value === 0 ? "0" : value;
 
@@ -25,36 +27,37 @@ export function flatArray(arr) {
 
 export const flatMergeArrays = (...arrays) => flatArray(arrays).filter(Boolean);
 
-export const mergeObjects = (obj1, obj2) => {
-  const result = {};
-  const keys1 = Object.keys(obj1);
-  const keys2 = Object.keys(obj2);
+export const mergeObjects = createDefu((obj, key, value) => {
+  if (typeof obj[key] === "string" && typeof value === "string") {
+    obj[key] += " " + value;
 
-  for (const key of keys1) {
-    if (keys2.includes(key)) {
-      const val1 = obj1[key];
-      const val2 = obj2[key];
-
-      if (Array.isArray(val1) || Array.isArray(val2)) {
-        result[key] = flatMergeArrays(val2, val1);
-      } else if (typeof val1 === "object" && typeof val2 === "object") {
-        result[key] = mergeObjects(val1, val2);
-      } else {
-        result[key] = val2 + " " + val1;
-      }
-    } else {
-      result[key] = obj1[key];
-    }
+    return true;
   }
 
-  for (const key of keys2) {
-    if (!keys1.includes(key)) {
-      result[key] = obj2[key];
-    }
+  if (Array.isArray(obj[key]) || Array.isArray(value)) {
+    obj[key] = flatMergeArrays(obj[key], value);
+
+    return true;
   }
 
-  return result;
-};
+  if (typeof obj[key] === "object" && typeof value === "object") {
+    obj[key] = mergeObjects(obj[key], value);
+
+    return true;
+  }
+});
+
+export const mergeOptions = createDefu((obj, key, value) => {
+  if (
+    ["compoundSlots", "compoundVariants"].includes(key) &&
+    Array.isArray(value) &&
+    Array.isArray(obj[key])
+  ) {
+    obj[key] = value;
+
+    return true;
+  }
+});
 
 export const removeExtraSpaces = (str) => {
   if (!str || typeof str !== "string") {
