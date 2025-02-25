@@ -37,6 +37,7 @@
     "test:watch": "jest --watch --no-verbose"
   },
   "dependencies": {
+    "defu": "6.1.4",
     "tailwind-merge": "2.5.4"
   },
   "devDependencies": {

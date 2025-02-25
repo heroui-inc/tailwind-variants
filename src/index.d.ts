@@ -225,6 +225,111 @@ export type TVReturnType<
     : string;
 } & TVReturnProps<V, S, B, EV, ES, E>;
 
+export type TVOptions<
+  V extends TVVariants<S, B, EV>,
+  CV extends TVCompoundVariants<V, S, B, EV, ES>,
+  DV extends TVDefaultVariants<V, S, EV, ES>,
+  C extends TVConfig<V, EV>,
+  B extends ClassValue = undefined,
+  S extends TVSlots = undefined,
+  // @ts-expect-error
+  E extends TVReturnType = TVReturnType<
+    V,
+    S,
+    B,
+    C,
+    // @ts-expect-error
+    EV extends undefined ? {} : EV,
+    // @ts-expect-error
+    ES extends undefined ? {} : ES
+  >,
+  EV extends TVVariants<ES, B, E["variants"], ES> = E["variants"],
+  ES extends TVSlots = E["slots"] extends TVSlots ? E["slots"] : undefined,
+> = {
+  /**
+   * Extend allows for easy composition of components.
+   * @see https://www.tailwind-variants.org/docs/composing-components
+   */
+  extend?: E;
+  /**
+   * Base allows you to set a base class for a component.
+   */
+  base?: B;
+  /**
+   * Slots allow you to separate a component into multiple parts.
+   * @see https://www.tailwind-variants.org/docs/slots
+   */
+  slots?: S;
+  /**
+   * Variants allow you to create multiple versions of the same component.
+   * @see https://www.tailwind-variants.org/docs/variants#adding-variants
+   */
+  variants?: V;
+  /**
+   * Compound variants allow you to apply classes to multiple variants at once.
+   * @see https://www.tailwind-variants.org/docs/variants#compound-variants
+   */
+  compoundVariants?: CV;
+  /**
+   * Compound slots allow you to apply classes to multiple slots at once.
+   */
+  compoundSlots?: TVCompoundSlots<V, S, B>;
+  /**
+   * Default variants allow you to set default variants for a component.
+   * @see https://www.tailwind-variants.org/docs/variants#default-variants
+   */
+  defaultVariants?: DV;
+};
+
+export type TVOverride<
+  V extends TVVariants<S, B, EV>,
+  C extends TVConfig<V, EV>,
+  B extends ClassValue = undefined,
+  S extends TVSlots = undefined,
+  // @ts-expect-error
+  E extends TVReturnType = TVReturnType<
+    V,
+    S,
+    B,
+    C,
+    // @ts-expect-error
+    EV extends undefined ? {} : EV,
+    // @ts-expect-error
+    ES extends undefined ? {} : ES
+  >,
+  EV extends TVVariants<ES, B, E["variants"], ES> = E["variants"],
+  ES extends TVSlots = E["slots"] extends TVSlots ? E["slots"] : undefined,
+> = {
+  /**
+   * Slots allow you to override the slot config of a component
+   */
+  slots?: S extends TVSlots ? {[KS in keyof S]?: ClassValue} : never;
+  /**
+   * Variants allow you to override the variant config of a component
+   */
+  variants?: {
+    [KV in keyof V]?: {
+      [OV in keyof V[KV]]?: S extends TVSlots
+        ? {
+            [KS in keyof S]?: ClassValue;
+          }
+        : ClassValue;
+    };
+  };
+  /**
+   * Compound variants allow you to override the compound variant config of a component
+   */
+  compoundVariants?: TVCompoundVariants<V, S, B, EV, ES>;
+  /**
+   * Compound slots allow you to override the compound slot config of a components
+   */
+  compoundSlots?: TVCompoundSlots<V, S, B>;
+  /**
+   * Default variants allow you to override the default variant config of a component
+   */
+  defaultVariants?: TVDefaultVariants<V, S, EV, ES>;
+};
+
 export type TV = {
   <
     V extends TVVariants<S, B, EV>,
@@ -247,41 +352,11 @@ export type TV = {
     EV extends TVVariants<ES, B, E["variants"], ES> = E["variants"],
     ES extends TVSlots = E["slots"] extends TVSlots ? E["slots"] : undefined,
   >(
-    options: {
-      /**
-       * Extend allows for easy composition of components.
-       * @see https://www.tailwind-variants.org/docs/composing-components
-       */
-      extend?: E;
-      /**
-       * Base allows you to set a base class for a component.
-       */
-      base?: B;
-      /**
-       * Slots allow you to separate a component into multiple parts.
-       * @see https://www.tailwind-variants.org/docs/slots
-       */
-      slots?: S;
-      /**
-       * Variants allow you to create multiple versions of the same component.
-       * @see https://www.tailwind-variants.org/docs/variants#adding-variants
-       */
-      variants?: V;
-      /**
-       * Compound variants allow you to apply classes to multiple variants at once.
-       * @see https://www.tailwind-variants.org/docs/variants#compound-variants
-       */
-      compoundVariants?: CV;
-      /**
-       * Compound slots allow you to apply classes to multiple slots at once.
-       */
-      compoundSlots?: TVCompoundSlots<V, S, B>;
-      /**
-       * Default variants allow you to set default variants for a component.
-       * @see https://www.tailwind-variants.org/docs/variants#default-variants
-       */
-      defaultVariants?: DV;
-    },
+    /**
+     * The options object allows you to define the component.
+     * @see https://www.tailwind-variants.org/docs/api-reference#options
+     */
+    options: TVOptions<V, CV, DV, C, B, S, E, EV, ES>,
     /**
      * The config object allows you to modify the default configuration.
      * @see https://www.tailwind-variants.org/docs/api-reference#config-optional
@@ -312,41 +387,7 @@ export type CreateTV<RV extends TVConfig["responsiveVariants"] = undefined> = {
     EV extends TVVariants<ES, B, E["variants"], ES> = E["variants"],
     ES extends TVSlots = E["slots"] extends TVSlots ? E["slots"] : undefined,
   >(
-    options: {
-      /**
-       * Extend allows for easy composition of components.
-       * @see https://www.tailwind-variants.org/docs/composing-components
-       */
-      extend?: E;
-      /**
-       * Base allows you to set a base class for a component.
-       */
-      base?: B;
-      /**
-       * Slots allow you to separate a component into multiple parts.
-       * @see https://www.tailwind-variants.org/docs/slots
-       */
-      slots?: S;
-      /**
-       * Variants allow you to create multiple versions of the same component.
-       * @see https://www.tailwind-variants.org/docs/variants#adding-variants
-       */
-      variants?: V;
-      /**
-       * Compound variants allow you to apply classes to multiple variants at once.
-       * @see https://www.tailwind-variants.org/docs/variants#compound-variants
-       */
-      compoundVariants?: CV;
-      /**
-       * Compound slots allow you to apply classes to multiple slots at once.
-       */
-      compoundSlots?: TVCompoundSlots<V, S, B>;
-      /**
-       * Default variants allow you to set default variants for a component.
-       * @see https://www.tailwind-variants.org/docs/variants#default-variants
-       */
-      defaultVariants?: DV;
-    },
+    options: TVOptions<V, CV, DV, C, B, S, E, EV, ES>,
     /**
      * The config object allows you to modify the default configuration.
      * @see https://www.tailwind-variants.org/docs/api-reference#config-optional
@@ -355,12 +396,60 @@ export type CreateTV<RV extends TVConfig["responsiveVariants"] = undefined> = {
   ): TVReturnType<V, S, B, C & RV, EV, ES, E>;
 };
 
+export type DefineTVTemplate = {
+  <
+    V extends TVVariants<S, B, EV>,
+    CV extends TVCompoundVariants<V, S, B, EV, ES>,
+    DV extends TVDefaultVariants<V, S, EV, ES>,
+    C extends TVConfig<V, EV>,
+    B extends ClassValue = undefined,
+    S extends TVSlots = undefined,
+    // @ts-expect-error
+    E extends TVReturnType = TVReturnType<
+      V,
+      S,
+      B,
+      C,
+      // @ts-expect-error
+      EV extends undefined ? {} : EV,
+      // @ts-expect-error
+      ES extends undefined ? {} : ES
+    >,
+    EV extends TVVariants<ES, B, E["variants"], ES> = E["variants"],
+    ES extends TVSlots = E["slots"] extends TVSlots ? E["slots"] : undefined,
+  >(
+    /**
+     * The template object allows you to define a component spec.
+     * @see https://www.tailwind-variants.org/docs/api-reference#template
+     */
+    template: TVOptions<V, CV, DV, C, B, S, E, EV, ES>,
+    /**
+     * The config object allows you to modify the default configuration.
+     * @see https://www.tailwind-variants.org/docs/api-reference#config-optional
+     */
+    config?: C,
+  ): (
+    /**
+     * The override object allows you to override the component template.
+     * @see https://www.tailwind-variants.org/docs/api-reference#override-optional
+     */
+    override?: TVOverride<V, C, B, S, E, EV, ES>,
+    /**
+     * The props object allows you to pass props to the component.
+     * @see https://www.tailwind-variants.org/docs/api-reference#props-optional
+     */
+    props?: TVProps<V, S, C, EV, ES>,
+  ) => ReturnType<TVReturnType<V, S, B, C, EV, ES, E>>;
+};
+
 // main function
 export declare const tv: TV;
 
 export declare function createTV<T extends TVConfig["responsiveVariants"]>(
   config: TVConfig & T,
 ): CreateTV<T>;
+
+export declare const defineTV: DefineTVTemplate;
 
 export declare const defaultConfig: TVConfig;
 

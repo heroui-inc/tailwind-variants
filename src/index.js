@@ -5,6 +5,7 @@ import {
   isEmptyObject,
   falsyToString,
   mergeObjects,
+  mergeOptions,
   removeExtraSpaces,
   flatMergeArrays,
   flatArray,
@@ -79,7 +80,7 @@ export const tv = (options, configProp) => {
   const base = extend?.base ? cnBase(extend.base, options?.base) : options?.base;
   const variants =
     extend?.variants && !isEmptyObject(extend.variants)
-      ? mergeObjects(variantsProps, extend.variants)
+      ? mergeObjects(extend.variants, variantsProps)
       : variantsProps;
   const defaultVariants =
     extend?.defaultVariants && !isEmptyObject(extend.defaultVariants)
@@ -453,5 +454,11 @@ export const tv = (options, configProp) => {
 };
 
 export const createTV = (configProp) => {
-  return (options, config) => tv(options, config ? mergeObjects(configProp, config) : configProp);
+  return (options, config) => tv(options, config ? mergeObjects(config, configProp) : configProp);
+};
+
+export const defineTV = (options, config) => (override, props) => {
+  const template = override ? mergeOptions(override, options) : options;
+
+  return tv(template, config)(props);
 };
