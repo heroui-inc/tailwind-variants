@@ -87,7 +87,7 @@
   ],
   "tsup": {
     "clean": true,
-    "minify": false,
+    "minify": true,
     "treeshake": true,
     "entry": [
       "src/*.js"
