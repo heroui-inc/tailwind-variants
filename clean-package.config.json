@@ -11,11 +11,6 @@
         "types": "./dist/index.d.ts"
       },
       "./dist/*": "./dist/*",
-      "./transformer": {
-        "require": "./dist/transformer.cjs",
-        "types": "./dist/transformer.d.ts",
-        "default": "./dist/transformer.js"
-      },
       "./package.json": "./package.json"
     }
   }

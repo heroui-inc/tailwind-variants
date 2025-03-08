@@ -20,12 +20,11 @@
   "sideEffects": false,
   "files": [
     "dist",
-    "transformer.js",
-    "transformer.d.ts",
     "README.md",
     "LICENSE"
   ],
   "scripts": {
+    "dev": "tsup --watch",
     "build": "tsup && node copy-types.cjs",
     "typecheck": "tsc --noEmit",
     "prepack": "clean-package",

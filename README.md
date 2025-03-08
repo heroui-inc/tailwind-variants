@@ -20,16 +20,20 @@
 ## Features
 
 - First-class variant API
-- Responsive variants
 - Slots support
 - Composition support
 - Fully typed
 - Framework agnostic
 - Automatic conflict resolution
+- Tailwindcss V4 support
 
 ## Documentation
 
 For full documentation, visit [tailwind-variants.org](https://tailwind-variants.org)
+
+> ❕ Note: `Tailwindcss V4` no longer supports the `config.content.transform` so we remove the `responsive variants` feature
+>
+> If you want to use `responsive variants`, you need to add it manually to your classname.
 
 ## Quick Start
 
@@ -73,46 +77,6 @@ const button = tv({
 });
 
 return <button className={button({size: "sm", color: "secondary"})}>Click me</button>;
-```
-
-3. Responsive variants configuration (optional): If you want to use responsive variants
-   you need to add the Tailwind Variants `wrapper` to your TailwindCSS config file `tailwind.config.js`.
-
-```js
-// tailwind.config.js
-
-const {withTV} = require("tailwind-variants/transformer");
-
-/** @type {import('tailwindcss').Config} */
-module.exports = withTV({
-  content: ["./index.html", "./src/**/*.{js,ts,jsx,tsx}"],
-  theme: {
-    extend: {},
-  },
-  plugins: [],
-});
-```
-
-If you're using a custom path to import Tailwind variants, such as creating a custom tv instance with `createTV`, it's recommended to include this path in the transformer configuration:
-
-```js
-// tailwind.config.js
-
-const {withTV} = require("tailwind-variants/transformer");
-
-/** @type {import('tailwindcss').Config} */
-module.exports = withTV(
-  {
-    content: ["./index.html", "./src/**/*.{js,ts,jsx,tsx}"],
-    theme: {
-      extend: {},
-    },
-    plugins: [],
-  },
-  {
-    aliases: ["@/lib/tv"],
-  },
-);
 ```
 
 ## Acknowledgements
