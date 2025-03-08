@@ -1,6 +1,6 @@
 {
   "name": "tailwind-variants",
-  "version": "0.3.0",
+  "version": "1.0.0",
   "description": "🦄 Tailwindcss first-class variant API",
   "author": "Junior Garcia <jrgarciadev@gmail.com>",
   "license": "MIT",
@@ -16,7 +16,7 @@
   },
   "type": "module",
   "main": "dist/index.cjs",
-  "types": "./dist/index.d.ts",
+  "types": "dist/index.d.ts",
   "sideEffects": false,
   "files": [
     "dist",
@@ -85,22 +85,18 @@
     "styled",
     "styles"
   ],
-  "tsup": {
-    "clean": true,
-    "minify": true,
-    "treeshake": true,
-    "entry": [
-      "src/*.js"
-    ],
-    "target": "es2019",
-    "format": [
-      "cjs",
-      "esm"
-    ]
-  },
-  "packageManager": "pnpm@9.12.3",
   "engines": {
     "node": ">=16.x",
     "pnpm": ">=7.x"
+  },
+  "module": "dist/index.js",
+  "exports": {
+    ".": {
+      "require": "./dist/index.cjs",
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    },
+    "./dist/*": "./dist/*",
+    "./package.json": "./package.json"
   }
 }
