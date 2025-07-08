@@ -31,6 +31,11 @@ export const cn =
       return cnBase(classes);
     }
 
+    // Use custom twMerge function if provided
+    if (config.twMergeFn) {
+      return voidEmpty(config.twMergeFn(cnBase(classes)));
+    }
+
     if (!cachedTwMerge || didTwMergeConfigChange) {
       didTwMergeConfigChange = false;
       cachedTwMerge = isEmptyObject(cachedTwMergeConfig)
@@ -453,5 +458,16 @@ export const tv = (options, configProp) => {
 };
 
 export const createTV = (configProp) => {
-  return (options, config) => tv(options, config ? mergeObjects(configProp, config) : configProp);
+  return (options, config) => {
+    const mergedConfig = config ? mergeObjects(configProp, config) : configProp;
+
+    // Ensure twMergeFn from runtime config takes precedence
+    if (config?.twMergeFn) {
+      mergedConfig.twMergeFn = config.twMergeFn;
+    } else if (configProp.twMergeFn && !mergedConfig.twMergeFn) {
+      mergedConfig.twMergeFn = configProp.twMergeFn;
+    }
+
+    return tv(options, mergedConfig);
+  };
 };
