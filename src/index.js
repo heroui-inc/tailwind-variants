@@ -1,5 +1,3 @@
-import {twMerge as twMergeBase, extendTailwindMerge} from "tailwind-merge";
-
 import {
   isEqual,
   isEmptyObject,
@@ -7,8 +5,8 @@ import {
   mergeObjects,
   removeExtraSpaces,
   flatMergeArrays,
-  flatArray,
 } from "./utils.js";
+import {createTwMerge} from "./cn.js";
 
 export const defaultConfig = {
   twMerge: true,
@@ -16,9 +14,30 @@ export const defaultConfig = {
   responsiveVariants: false,
 };
 
-export const voidEmpty = (value) => (!!value ? value : undefined);
+export const cnBase = (...classes) => {
+  const result = [];
 
-export const cnBase = (...classes) => voidEmpty(flatArray(classes).filter(Boolean).join(" "));
+  flat(classes, result);
+  let str = "";
+
+  for (let i = 0; i < result.length; i++) {
+    if (result[i]) {
+      if (str) str += " ";
+      str += result[i];
+    }
+  }
+
+  return str || undefined;
+};
+
+function flat(arr, target) {
+  for (let i = 0; i < arr.length; i++) {
+    const el = arr[i];
+
+    if (Array.isArray(el)) flat(el, target);
+    else if (el) target.push(el);
+  }
+}
 
 let cachedTwMerge = null;
 let cachedTwMergeConfig = {};
@@ -27,34 +46,21 @@ let didTwMergeConfigChange = false;
 export const cn =
   (...classes) =>
   (config) => {
-    if (!config.twMerge) {
-      return cnBase(classes);
-    }
+    const base = cnBase(classes);
+
+    if (!base || !config.twMerge) return base;
 
     if (!cachedTwMerge || didTwMergeConfigChange) {
       didTwMergeConfigChange = false;
-      cachedTwMerge = isEmptyObject(cachedTwMergeConfig)
-        ? twMergeBase
-        : extendTailwindMerge({
-            ...cachedTwMergeConfig,
-            extend: {
-              // Support for legacy tailwind-merge config shape
-              theme: cachedTwMergeConfig.theme,
-              classGroups: cachedTwMergeConfig.classGroups,
-              conflictingClassGroupModifiers: cachedTwMergeConfig.conflictingClassGroupModifiers,
-              conflictingClassGroups: cachedTwMergeConfig.conflictingClassGroups,
-              // Support for new tailwind-merge config shape
-              ...cachedTwMergeConfig.extend,
-            },
-          });
+      cachedTwMerge = createTwMerge(cachedTwMergeConfig);
     }
 
-    return voidEmpty(cachedTwMerge(cnBase(classes)));
+    return cachedTwMerge(base) || undefined;
   };
 
 const joinObjects = (obj1, obj2) => {
   for (const key in obj2) {
-    if (obj1.hasOwnProperty(key)) {
+    if (key in obj1) {
       obj1[key] = cnBase(obj1[key], obj2[key]);
     } else {
       obj1[key] = obj2[key];
@@ -135,37 +141,36 @@ export const tv = (options, configProp) => {
       let result = acc;
 
       if (typeof screenVariantValue === "string") {
-        result = result.concat(
-          removeExtraSpaces(screenVariantValue)
-            .split(" ")
-            .map((v) => `${screen}:${v}`),
-        );
+        const cleaned = removeExtraSpaces(screenVariantValue);
+        const parts = cleaned.split(" ");
+
+        for (let i = 0; i < parts.length; i++) {
+          result.push(`${screen}:${parts[i]}`);
+        }
       } else if (Array.isArray(screenVariantValue)) {
-        result = result.concat(
-          screenVariantValue.reduce((acc, v) => {
-            return acc.concat(`${screen}:${v}`);
-          }, []),
-        );
+        for (let i = 0; i < screenVariantValue.length; i++) {
+          result.push(`${screen}:${screenVariantValue[i]}`);
+        }
       } else if (typeof screenVariantValue === "object" && typeof slotKey === "string") {
-        for (const key in screenVariantValue) {
-          if (screenVariantValue.hasOwnProperty(key) && key === slotKey) {
-            const value = screenVariantValue[key];
+        if (slotKey in screenVariantValue) {
+          const value = screenVariantValue[slotKey];
 
-            if (value && typeof value === "string") {
-              const fixedValue = removeExtraSpaces(value);
+          if (value && typeof value === "string") {
+            const fixedValue = removeExtraSpaces(value);
+            const parts = fixedValue.split(" ");
+            const arr = [];
 
-              if (result[slotKey]) {
-                result[slotKey] = result[slotKey].concat(
-                  fixedValue.split(" ").map((v) => `${screen}:${v}`),
-                );
-              } else {
-                result[slotKey] = fixedValue.split(" ").map((v) => `${screen}:${v}`);
-              }
-            } else if (Array.isArray(value) && value.length > 0) {
-              result[slotKey] = value.reduce((acc, v) => {
-                return acc.concat(`${screen}:${v}`);
-              }, []);
+            for (let i = 0; i < parts.length; i++) {
+              arr.push(`${screen}:${parts[i]}`);
             }
+            result[slotKey] = result[slotKey] ? result[slotKey].concat(arr) : arr;
+          } else if (Array.isArray(value) && value.length > 0) {
+            const arr = [];
+
+            for (let i = 0; i < value.length; i++) {
+              arr.push(`${screen}:${value[i]}`);
+            }
+            result[slotKey] = arr;
           }
         }
       }
@@ -246,19 +251,24 @@ export const tv = (options, configProp) => {
     };
 
     const getVariantClassNames = () => {
-      if (!variants) {
-        return null;
+      if (!variants) return null;
+
+      const keys = Object.keys(variants);
+      const result = [];
+
+      for (let i = 0; i < keys.length; i++) {
+        const value = getVariantValue(keys[i], variants);
+
+        if (value) result.push(value);
       }
 
-      return Object.keys(variants).map((vk) => getVariantValue(vk, variants));
+      return result;
     };
 
     const getVariantClassNamesBySlotKey = (slotKey, slotProps) => {
-      if (!variants || typeof variants !== "object") {
-        return null;
-      }
+      if (!variants || typeof variants !== "object") return null;
 
-      const result = new Array();
+      const result = [];
 
       for (const variant in variants) {
         const variantValue = getVariantValue(variant, variants, slotKey, slotProps);
@@ -268,9 +278,7 @@ export const tv = (options, configProp) => {
             ? variantValue
             : variantValue && variantValue[slotKey];
 
-        if (value) {
-          result[result.length] = value;
-        }
+        if (value) result.push(value);
       }
 
       return result;
@@ -279,9 +287,9 @@ export const tv = (options, configProp) => {
     const propsWithoutUndefined = {};
 
     for (const prop in props) {
-      if (props[prop] !== undefined) {
-        propsWithoutUndefined[prop] = props[prop];
-      }
+      const value = props[prop];
+
+      if (value !== undefined) propsWithoutUndefined[prop] = value;
     }
 
     const getCompleteProps = (key, slotProps) => {
@@ -302,12 +310,16 @@ export const tv = (options, configProp) => {
 
     const getCompoundVariantsValue = (cv = [], slotProps) => {
       const result = [];
+      const cvLength = cv.length;
 
-      for (const {class: tvClass, className: tvClassName, ...compoundVariantOptions} of cv) {
+      for (let i = 0; i < cvLength; i++) {
+        const {class: tvClass, className: tvClassName, ...compoundVariantOptions} = cv[i];
         let isValid = true;
+        const completeProps = getCompleteProps(null, slotProps);
 
-        for (const [key, value] of Object.entries(compoundVariantOptions)) {
-          const completePropsValue = getCompleteProps(key, slotProps)[key];
+        for (const key in compoundVariantOptions) {
+          const value = compoundVariantOptions[key];
+          const completePropsValue = completeProps[key];
 
           if (Array.isArray(value)) {
             if (!value.includes(completePropsValue)) {
@@ -315,9 +327,11 @@ export const tv = (options, configProp) => {
               break;
             }
           } else {
-            const isBlankOrFalse = (v) => v == null || v === false;
-
-            if (isBlankOrFalse(value) && isBlankOrFalse(completePropsValue)) continue;
+            if (
+              (value == null || value === false) &&
+              (completePropsValue == null || completePropsValue === false)
+            )
+              continue;
 
             if (completePropsValue !== value) {
               isValid = false;
@@ -327,8 +341,8 @@ export const tv = (options, configProp) => {
         }
 
         if (isValid) {
-          tvClass && result.push(tvClass);
-          tvClassName && result.push(tvClassName);
+          if (tvClass) result.push(tvClass);
+          if (tvClassName) result.push(tvClassName);
         }
       }
 
@@ -338,20 +352,19 @@ export const tv = (options, configProp) => {
     const getCompoundVariantClassNamesBySlot = (slotProps) => {
       const compoundClassNames = getCompoundVariantsValue(compoundVariants, slotProps);
 
-      if (!Array.isArray(compoundClassNames)) {
-        return compoundClassNames;
-      }
+      if (!Array.isArray(compoundClassNames)) return compoundClassNames;
 
       const result = {};
+      const cnFn = cn;
 
-      for (const className of compoundClassNames) {
+      for (let i = 0; i < compoundClassNames.length; i++) {
+        const className = compoundClassNames[i];
+
         if (typeof className === "string") {
-          result.base = cn(result.base, className)(config);
-        }
-
-        if (typeof className === "object") {
-          for (const [slot, slotClassName] of Object.entries(className)) {
-            result[slot] = cn(result[slot], slotClassName)(config);
+          result.base = cnFn(result.base, className)(config);
+        } else if (typeof className === "object") {
+          for (const slot in className) {
+            result[slot] = cnFn(result[slot], className[slot])(config);
           }
         }
       }
@@ -360,42 +373,44 @@ export const tv = (options, configProp) => {
     };
 
     const getCompoundSlotClassNameBySlot = (slotProps) => {
-      if (compoundSlots.length < 1) {
-        return null;
-      }
+      if (compoundSlots.length < 1) return null;
 
       const result = {};
+      const completeProps = getCompleteProps(null, slotProps);
 
-      for (const {
-        slots = [],
-        class: slotClass,
-        className: slotClassName,
-        ...slotVariants
-      } of compoundSlots) {
+      for (let i = 0; i < compoundSlots.length; i++) {
+        const {
+          slots = [],
+          class: slotClass,
+          className: slotClassName,
+          ...slotVariants
+        } = compoundSlots[i];
+
         if (!isEmptyObject(slotVariants)) {
           let isValid = true;
 
-          for (const key of Object.keys(slotVariants)) {
-            const completePropsValue = getCompleteProps(key, slotProps)[key];
+          for (const key in slotVariants) {
+            const completePropsValue = completeProps[key];
+            const slotVariantValue = slotVariants[key];
 
             if (
               completePropsValue === undefined ||
-              (Array.isArray(slotVariants[key])
-                ? !slotVariants[key].includes(completePropsValue)
-                : slotVariants[key] !== completePropsValue)
+              (Array.isArray(slotVariantValue)
+                ? !slotVariantValue.includes(completePropsValue)
+                : slotVariantValue !== completePropsValue)
             ) {
               isValid = false;
               break;
             }
           }
 
-          if (!isValid) {
-            continue;
-          }
+          if (!isValid) continue;
         }
 
-        for (const slotName of slots) {
-          result[slotName] = result[slotName] || [];
+        for (let j = 0; j < slots.length; j++) {
+          const slotName = slots[j];
+
+          if (!result[slotName]) result[slotName] = [];
           result[slotName].push([slotClass, slotClassName]);
         }
       }
@@ -408,16 +423,22 @@ export const tv = (options, configProp) => {
       const slotsFns = {};
 
       if (typeof slots === "object" && !isEmptyObject(slots)) {
-        for (const slotKey of Object.keys(slots)) {
-          slotsFns[slotKey] = (slotProps) =>
-            cn(
+        const cnFn = cn;
+
+        for (const slotKey in slots) {
+          slotsFns[slotKey] = (slotProps) => {
+            const compoundVariantClasses = getCompoundVariantClassNamesBySlot(slotProps);
+            const compoundSlotClasses = getCompoundSlotClassNameBySlot(slotProps);
+
+            return cnFn(
               slots[slotKey],
               getVariantClassNamesBySlotKey(slotKey, slotProps),
-              (getCompoundVariantClassNamesBySlot(slotProps) ?? [])[slotKey],
-              (getCompoundSlotClassNameBySlot(slotProps) ?? [])[slotKey],
+              compoundVariantClasses ? compoundVariantClasses[slotKey] : undefined,
+              compoundSlotClasses ? compoundSlotClasses[slotKey] : undefined,
               slotProps?.class,
               slotProps?.className,
             )(config);
+          };
         }
       }
 

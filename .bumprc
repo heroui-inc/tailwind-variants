@@ -1,0 +1,8 @@
+{
+  "commit": true,
+  "confirm": true,
+  "push": true,
+  "tag": true,
+  "release": "prompt",
+  "all": true
+}
