@@ -2,6 +2,10 @@
 
 
 
+# [2.0.0](https://github.com/heroui-inc/tailwind-variants/compare/v1.0.0...v2.0.0) (2025-07-27)
+
+
+
 # Changelog
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
