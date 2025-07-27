@@ -1,5 +1,4 @@
 import {twMerge as twMergeBase, extendTailwindMerge} from "tailwind-merge";
-
 import {isEmptyObject} from "./utils.js";
 
 export const createTwMerge = (cachedTwMergeConfig) => {
