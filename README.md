@@ -44,7 +44,21 @@ For full documentation, visit [tailwind-variants.org](https://tailwind-variants.
 yarn add tailwind-variants
 # or
 npm i tailwind-variants
+# or
+pnpm add tailwind-variants
 ```
+
+**Optional:** If you want automatic conflict resolution, also install `tailwind-merge`:
+
+```bash
+yarn add tailwind-merge
+# or
+npm i tailwind-merge
+# or
+pnpm add tailwind-merge
+```
+
+> **⚠️ Upgrading from v1?** Please read the [migration guide](./MIGRATION-V2.md) for breaking changes and performance improvements.
 
 2. Usage:
 
