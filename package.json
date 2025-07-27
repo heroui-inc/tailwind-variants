@@ -99,6 +99,7 @@
     "node": ">=16.x",
     "pnpm": ">=7.x"
   },
+  "packageManager": "pnpm@10.3.0",
   "module": "dist/index.js",
   "exports": {
     ".": {
