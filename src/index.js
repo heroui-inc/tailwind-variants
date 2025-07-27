@@ -1,5 +1,3 @@
-import {twMerge as twMergeBase, extendTailwindMerge} from "tailwind-merge";
-
 import {
   isEqual,
   isEmptyObject,
@@ -23,6 +21,7 @@ export const cnBase = (...classes) => voidEmpty(flatArray(classes).filter(Boolea
 let cachedTwMerge = null;
 let cachedTwMergeConfig = {};
 let didTwMergeConfigChange = false;
+let twMergeModule = null;
 
 export const cn =
   (...classes) =>
@@ -33,20 +32,16 @@ export const cn =
 
     if (!cachedTwMerge || didTwMergeConfigChange) {
       didTwMergeConfigChange = false;
-      cachedTwMerge = isEmptyObject(cachedTwMergeConfig)
-        ? twMergeBase
-        : extendTailwindMerge({
-            ...cachedTwMergeConfig,
-            extend: {
-              // Support for legacy tailwind-merge config shape
-              theme: cachedTwMergeConfig.theme,
-              classGroups: cachedTwMergeConfig.classGroups,
-              conflictingClassGroupModifiers: cachedTwMergeConfig.conflictingClassGroupModifiers,
-              conflictingClassGroups: cachedTwMergeConfig.conflictingClassGroups,
-              // Support for new tailwind-merge config shape
-              ...cachedTwMergeConfig.extend,
-            },
-          });
+
+      // Lazy load the tailwind-merge functionality
+      // This ensures it's only loaded when twMerge is true
+      if (!twMergeModule) {
+        // Use dynamic import to load the module only when needed
+        // Bundlers will create a separate chunk for this
+        twMergeModule = require("./cn.js");
+      }
+
+      cachedTwMerge = twMergeModule.createTwMerge(cachedTwMergeConfig);
     }
 
     return voidEmpty(cachedTwMerge(cnBase(classes)));
