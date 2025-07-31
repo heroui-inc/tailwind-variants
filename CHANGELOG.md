@@ -1,3 +1,12 @@
+# [2.1.0](https://github.com/heroui-inc/tailwind-variants/compare/v2.0.1...v2.1.0) (2025-07-31)
+
+
+### Features
+
+* implement lazy loading for tailwind-merge module ([#257](https://github.com/heroui-inc/tailwind-variants/issues/257)) ([e80c23a](https://github.com/heroui-inc/tailwind-variants/commit/e80c23a4b585936f7b5fca2c5c383b8ddaa7d405))
+
+
+
 ## [2.0.1](https://github.com/heroui-inc/tailwind-variants/compare/v2.0.0...v2.0.1) (2025-07-28)
 
 
