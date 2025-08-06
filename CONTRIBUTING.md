@@ -24,7 +24,7 @@ Welcome, and thanks for your interest in contributing! Please take a moment to r
 ### Scripts
 
 - `pnpm build` – production build
-- `pnpm check` – type checks
+- `pnpm typecheck` – type checks
 - `pnpm test` – runs jest, watching for file changes
 
 ### Commit Convention
