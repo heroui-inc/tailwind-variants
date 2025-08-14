@@ -1156,6 +1156,7 @@ describe("Tailwind Variants (TV) - Slots", () => {
             base: "color--secondary-base",
             title: "color--secondary-title",
           },
+          tertiary: {},
         },
       },
       compoundVariants: [
@@ -1163,6 +1164,16 @@ describe("Tailwind Variants (TV) - Slots", () => {
           color: "secondary",
           class: {
             title: "truncate",
+          },
+        },
+        {
+          color: "tertiary",
+          class: ["color--tertiary-base"],
+        },
+        {
+          color: "tertiary",
+          class: {
+            title: "color--tertiary-title",
           },
         },
       ],
@@ -1181,6 +1192,8 @@ describe("Tailwind Variants (TV) - Slots", () => {
       "color--secondary-title",
       "truncate",
     ]);
+    expect(base({color: "tertiary"})).toHaveClass(["text-3xl", "color--tertiary-base"]);
+    expect(title({color: "tertiary"})).toHaveClass(["text-2xl", "color--tertiary-title"]);
   });
 });
 

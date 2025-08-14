@@ -360,7 +360,7 @@ export const tv = (options, configProp) => {
       for (let i = 0; i < compoundClassNames.length; i++) {
         const className = compoundClassNames[i];
 
-        if (typeof className === "string") {
+        if (typeof className === "string" || Array.isArray(className)) {
           result.base = cnFn(result.base, className)(config);
         } else if (typeof className === "object") {
           for (const slot in className) {
