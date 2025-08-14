@@ -1,9 +1,15 @@
-import {expect, describe, test} from "@jest/globals";
+import {expect, describe, test, jest} from "@jest/globals";
 
-import {tv} from "../index";
+import {tv as tvFull} from "../index";
+import {tv as tvLite} from "../lite";
 
-describe("Tailwind Variants (TV) - twMerge: false", () => {
-  test("should not resolve tailwind conflicts when twMerge is false", () => {
+const variants = [
+  {name: "full - tailwind-merge", tv: tvFull, mode: "full"},
+  {name: "lite - without tailwind-merge", tv: tvLite, mode: "lite"},
+];
+
+describe.each(variants)("Tailwind Variants (TV) - twMerge: false - $name", ({tv}) => {
+  test("should keep all classes including conflicting ones when twMerge is false", () => {
     const button = tv(
       {
         base: "px-4 px-2 py-2 py-4 bg-blue-500 bg-red-500",

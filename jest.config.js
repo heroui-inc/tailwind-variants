@@ -8,7 +8,7 @@ const config = {
   transform: {
     "^.+\\.(t|j)sx?$": "@swc/jest",
   },
-  setupFilesAfterEnv: ["<rootDir>/setupTests.ts"],
+  setupFilesAfterEnv: ["<rootDir>/../setupTests.ts"],
   extensionsToTreatAsEsm: [".ts"],
 };
 
