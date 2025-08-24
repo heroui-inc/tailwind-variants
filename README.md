@@ -58,7 +58,14 @@ npm i tailwind-merge
 pnpm add tailwind-merge
 ```
 
-> **⚠️ Upgrading from v1?** Please read the [migration guide](./MIGRATION-V2.md) for breaking changes and performance improvements.
+> **💡 Lite mode (v3):** For smaller bundle size and faster runtime without conflict resolution, use the `/lite` import:
+> ```js
+> import {tv} from "tailwind-variants/lite";
+> ```
+
+> **⚠️ Upgrading?** 
+> - From v2 to v3: See the [v3 migration guide](./MIGRATION-V3.md)
+> - From v1 to v2: See the [v2 migration guide](./MIGRATION-V2.md)
 
 2. Usage:
 
