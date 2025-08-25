@@ -1,3 +1,12 @@
+# [3.0.0](https://github.com/heroui-inc/tailwind-variants/compare/v2.1.0...v3.0.0) (2025-08-24)
+
+
+### Features
+
+* split tv into original and lite versions  ([#264](https://github.com/heroui-inc/tailwind-variants/issues/264)) ([0eb65ba](https://github.com/heroui-inc/tailwind-variants/commit/0eb65bab81842f27dc9fc09c04f12eb2b5584cc9))
+
+
+
 # [2.1.0](https://github.com/heroui-inc/tailwind-variants/compare/v2.0.1...v2.1.0) (2025-07-31)
 
 

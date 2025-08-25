@@ -19,3 +19,5 @@ export type TWMConfig = {
 };
 
 export type TVConfig = TWMConfig;
+
+export declare const defaultConfig: TVConfig;

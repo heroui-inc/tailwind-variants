@@ -1195,6 +1195,31 @@ describe("Tailwind Variants (TV) - Slots", () => {
     expect(base({color: "tertiary"})).toHaveClass(["text-3xl", "color--tertiary-base"]);
     expect(title({color: "tertiary"})).toHaveClass(["text-2xl", "color--tertiary-title"]);
   });
+
+  test("should work with native prototype", () => {
+    const avatar = tv({
+      slots: {
+        concat: "bg-white",
+        link: "cursor-pointer",
+        map: "bg-black",
+      },
+      variants: {
+        size: {
+          md: {
+            concat: "size-10",
+            link: "size-10",
+            map: "size-10",
+          },
+        },
+      },
+    });
+
+    const {concat, link, map} = avatar({size: "md"});
+
+    expect(concat()).toBe("bg-white size-10");
+    expect(link()).toBe("cursor-pointer size-10");
+    expect(map()).toBe("bg-black size-10");
+  });
 });
 
 describe("Tailwind Variants (TV) - Compound Slots", () => {
