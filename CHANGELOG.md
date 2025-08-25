@@ -1,3 +1,12 @@
+# [3.1.0](https://github.com/heroui-inc/tailwind-variants/compare/v3.0.0...v3.1.0) (2025-08-25)
+
+
+### Features
+
+* export config types ([#267](https://github.com/heroui-inc/tailwind-variants/issues/267)) ([5fd06fa](https://github.com/heroui-inc/tailwind-variants/commit/5fd06face1211a63b85b782f8948bb543ef66c9b))
+
+
+
 # [3.0.0](https://github.com/heroui-inc/tailwind-variants/compare/v2.1.0...v3.0.0) (2025-08-24)
 
 
