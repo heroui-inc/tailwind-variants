@@ -2,6 +2,7 @@ import {CnOptions, CnReturn, TVLite} from "./types";
 
 export * from "./types";
 
+// util function
 export declare const cnBase: <T extends CnOptions>(...classes: T) => CnReturn;
 
 export declare const cn: <T extends CnOptions>(...classes: T) => CnReturn;
