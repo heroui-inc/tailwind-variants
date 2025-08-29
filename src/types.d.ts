@@ -1,6 +1,5 @@
 import type {ClassNameValue as ClassValue} from "tailwind-merge";
-
-import {TVConfig} from "./config";
+import type {TVConfig} from "./config.d.ts";
 
 /**
  * ----------------------------------------
