@@ -1,7 +1,7 @@
-import {TVConfig, TWMConfig, TWMergeConfig} from "./config";
-import {CnOptions, CnReturn, TV} from "./types";
+import type {TVConfig, TWMConfig, TWMergeConfig} from "./config.d.ts";
+import type {CnOptions, CnReturn, TV} from "./types.d.ts";
 
-export * from "./types";
+export type * from "./types.d.ts";
 
 // util function
 export declare const cnBase: <T extends CnOptions>(...classes: T) => CnReturn;

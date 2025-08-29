@@ -1,5 +1,5 @@
-import {TWMConfig} from "./config";
-import {CnOptions, CnReturn} from "./types";
+import type {TWMConfig} from "./config.d.ts";
+import type {CnOptions, CnReturn} from "./types.d.ts";
 
 export declare const falsyToString: <T>(value: T) => T | string;
 

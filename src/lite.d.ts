@@ -1,6 +1,6 @@
-import {CnOptions, CnReturn, TVLite} from "./types";
+import type {CnOptions, CnReturn, TVLite} from "./types.d.ts";
 
-export * from "./types";
+export type * from "./types.d.ts";
 
 // util function
 export declare const cnBase: <T extends CnOptions>(...classes: T) => CnReturn;
