@@ -1,3 +1,12 @@
+## [3.1.1](https://github.com/heroui-inc/tailwind-variants/compare/v3.1.0...v3.1.1) (2025-09-08)
+
+
+### Bug Fixes
+
+* use 'type' for type-only imports and specify file extensions ([#272](https://github.com/heroui-inc/tailwind-variants/issues/272)) ([58aa71e](https://github.com/heroui-inc/tailwind-variants/commit/58aa71eaf1e9d9cf4954fad786b3b8e9e36775ca))
+
+
+
 # [3.1.0](https://github.com/heroui-inc/tailwind-variants/compare/v3.0.0...v3.1.0) (2025-08-25)
 
 
