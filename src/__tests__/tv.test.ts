@@ -2628,3 +2628,244 @@ describe("Tailwind Variants (TV) - Tailwind Merge", () => {
     expect(result).toHaveClass(["text-medium", "text-blue-500", "w-unit-4"]);
   });
 });
+
+describe("Tailwind Variants (TV) - Required Variants", () => {
+  test("should throw error when required variant is not provided", () => {
+    const button = tv({
+      base: "font-semibold border border-blue-500 text-blue-500 hover:bg-blue-500 hover:text-white",
+      variants: {
+        intent: {
+          primary: "bg-blue-500 text-white border-transparent hover:bg-blue-600",
+          secondary: "bg-white text-blue-500 border-blue-500 hover:bg-blue-500 hover:text-white",
+        },
+        size: {
+          small: "text-sm px-2 py-1",
+          medium: "text-base px-4 py-2",
+          large: "text-lg px-6 py-3",
+        },
+      },
+      requiredVariants: ["intent", "size"] as const,
+    });
+
+    // Should throw when intent is missing
+    // @ts-expect-error - Testing runtime error with missing required variant
+    expect(() => button({size: "small"})).toThrow(
+      'Missing required variant: "intent". This variant must be provided.',
+    );
+
+    // Should throw when size is missing
+    // @ts-expect-error - Testing runtime error with missing required variant
+    expect(() => button({intent: "primary"})).toThrow(
+      'Missing required variant: "size". This variant must be provided.',
+    );
+
+    // Should throw when both are missing
+    expect(() => button()).toThrow(
+      'Missing required variant: "intent". This variant must be provided.',
+    );
+  });
+
+  test("should work correctly when all required variants are provided", () => {
+    const button = tv({
+      base: "font-semibold border border-blue-500 text-blue-500 hover:bg-blue-500 hover:text-white",
+      variants: {
+        intent: {
+          primary: "bg-blue-500 text-white border-transparent hover:bg-blue-600",
+          secondary: "bg-white text-blue-500 border-blue-500 hover:bg-blue-500 hover:text-white",
+        },
+        size: {
+          small: "text-sm px-2 py-1",
+          medium: "text-base px-4 py-2",
+          large: "text-lg px-6 py-3",
+        },
+      },
+      requiredVariants: ["intent", "size"] as const,
+    });
+
+    const expectedResult =
+      "font-semibold border hover:text-white bg-blue-500 text-white border-transparent hover:bg-blue-600 text-base px-4 py-2";
+    const result = button({intent: "primary", size: "medium"});
+
+    expect(result).toBe(expectedResult);
+  });
+
+  test("should work with defaultVariants for required variants", () => {
+    const button = tv({
+      base: "font-semibold border",
+      variants: {
+        intent: {
+          primary: "bg-blue-500 text-white",
+          secondary: "bg-white text-blue-500",
+        },
+        size: {
+          small: "text-sm px-2 py-1",
+          medium: "text-base px-4 py-2",
+        },
+      },
+      defaultVariants: {
+        intent: "primary",
+        size: "medium",
+      },
+      requiredVariants: ["intent"] as const,
+    });
+
+    const expectedResult1 = "font-semibold border bg-white text-blue-500 text-base px-4 py-2";
+    const result1 = button({intent: "secondary"});
+
+    expect(result1).toBe(expectedResult1);
+
+    // Should still throw when required variant is not provided, even with default
+    expect(() => button()).toThrow(
+      'Missing required variant: "intent". This variant must be provided.',
+    );
+  });
+
+  test("should work with slots and required variants", () => {
+    const card = tv({
+      slots: {
+        base: "rounded-lg border shadow-md",
+        header: "p-4 border-b",
+        body: "p-4",
+        footer: "p-4 border-t bg-gray-50",
+      },
+      variants: {
+        size: {
+          small: {
+            base: "max-w-sm",
+            header: "p-2",
+            body: "p-2",
+            footer: "p-2",
+          },
+          large: {
+            base: "max-w-4xl",
+            header: "p-6",
+            body: "p-6",
+            footer: "p-6",
+          },
+        },
+      },
+      requiredVariants: ["size"] as const,
+    });
+
+    // Should throw when required variant is missing
+    expect(() => card()).toThrow(
+      'Missing required variant: "size". This variant must be provided.',
+    );
+
+    const {base, header, body, footer} = card({size: "small"});
+
+    expect(base()).toBe("rounded-lg border shadow-md max-w-sm");
+    expect(header()).toBe("border-b p-2");
+    expect(body()).toBe("p-2");
+    expect(footer()).toBe("border-t bg-gray-50 p-2");
+  });
+
+  test("should work without required variants", () => {
+    const button = tv({
+      base: "font-semibold",
+      variants: {
+        intent: {
+          primary: "bg-blue-500 text-white",
+          secondary: "bg-white text-blue-500",
+        },
+      },
+    });
+
+    const expectedResult1 = "font-semibold";
+    const result1 = button();
+
+    expect(result1).toBe(expectedResult1);
+
+    const expectedResult2 = "font-semibold bg-blue-500 text-white";
+    const result2 = button({intent: "primary"});
+
+    expect(result2).toBe(expectedResult2);
+  });
+
+  test("should throw error if requiredVariants is not an array", () => {
+    expect(() =>
+      tv({
+        base: "font-semibold",
+        variants: {
+          intent: {
+            primary: "bg-blue-500",
+          },
+        },
+        // @ts-expect-error - testing runtime validation
+        requiredVariants: "intent",
+      })(),
+    ).toThrow('The "requiredVariants" prop must be an array. Received: string');
+
+    expect(() =>
+      tv({
+        base: "font-semibold",
+        variants: {
+          intent: {
+            primary: "bg-blue-500",
+          },
+        },
+        // @ts-expect-error - testing runtime validation
+        requiredVariants: {intent: true},
+      })(),
+    ).toThrow('The "requiredVariants" prop must be an array. Received: object');
+  });
+
+  test("should expose requiredVariants on component", () => {
+    const button = tv({
+      base: "font-semibold",
+      variants: {
+        intent: {
+          primary: "bg-blue-500",
+          secondary: "bg-white",
+        },
+        size: {
+          small: "text-sm",
+          large: "text-lg",
+        },
+      },
+      requiredVariants: ["intent"] as const,
+    });
+
+    expect(button.requiredVariants).toEqual(["intent"]);
+  });
+
+  test("should work with extend and required variants", () => {
+    const baseButton = tv({
+      base: "font-semibold",
+      variants: {
+        intent: {
+          primary: "bg-blue-500",
+          secondary: "bg-white",
+        },
+      },
+      requiredVariants: ["intent"] as const,
+    });
+
+    const iconButton = tv({
+      extend: baseButton,
+      variants: {
+        size: {
+          small: "p-1",
+          large: "p-3",
+        },
+      },
+      requiredVariants: ["intent", "size"] as const,
+    });
+
+    // Should throw when required variants from extended component are missing
+    // @ts-expect-error - Testing runtime error with missing required variant
+    expect(() => iconButton({size: "small"})).toThrow(
+      'Missing required variant: "intent". This variant must be provided.',
+    );
+
+    // @ts-expect-error - Testing runtime error with missing required variant
+    expect(() => iconButton({intent: "primary"})).toThrow(
+      'Missing required variant: "size". This variant must be provided.',
+    );
+
+    const expectedResult = "font-semibold p-1 bg-blue-500";
+    const result = iconButton({intent: "primary", size: "small"});
+
+    expect(result).toBe(expectedResult);
+  });
+});
