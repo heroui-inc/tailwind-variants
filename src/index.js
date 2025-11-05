@@ -1,14 +1,9 @@
-import {twMerge as twMergeBase, extendTailwindMerge} from "tailwind-merge";
+import {getTailwindVariants} from "./core.js";
+import {cn} from "./tw-merge.js";
+import {cn as cnBase} from "./utils.js";
+import {defaultConfig} from "./config.js";
 
-import {
-  isEqual,
-  isEmptyObject,
-  falsyToString,
-  mergeObjects,
-  removeExtraSpaces,
-  flatMergeArrays,
-  flatArray,
-} from "./utils.js";
+export const {createTV, tv} = getTailwindVariants(cn);
 
 export const defaultConfig = {
   twMerge: true,

@@ -1,14 +1,24 @@
 {
   "remove": ["tsup", "packageManager"],
   "replace": {
-    "main": "dist/index.cjs",
-    "module": "dist/index.js",
-    "types": "dist/index.d.ts",
+    "main": "./dist/index.cjs",
+    "module": "./dist/index.js",
+    "types": "./dist/index.d.ts",
     "exports": {
       ".": {
-        "require": "./dist/index.cjs",
+        "types": "./dist/index.d.ts",
         "import": "./dist/index.js",
-        "types": "./dist/index.d.ts"
+        "require": "./dist/index.cjs"
+      },
+      "./lite": {
+        "types": "./dist/lite.d.ts",
+        "import": "./dist/lite.js",
+        "require": "./dist/lite.cjs"
+      },
+      "./utils": {
+        "types": "./dist/utils.d.ts",
+        "import": "./dist/utils.js",
+        "require": "./dist/utils.cjs"
       },
       "./dist/*": "./dist/*",
       "./package.json": "./package.json"

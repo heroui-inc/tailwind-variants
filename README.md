@@ -44,7 +44,28 @@ For full documentation, visit [tailwind-variants.org](https://tailwind-variants.
 yarn add tailwind-variants
 # or
 npm i tailwind-variants
+# or
+pnpm add tailwind-variants
 ```
+
+**Optional:** If you want automatic conflict resolution, also install `tailwind-merge`:
+
+```bash
+yarn add tailwind-merge
+# or
+npm i tailwind-merge
+# or
+pnpm add tailwind-merge
+```
+
+> **💡 Lite mode (v3):** For smaller bundle size and faster runtime without conflict resolution, use the `/lite` import:
+> ```js
+> import {tv} from "tailwind-variants/lite";
+> ```
+
+> **⚠️ Upgrading?** 
+> - From v2 to v3: See the [v3 migration guide](./MIGRATION-V3.md)
+> - From v1 to v2: See the [v2 migration guide](./MIGRATION-V2.md)
 
 2. Usage:
 
