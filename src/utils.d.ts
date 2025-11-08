@@ -1,4 +1,3 @@
-import type {TWMConfig} from "./config.d.ts";
 import type {CnOptions, CnReturn} from "./types.d.ts";
 
 export declare const falsyToString: <T>(value: T) => T | string;
@@ -30,4 +29,4 @@ export declare const joinObjects: <
 
 export declare const flat: <T>(arr: unknown[], target: T[]) => void;
 
-export declare const cn: <T extends CnOptions>(...classes: T) => (config?: TWMConfig) => CnReturn;
+export declare const cx: <T extends CnOptions>(...classes: T) => CnReturn;

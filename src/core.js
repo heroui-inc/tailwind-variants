@@ -6,7 +6,7 @@ import {
   removeExtraSpaces,
   flatMergeArrays,
   joinObjects,
-  cn as cnBase,
+  cx,
 } from "./utils.js";
 import {defaultConfig} from "./config.js";
 import {state} from "./state.js";
@@ -24,7 +24,7 @@ export const getTailwindVariants = (cn) => {
 
     const config = {...defaultConfig, ...configProp};
 
-    const base = extend?.base ? cnBase(extend.base, options?.base) : options?.base;
+    const base = extend?.base ? cx(extend.base, options?.base) : options?.base;
     const variants =
       extend?.variants && !isEmptyObject(extend.variants)
         ? mergeObjects(variantsProps, extend.variants)
@@ -47,7 +47,7 @@ export const getTailwindVariants = (cn) => {
     const componentSlots = !isEmptyObject(slotProps)
       ? {
           // add "base" to the slots object
-          base: cnBase(options?.base, isExtendedSlotsEmpty && extend?.base),
+          base: cx(options?.base, isExtendedSlotsEmpty && extend?.base),
           ...slotProps,
         }
       : {};

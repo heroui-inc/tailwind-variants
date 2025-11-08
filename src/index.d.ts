@@ -4,7 +4,7 @@ import type {CnOptions, CnReturn, TV} from "./types.d.ts";
 export type * from "./types.d.ts";
 
 // util function
-export declare const cnBase: <T extends CnOptions>(...classes: T) => CnReturn;
+export declare const cx: <T extends CnOptions>(...classes: T) => CnReturn;
 
 export declare const cn: <T extends CnOptions>(...classes: T) => (config?: TWMConfig) => CnReturn;
 
