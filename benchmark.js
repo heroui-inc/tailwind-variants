@@ -396,16 +396,7 @@ const nestedArrays = [
   "px-4",
   ["py-2", ["bg-blue-500", ["rounded-lg", false, ["shadow-md", ["text-white"]]]]],
 ];
-const withFalsy = [
-  "text-xl",
-  false && "font-bold",
-  "text-center",
-  undefined,
-  null,
-  0,
-  "",
-  "px-4",
-];
+const withFalsy = ["text-xl", false && "font-bold", "text-center", undefined, null, 0, "", "px-4"];
 
 // add tests
 suite
