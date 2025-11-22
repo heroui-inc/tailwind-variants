@@ -1,8 +1,8 @@
 import {getTailwindVariants} from "./core.js";
-import {cn} from "./tw-merge.js";
+import {cn, cnMerge} from "./tw-merge.js";
 import {cx} from "./utils.js";
 import {defaultConfig} from "./config.js";
 
-export const {createTV, tv} = getTailwindVariants(cn);
+export const {createTV, tv} = getTailwindVariants(cnMerge);
 
-export {cn, cx, defaultConfig};
+export {cn, cnMerge, cx, defaultConfig};

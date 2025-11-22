@@ -1,6 +1,6 @@
 import {expect, describe, test} from "@jest/globals";
 
-import {tv, cn} from "../index";
+import {tv, cnMerge} from "../index";
 
 const COMMON_UNITS = ["small", "medium", "large"];
 
@@ -2475,10 +2475,10 @@ describe("Tailwind Variants (TV) - Extends", () => {
     const tvResult = ["w-fit", "h-fit"];
     const custom = ["w-full"];
 
-    const resultWithoutMerge = cn(tvResult.concat(custom))({twMerge: false});
-    const resultWithMerge = cn(tvResult.concat(custom))({twMerge: true});
-    const emptyResultWithoutMerge = cn([].concat([]))({twMerge: false});
-    const emptyResultWithMerge = cn([].concat([]))({twMerge: true});
+    const resultWithoutMerge = cnMerge(tvResult.concat(custom))({twMerge: false});
+    const resultWithMerge = cnMerge(tvResult.concat(custom))({twMerge: true});
+    const emptyResultWithoutMerge = cnMerge([].concat([]))({twMerge: false});
+    const emptyResultWithMerge = cnMerge([].concat([]))({twMerge: true});
 
     expect(resultWithoutMerge).toBe("w-fit h-fit w-full");
     expect(resultWithMerge).toBe("h-fit w-full");

@@ -1,6 +1,6 @@
 import {expect, describe, test} from "@jest/globals";
 
-import {cn as cnWithMerge, cx as cxFull} from "../index";
+import {cn, cnMerge, cx as cxFull} from "../index";
 import {cn as cnLite, cx as cxLite} from "../lite";
 import {cx as cxUtils} from "../utils";
 
@@ -85,126 +85,182 @@ describe("cn function from lite (simple concatenation)", () => {
 });
 
 describe("cn function with tailwind-merge (main index)", () => {
-  test("should merge conflicting tailwind classes when twMerge is true", () => {
-    const result = cnWithMerge("px-2", "px-4", "py-2")({twMerge: true});
+  test("should merge conflicting tailwind classes by default", () => {
+    const result = cn("px-2", "px-4", "py-2");
 
     expect(result).toBe("px-4 py-2");
   });
 
-  test("should not merge classes when twMerge is false", () => {
-    const result = cnWithMerge("px-2", "px-4", "py-2")({twMerge: false});
-
-    expect(result).toBe("px-2 px-4 py-2");
-  });
-
-  test("should merge text color classes", () => {
-    const result = cnWithMerge("text-red-500", "text-blue-500")({twMerge: true});
+  test("should merge text color classes by default", () => {
+    const result = cn("text-red-500", "text-blue-500");
 
     expect(result).toBe("text-blue-500");
   });
 
-  test("should merge background color classes", () => {
-    const result = cnWithMerge("bg-red-500", "bg-blue-500")({twMerge: true});
+  test("should merge background color classes by default", () => {
+    const result = cn("bg-red-500", "bg-blue-500");
 
     expect(result).toBe("bg-blue-500");
   });
 
   test("should merge multiple conflicting classes", () => {
-    const result = cnWithMerge("px-2 py-1 text-sm", "px-4 py-2 text-lg")({twMerge: true});
+    const result = cn("px-2 py-1 text-sm", "px-4 py-2 text-lg");
 
     expect(result).toBe("px-4 py-2 text-lg");
   });
 
   test("should handle non-conflicting classes", () => {
-    const result = cnWithMerge("px-2", "py-2", "text-sm")({twMerge: true});
+    const result = cn("px-2", "py-2", "text-sm");
 
     expect(result).toBe("px-2 py-2 text-sm");
   });
 
   test("should return undefined when no classes provided", () => {
-    const result = cnWithMerge()({twMerge: true});
+    const result = cn();
 
     expect(result).toBeUndefined();
   });
 
   test("should handle arrays with tailwind-merge", () => {
-    const result = cnWithMerge(["px-2", "px-4"], "py-2")({twMerge: true});
+    const result = cn(["px-2", "px-4"], "py-2");
 
     expect(result).toBe("px-4 py-2");
   });
 
   test("should handle objects with tailwind-merge", () => {
-    const result = cnWithMerge({"px-2": true, "px-4": true, "py-2": true})({twMerge: true});
+    const result = cn({"px-2": true, "px-4": true, "py-2": true});
 
     expect(result).toBe("px-4 py-2");
   });
 
-  test("should merge when config is undefined (default behavior)", () => {
-    const result = cnWithMerge("px-2", "px-4")({twMerge: true});
+  test("should handle complex className with conditional object classes", () => {
+    const selectedZoom: string = "a";
+    const key: string = "b";
 
-    expect(result).toBe("px-4");
+    const result = cn(
+      "text-foreground ease-in-out-quad absolute left-1/2 top-1/2 origin-center -translate-x-1/2 -translate-y-1/2 scale-75 text-[21px] font-medium opacity-0 transition-[scale,opacity] duration-[300ms] ease-[cubic-bezier(0.33,1,0.68,1)] data-[selected=true]:scale-100 data-[selected=true]:opacity-100 data-[selected=true]:delay-200",
+      {
+        "sr-only": selectedZoom !== key,
+      },
+    );
+
+    expect(result).toContain("text-foreground");
+    expect(result).toContain("sr-only");
+    expect(typeof result).toBe("string");
   });
 
-  test("should merge classes by default when called directly without ()", () => {
-    const result = cnWithMerge("px-2", "px-4", "py-2");
+  test("should handle conditional object classes when condition is false", () => {
+    const selectedZoom: string = "a";
+    const key: string = "a";
 
-    // Should work as a string in template literals and string coercion
-    expect(String(result)).toBe("px-4 py-2");
-    expect(`${result}`).toBe("px-4 py-2");
+    const result = cn("text-xl font-bold", {
+      "sr-only": selectedZoom !== key,
+    });
+
+    expect(result).toBe("text-xl font-bold");
+    expect(result).not.toContain("sr-only");
   });
+});
 
-  test("should merge classes by default when no config is provided", () => {
-    const result = cnWithMerge("px-2", "px-4", "py-2")();
+describe("cnMerge function with tailwind-merge config", () => {
+  test("should merge conflicting tailwind classes when twMerge is true", () => {
+    const result = cnMerge("px-2", "px-4", "py-2")({twMerge: true});
 
     expect(result).toBe("px-4 py-2");
   });
 
-  test("should merge text color classes by default when called directly", () => {
-    const result = cnWithMerge("text-red-500", "text-blue-500");
-
-    expect(String(result)).toBe("text-blue-500");
-  });
-
-  test("should merge text color classes by default when no config is provided", () => {
-    const result = cnWithMerge("text-red-500", "text-blue-500")();
-
-    expect(result).toBe("text-blue-500");
-  });
-
-  test("should merge background color classes by default when called directly", () => {
-    const result = cnWithMerge("bg-red-500", "bg-blue-500");
-
-    expect(String(result)).toBe("bg-blue-500");
-  });
-
-  test("should merge background color classes by default when no config is provided", () => {
-    const result = cnWithMerge("bg-red-500", "bg-blue-500")();
-
-    expect(result).toBe("bg-blue-500");
-  });
-
-  test("should not merge classes when twMerge is explicitly false", () => {
-    const result = cnWithMerge("px-2", "px-4", "py-2")({twMerge: false});
+  test("should not merge classes when twMerge is false", () => {
+    const result = cnMerge("px-2", "px-4", "py-2")({twMerge: false});
 
     expect(result).toBe("px-2 px-4 py-2");
   });
 
-  test("should merge classes when twMerge is explicitly true (backward compatibility)", () => {
-    const result = cnWithMerge("px-2", "px-4", "py-2")({twMerge: true});
+  test("should merge text color classes", () => {
+    const result = cnMerge("text-red-500", "text-blue-500")({twMerge: true});
+
+    expect(result).toBe("text-blue-500");
+  });
+
+  test("should merge background color classes", () => {
+    const result = cnMerge("bg-red-500", "bg-blue-500")({twMerge: true});
+
+    expect(result).toBe("bg-blue-500");
+  });
+
+  test("should merge multiple conflicting classes", () => {
+    const result = cnMerge("px-2 py-1 text-sm", "px-4 py-2 text-lg")({twMerge: true});
+
+    expect(result).toBe("px-4 py-2 text-lg");
+  });
+
+  test("should handle non-conflicting classes", () => {
+    const result = cnMerge("px-2", "py-2", "text-sm")({twMerge: true});
+
+    expect(result).toBe("px-2 py-2 text-sm");
+  });
+
+  test("should return undefined when no classes provided", () => {
+    const result = cnMerge()({twMerge: true});
+
+    expect(result).toBeUndefined();
+  });
+
+  test("should handle arrays with tailwind-merge", () => {
+    const result = cnMerge(["px-2", "px-4"], "py-2")({twMerge: true});
 
     expect(result).toBe("px-4 py-2");
   });
 
-  test("should merge classes when config is empty object (defaults to true)", () => {
-    const result = cnWithMerge("px-2", "px-4", "py-2")({});
+  test("should handle objects with tailwind-merge", () => {
+    const result = cnMerge({"px-2": true, "px-4": true, "py-2": true})({twMerge: true});
+
+    expect(result).toBe("px-4 py-2");
+  });
+
+  test("should merge classes by default when no config is provided", () => {
+    const result = cnMerge("px-2", "px-4", "py-2")();
 
     expect(result).toBe("px-4 py-2");
   });
 
   test("should merge classes when config is undefined", () => {
-    const result = cnWithMerge("px-2", "px-4", "py-2")(undefined);
+    const result = cnMerge("px-2", "px-4", "py-2")(undefined);
 
     expect(result).toBe("px-4 py-2");
+  });
+
+  test("should merge classes when config is empty object (defaults to true)", () => {
+    const result = cnMerge("px-2", "px-4", "py-2")({});
+
+    expect(result).toBe("px-4 py-2");
+  });
+
+  test("should not merge classes when twMerge is explicitly false", () => {
+    const result = cnMerge("px-2", "px-4", "py-2")({twMerge: false});
+
+    expect(result).toBe("px-2 px-4 py-2");
+  });
+
+  test("should merge classes when twMerge is explicitly true", () => {
+    const result = cnMerge("px-2", "px-4", "py-2")({twMerge: true});
+
+    expect(result).toBe("px-4 py-2");
+  });
+
+  test("should handle complex className with conditional object classes", () => {
+    const selectedZoom: string = "a";
+    const key: string = "b";
+
+    const result = cnMerge(
+      "text-foreground ease-in-out-quad absolute left-1/2 top-1/2 origin-center -translate-x-1/2 -translate-y-1/2 scale-75 text-[21px] font-medium opacity-0 transition-[scale,opacity] duration-[300ms] ease-[cubic-bezier(0.33,1,0.68,1)] data-[selected=true]:scale-100 data-[selected=true]:opacity-100 data-[selected=true]:delay-200",
+      {
+        "sr-only": selectedZoom !== key,
+      },
+    )();
+
+    expect(result).toContain("text-foreground");
+    expect(result).toContain("sr-only");
+    expect(typeof result).toBe("string");
   });
 });
 

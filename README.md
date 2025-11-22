@@ -104,6 +104,59 @@ const button = tv({
 return <button className={button({size: "sm", color: "secondary"})}>Click me</button>;
 ```
 
+## Utility Functions
+
+Tailwind Variants provides several utility functions for combining and merging class names:
+
+### `cx` - Simple Concatenation
+
+Combines class names without merging conflicting classes (similar to `clsx`):
+
+```js
+import {cx} from "tailwind-variants";
+
+cx("text-xl", "font-bold"); // => "text-xl font-bold"
+cx("px-2", "px-4"); // => "px-2 px-4" (no merging)
+```
+
+### `cn` - Merge with Default Config
+
+> **Updated in v3.2.2** - Now returns a string directly (no function call needed)
+
+Combines class names and merges conflicting Tailwind CSS classes using the default `tailwind-merge` config. Returns a string directly:
+
+```js
+import {cn} from "tailwind-variants";
+
+cn("bg-red-500", "bg-blue-500"); // => "bg-blue-500"
+cn("px-2", "px-4", "py-2"); // => "px-4 py-2"
+```
+
+### `cnMerge` - Merge with Custom Config
+
+> **Available from v3.2.2**
+
+Combines class names and merges conflicting Tailwind CSS classes with support for custom `twMerge` configuration via a second function call:
+
+```js
+import {cnMerge} from "tailwind-variants";
+
+// Disable merging
+cnMerge("px-2", "px-4")({twMerge: false}) // => "px-2 px-4"
+
+// Enable merging explicitly
+cnMerge("bg-red-500", "bg-blue-500")({twMerge: true}) // => "bg-blue-500"
+
+// Use custom twMergeConfig
+cnMerge("px-2", "px-4")({twMergeConfig: {...}}) // => merged with custom config
+```
+
+**When to use which:**
+
+- Use `cx` when you want simple concatenation without any merging
+- Use `cn` for most cases when you want automatic conflict resolution with default settings
+- Use `cnMerge` when you need to customize the merge behavior (disable merging, custom config, etc.)
+
 ## Acknowledgements
 
 - [**cva**](https://github.com/joe-bell/cva) ([Joe Bell](https://github.com/joe-bell))
