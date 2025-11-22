@@ -5,7 +5,7 @@ export default defineConfig({
   format: ["cjs", "esm"],
   dts: false,
   clean: true,
-  minify: true,
+  minify: false,
   treeshake: true,
   splitting: true,
   external: ["tailwind-merge"],
