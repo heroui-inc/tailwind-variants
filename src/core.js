@@ -3,7 +3,6 @@ import {
   isEmptyObject,
   falsyToString,
   mergeObjects,
-  removeExtraSpaces,
   flatMergeArrays,
   joinObjects,
   cx,
@@ -82,48 +81,7 @@ export const getTailwindVariants = (cn) => {
         );
       }
 
-      const getScreenVariantValues = (screen, screenVariantValue, acc = [], slotKey) => {
-        let result = acc;
-
-        if (typeof screenVariantValue === "string") {
-          const cleaned = removeExtraSpaces(screenVariantValue);
-          const parts = cleaned.split(" ");
-
-          for (let i = 0; i < parts.length; i++) {
-            result.push(`${screen}:${parts[i]}`);
-          }
-        } else if (Array.isArray(screenVariantValue)) {
-          for (let i = 0; i < screenVariantValue.length; i++) {
-            result.push(`${screen}:${screenVariantValue[i]}`);
-          }
-        } else if (typeof screenVariantValue === "object" && typeof slotKey === "string") {
-          if (slotKey in screenVariantValue) {
-            const value = screenVariantValue[slotKey];
-
-            if (value && typeof value === "string") {
-              const fixedValue = removeExtraSpaces(value);
-              const parts = fixedValue.split(" ");
-              const arr = [];
-
-              for (let i = 0; i < parts.length; i++) {
-                arr.push(`${screen}:${parts[i]}`);
-              }
-              result[slotKey] = result[slotKey] ? result[slotKey].concat(arr) : arr;
-            } else if (Array.isArray(value) && value.length > 0) {
-              const arr = [];
-
-              for (let i = 0; i < value.length; i++) {
-                arr.push(`${screen}:${value[i]}`);
-              }
-              result[slotKey] = arr;
-            }
-          }
-        }
-
-        return result;
-      };
-
-      const getVariantValue = (variant, vrs = variants, slotKey = null, slotProps = null) => {
+      const getVariantValue = (variant, vrs = variants, _slotKey = null, slotProps = null) => {
         const variantObj = vrs[variant];
 
         if (!variantObj || isEmptyObject(variantObj)) {
@@ -136,66 +94,15 @@ export const getTailwindVariants = (cn) => {
 
         const variantKey = falsyToString(variantProp);
 
-        // responsive variants
-        const responsiveVarsEnabled =
-          (Array.isArray(config.responsiveVariants) && config.responsiveVariants.length > 0) ||
-          config.responsiveVariants === true;
-
-        let defaultVariantProp = defaultVariants?.[variant];
-        let screenValues = [];
-
-        if (typeof variantKey === "object" && responsiveVarsEnabled) {
-          for (const [screen, screenVariantKey] of Object.entries(variantKey)) {
-            const screenVariantValue = variantObj[screenVariantKey];
-
-            if (screen === "initial") {
-              defaultVariantProp = screenVariantKey;
-              continue;
-            }
-
-            // if the screen is not in the responsiveVariants array, skip it
-            if (
-              Array.isArray(config.responsiveVariants) &&
-              !config.responsiveVariants.includes(screen)
-            ) {
-              continue;
-            }
-
-            screenValues = getScreenVariantValues(
-              screen,
-              screenVariantValue,
-              screenValues,
-              slotKey,
-            );
-          }
+        // If variant key is an object (responsive variants), ignore it as they're no longer supported
+        if (typeof variantKey === "object") {
+          return null;
         }
 
-        // If there is a variant key and it's not an object (screen variants),
-        // we use the variant key and ignore the default variant.
-        const key =
-          variantKey != null && typeof variantKey != "object"
-            ? variantKey
-            : falsyToString(defaultVariantProp);
+        const defaultVariantProp = defaultVariants?.[variant];
+        const key = variantKey != null ? variantKey : falsyToString(defaultVariantProp);
 
         const value = variantObj[key || "false"];
-
-        if (
-          typeof screenValues === "object" &&
-          typeof slotKey === "string" &&
-          screenValues[slotKey]
-        ) {
-          return joinObjects(screenValues, value);
-        }
-
-        if (screenValues.length > 0) {
-          screenValues.push(value);
-
-          if (slotKey === "base") {
-            return screenValues.join(" ");
-          }
-
-          return screenValues;
-        }
 
         return value;
       };

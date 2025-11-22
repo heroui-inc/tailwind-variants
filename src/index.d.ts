@@ -101,5 +101,23 @@ export declare const tv: TV;
  */
 export declare function createTV(config: TVConfig): TV;
 
+/**
+ * Default configuration object for tailwind-variants.
+ * Can be modified to set global defaults for all components.
+ * @example
+ * ```ts
+ * import { defaultConfig } from "tailwind-variants";
+ *
+ * defaultConfig.twMergeConfig = {
+ *   extend: {
+ *     theme: {
+ *       spacing: ["medium", "large"],
+ *     },
+ *   },
+ * };
+ * ```
+ */
+export declare const defaultConfig: TVConfig;
+
 // types
 export type {TVConfig, TWMConfig, TWMergeConfig};

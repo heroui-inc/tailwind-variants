@@ -331,8 +331,6 @@ export type TVLite = {
   }): TVReturnType<V, S, B, EV, ES, E>;
 };
 
-export declare const defaultConfig: TVConfig;
-
 export type VariantProps<Component extends (...args: any) => any> = Omit<
   OmitUndefined<Parameters<Component>[0]>,
   "class" | "className"
