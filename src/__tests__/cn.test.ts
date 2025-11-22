@@ -24,9 +24,9 @@ describe("cn function from lite (simple concatenation)", () => {
   });
 
   test("should handle nested arrays", () => {
-    expect(cnLite(["px-4", ["py-2", ["bg-blue-500", ["rounded-lg", false, ["shadow-md"]]]]])()).toBe(
-      "px-4 py-2 bg-blue-500 rounded-lg shadow-md",
-    );
+    expect(
+      cnLite(["px-4", ["py-2", ["bg-blue-500", ["rounded-lg", false, ["shadow-md"]]]]])(),
+    ).toBe("px-4 py-2 bg-blue-500 rounded-lg shadow-md");
   });
 
   test("should join objects with truthy values as keys", () => {
@@ -145,16 +145,36 @@ describe("cn function with tailwind-merge (main index)", () => {
     expect(result).toBe("px-4");
   });
 
+  test("should merge classes by default when called directly without ()", () => {
+    const result = cnWithMerge("px-2", "px-4", "py-2");
+
+    // Should work as a string in template literals and string coercion
+    expect(String(result)).toBe("px-4 py-2");
+    expect(`${result}`).toBe("px-4 py-2");
+  });
+
   test("should merge classes by default when no config is provided", () => {
     const result = cnWithMerge("px-2", "px-4", "py-2")();
 
     expect(result).toBe("px-4 py-2");
   });
 
+  test("should merge text color classes by default when called directly", () => {
+    const result = cnWithMerge("text-red-500", "text-blue-500");
+
+    expect(String(result)).toBe("text-blue-500");
+  });
+
   test("should merge text color classes by default when no config is provided", () => {
     const result = cnWithMerge("text-red-500", "text-blue-500")();
 
     expect(result).toBe("text-blue-500");
+  });
+
+  test("should merge background color classes by default when called directly", () => {
+    const result = cnWithMerge("bg-red-500", "bg-blue-500");
+
+    expect(String(result)).toBe("bg-blue-500");
   });
 
   test("should merge background color classes by default when no config is provided", () => {

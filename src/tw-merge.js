@@ -19,7 +19,7 @@ export const createTwMerge = (cachedTwMergeConfig) => {
 };
 
 export const cn = (...classnames) => {
-  return (config) => {
+  const execute = (config) => {
     const base = cx(classnames);
 
     if (!base || !(config?.twMerge ?? true)) return base;
@@ -32,4 +32,39 @@ export const cn = (...classnames) => {
 
     return state.cachedTwMerge(base) || undefined;
   };
+
+  // Execute immediately with default config
+  const defaultResult = execute({});
+
+  // Create a function that can be called with config
+  const fn = (config) => execute(config);
+
+  // Make the function work as both a function and a value
+  // When used directly (e.g., in template literals), return the default result
+  // When called as a function, execute with the provided config
+  return new Proxy(fn, {
+    apply(target, thisArg, args) {
+      // Called as function: fn() or fn(config)
+      return target(...args);
+    },
+    get(target, prop) {
+      if (prop === Symbol.toPrimitive) {
+        return (hint) => {
+          if (hint === "string" || hint === "default") {
+            return defaultResult ?? "";
+          }
+
+          return defaultResult;
+        };
+      }
+      if (prop === "valueOf") {
+        return () => defaultResult;
+      }
+      if (prop === "toString") {
+        return () => String(defaultResult ?? "");
+      }
+
+      return target[prop];
+    },
+  });
 };

@@ -24,15 +24,19 @@ export declare const cx: <T extends CnOptions>(...classes: T) => CnReturn;
 /**
  * Combines class names and merges conflicting Tailwind CSS classes using `tailwind-merge`.
  * @param classes - Class names to combine (strings, arrays, objects, etc.)
- * @param config - Optional configuration object. When not provided or when `twMerge` is not specified, it defaults to `true`.
- * @returns A function that accepts an optional config and returns the merged class string or undefined
+ * @returns A callable function that returns the merged class string. Works directly in template literals (coerces to string) or can be called with optional config.
  * @example
  * ```ts
- * // twMerge defaults to true - no config needed
+ * // twMerge defaults to true - works directly in template literals
+ * `${cn('bg-red-500', 'bg-blue-500')}` // => 'bg-blue-500'
+ * String(cn('bg-red-500', 'bg-blue-500')) // => 'bg-blue-500'
+ *
+ * // Can still be called with config for explicit control
  * cn('bg-red-500', 'bg-blue-500')() // => 'bg-blue-500'
  *
- * // Explicitly disable twMerge
- * cn('bg-red-500', 'bg-blue-500')({ twMerge: false }) // => 'bg-red-500 bg-blue-500'
+ * // Note: If you need simple concatenation without merging, use `cx` instead:
+ * // Instead of: cn('bg-red-500', 'bg-blue-500')({ twMerge: false })
+ * // Use: cx('bg-red-500', 'bg-blue-500') // => 'bg-red-500 bg-blue-500'
  * ```
  */
 export declare const cn: <T extends CnOptions>(...classes: T) => (config?: TWMConfig) => CnReturn;
