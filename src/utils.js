@@ -6,7 +6,8 @@ export const removeExtraSpaces = (str) => {
   return str.replace(SPACE_REGEX, " ").trim();
 };
 
-export const cn = (...classnames) => {
+// cx - simple class name concatenation (like clsx)
+export const cx = (...classnames) => {
   const classList = [];
 
   // recursively process input
@@ -87,7 +88,7 @@ export const joinObjects = (obj1, obj2) => {
       const val2 = obj2[key];
 
       if (key in obj1) {
-        obj1[key] = cn(obj1[key], val2);
+        obj1[key] = cx(obj1[key], val2);
       } else {
         obj1[key] = val2;
       }

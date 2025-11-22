@@ -3,7 +3,7 @@ import Benchmark from "benchmark";
 import {cva} from "class-variance-authority";
 import {extendTailwindMerge} from "tailwind-merge";
 
-import {tv} from "./src/index.js";
+import {tv, cx, cn} from "./src/index.js";
 
 const suite = new Benchmark.Suite();
 
@@ -375,6 +375,38 @@ const cvaNoMerge = {
 
 const cvaMerge = extendTailwindMerge({extend: twMergeConfig});
 
+// Test data for cx benchmarks
+const simpleClasses = ["text-xl", "font-bold", "text-center", "px-4", "py-2"];
+const arrayClasses = [["px-4", "py-2"], "bg-blue-500", ["rounded-lg", "shadow-md"]];
+const objectClasses = {
+  "text-sm": true,
+  "font-bold": false,
+  "bg-green-200": 1,
+  "m-0": 0,
+  "px-2": true,
+  "py-2": true,
+};
+const mixedClasses = [
+  "text-lg",
+  ["px-3", {"hover:bg-yellow-300": true, "focus:outline-none": false}],
+  {"rounded-md": true, "shadow-md": null},
+  "leading-tight",
+];
+const nestedArrays = [
+  "px-4",
+  ["py-2", ["bg-blue-500", ["rounded-lg", false, ["shadow-md", ["text-white"]]]]],
+];
+const withFalsy = [
+  "text-xl",
+  false && "font-bold",
+  "text-center",
+  undefined,
+  null,
+  0,
+  "",
+  "px-4",
+];
+
 // add tests
 suite
   .add("TV without slots & tw-merge (enabled)", function () {
@@ -422,6 +454,45 @@ suite
     cvaNoMerge.avatar({size: "md"});
     cvaNoMerge.fallback();
     cvaNoMerge.image();
+  })
+  .add("cx - simple strings", function () {
+    cx(...simpleClasses);
+  })
+  .add("cx - arrays", function () {
+    cx(...arrayClasses);
+  })
+  .add("cx - objects", function () {
+    cx(objectClasses);
+  })
+  .add("cx - mixed arguments", function () {
+    cx(...mixedClasses);
+  })
+  .add("cx - nested arrays", function () {
+    cx(...nestedArrays);
+  })
+  .add("cx - with falsy values", function () {
+    cx(...withFalsy);
+  })
+  .add("cn - simple strings (with tw-merge)", function () {
+    cn(...simpleClasses)({twMerge: true});
+  })
+  .add("cn - arrays (with tw-merge)", function () {
+    cn(...arrayClasses)({twMerge: true});
+  })
+  .add("cn - objects (with tw-merge)", function () {
+    cn(objectClasses)({twMerge: true});
+  })
+  .add("cn - mixed arguments (with tw-merge)", function () {
+    cn(...mixedClasses)({twMerge: true});
+  })
+  .add("cn - nested arrays (with tw-merge)", function () {
+    cn(...nestedArrays)({twMerge: true});
+  })
+  .add("cn - with falsy values (with tw-merge)", function () {
+    cn(...withFalsy)({twMerge: true});
+  })
+  .add("cn - simple strings (without tw-merge)", function () {
+    cn(...simpleClasses)({twMerge: false});
   })
 
   // add listeners

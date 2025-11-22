@@ -1,6 +1,6 @@
 import {twMerge as twMergeBase, extendTailwindMerge} from "tailwind-merge";
 
-import {isEmptyObject, cn as cnBase} from "./utils.js";
+import {isEmptyObject, cx} from "./utils.js";
 import {state} from "./state.js";
 
 export const createTwMerge = (cachedTwMergeConfig) => {
@@ -20,7 +20,7 @@ export const createTwMerge = (cachedTwMergeConfig) => {
 
 export const cn = (...classnames) => {
   return (config) => {
-    const base = cnBase(classnames);
+    const base = cx(classnames);
 
     if (!base || !config.twMerge) return base;
 
