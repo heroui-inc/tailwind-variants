@@ -58,12 +58,16 @@ npm i tailwind-merge
 pnpm add tailwind-merge
 ```
 
+> **⚠️ Compatibility Note:** Supports Tailwind CSS v4.x (requires `tailwind-merge` v3.x). If you use Tailwind CSS v3.x, use tailwind-variants v0.x with [tailwind-merge v2.6.0](https://github.com/dcastil/tailwind-merge/tree/v2.6.0).
+
 > **💡 Lite mode (v3):** For smaller bundle size and faster runtime without conflict resolution, use the `/lite` import:
+>
 > ```js
 > import {tv} from "tailwind-variants/lite";
 > ```
 
-> **⚠️ Upgrading?** 
+> **⚠️ Upgrading?**
+>
 > - From v2 to v3: See the [v3 migration guide](./MIGRATION-V3.md)
 > - From v1 to v2: See the [v2 migration guide](./MIGRATION-V2.md)
 
