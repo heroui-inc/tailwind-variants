@@ -1,3 +1,12 @@
+## [3.2.1](https://github.com/heroui-inc/tailwind-variants/compare/v3.2.0...v3.2.1) (2025-11-22)
+
+
+### Bug Fixes
+
+* update cn function type and import cx from tailwind-variants/lite ([#285](https://github.com/heroui-inc/tailwind-variants/issues/285)) ([3a3afce](https://github.com/heroui-inc/tailwind-variants/commit/3a3afce7888a5f7594d4b6a206796bf7b5ac0a8d))
+
+
+
 # [3.2.0](https://github.com/heroui-inc/tailwind-variants/compare/v3.1.1...v3.2.0) (2025-11-22)
 
 
