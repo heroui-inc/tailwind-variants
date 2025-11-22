@@ -22,7 +22,7 @@ export const cn = (...classnames) => {
   return (config) => {
     const base = cx(classnames);
 
-    if (!base || !config.twMerge) return base;
+    if (!base || !(config?.twMerge ?? true)) return base;
 
     if (!state.cachedTwMerge || state.didTwMergeConfigChange) {
       state.didTwMergeConfigChange = false;

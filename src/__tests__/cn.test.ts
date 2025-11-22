@@ -144,6 +144,48 @@ describe("cn function with tailwind-merge (main index)", () => {
 
     expect(result).toBe("px-4");
   });
+
+  test("should merge classes by default when no config is provided", () => {
+    const result = cnWithMerge("px-2", "px-4", "py-2")();
+
+    expect(result).toBe("px-4 py-2");
+  });
+
+  test("should merge text color classes by default when no config is provided", () => {
+    const result = cnWithMerge("text-red-500", "text-blue-500")();
+
+    expect(result).toBe("text-blue-500");
+  });
+
+  test("should merge background color classes by default when no config is provided", () => {
+    const result = cnWithMerge("bg-red-500", "bg-blue-500")();
+
+    expect(result).toBe("bg-blue-500");
+  });
+
+  test("should not merge classes when twMerge is explicitly false", () => {
+    const result = cnWithMerge("px-2", "px-4", "py-2")({twMerge: false});
+
+    expect(result).toBe("px-2 px-4 py-2");
+  });
+
+  test("should merge classes when twMerge is explicitly true (backward compatibility)", () => {
+    const result = cnWithMerge("px-2", "px-4", "py-2")({twMerge: true});
+
+    expect(result).toBe("px-4 py-2");
+  });
+
+  test("should merge classes when config is empty object (defaults to true)", () => {
+    const result = cnWithMerge("px-2", "px-4", "py-2")({});
+
+    expect(result).toBe("px-4 py-2");
+  });
+
+  test("should merge classes when config is undefined", () => {
+    const result = cnWithMerge("px-2", "px-4", "py-2")(undefined);
+
+    expect(result).toBe("px-4 py-2");
+  });
 });
 
 describe.each(cxVariants)("cx function - $name", ({cx}) => {
