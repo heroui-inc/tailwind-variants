@@ -1,3 +1,19 @@
+# [3.2.0](https://github.com/heroui-inc/tailwind-variants/compare/v3.1.1...v3.2.0) (2025-11-22)
+
+
+### Bug Fixes
+
+* export defaultConfig as value and remove responsiveVariants ([#284](https://github.com/heroui-inc/tailwind-variants/issues/284)) ([65ee73c](https://github.com/heroui-inc/tailwind-variants/commit/65ee73cc80eb1813d582ede6091f849fa572317e))
+* make twMerge default to true in cn function ([#283](https://github.com/heroui-inc/tailwind-variants/issues/283)) ([1659aa7](https://github.com/heroui-inc/tailwind-variants/commit/1659aa7acccdc0a2ccdd4597a54c988866ca1d64))
+* no longer minifyng the code ([#282](https://github.com/heroui-inc/tailwind-variants/issues/282)) ([34c62f4](https://github.com/heroui-inc/tailwind-variants/commit/34c62f48a72680b2cde9d06d9e1e64520db0c55b))
+
+
+### Features
+
+* add cx function and refactor cn to use tailwind-merge ([#278](https://github.com/heroui-inc/tailwind-variants/issues/278)) ([8ec5f6f](https://github.com/heroui-inc/tailwind-variants/commit/8ec5f6fbd0c808675838fb71a6e32e8a570159cf))
+
+
+
 ## [3.1.1](https://github.com/heroui-inc/tailwind-variants/compare/v3.1.0...v3.1.1) (2025-09-08)
 
 
