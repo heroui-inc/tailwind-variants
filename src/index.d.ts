@@ -22,34 +22,40 @@ export type * from "./types.d.ts";
 export declare const cx: <T extends CnOptions>(...classes: T) => CnReturn;
 
 /**
- * Type representing a callable function that can also be coerced to a string.
- * This allows `cn` to work both as a function and directly in template literals.
+ * Combines class names and merges conflicting Tailwind CSS classes using `tailwind-merge`.
+ * Uses default twMerge config. For custom config, use `cnMerge` instead.
+ * @param classes - Class names to combine (strings, arrays, objects, etc.)
+ * @returns A merged class string, or `undefined` if no valid classes are provided
+ * @example
+ * ```ts
+ * // Simple usage with default twMerge config
+ * cn('bg-red-500', 'bg-blue-500') // => 'bg-blue-500'
+ * cn('px-2', 'px-4', 'py-2') // => 'px-4 py-2'
+ *
+ * // For custom twMerge config, use cnMerge instead
+ * cnMerge('px-2', 'px-4')({twMerge: false}) // => 'px-2 px-4'
+ * ```
  */
-type CnCallable = ((config?: TWMConfig) => CnReturn) & {
-  toString(): string;
-  valueOf(): CnReturn;
-  [Symbol.toPrimitive](hint: "string" | "number" | "default"): string | CnReturn;
-} & string;
+export declare const cn: <T extends CnOptions>(...classes: T) => CnReturn;
 
 /**
  * Combines class names and merges conflicting Tailwind CSS classes using `tailwind-merge`.
+ * Supports custom twMerge config via the second function call.
  * @param classes - Class names to combine (strings, arrays, objects, etc.)
- * @returns A callable function that returns the merged class string. Works directly in template literals (coerces to string) or can be called with optional config.
+ * @returns A function that accepts optional twMerge config and returns the merged class string
  * @example
  * ```ts
- * // twMerge defaults to true - works directly in template literals
- * `${cn('bg-red-500', 'bg-blue-500')}` // => 'bg-blue-500'
- * String(cn('bg-red-500', 'bg-blue-500')) // => 'bg-blue-500'
+ * // With custom config
+ * cnMerge('bg-red-500', 'bg-blue-500')({twMerge: true}) // => 'bg-blue-500'
+ * cnMerge('px-2', 'px-4')({twMerge: false}) // => 'px-2 px-4'
  *
- * // Can still be called with config for explicit control
- * cn('bg-red-500', 'bg-blue-500')() // => 'bg-blue-500'
- *
- * // Note: If you need simple concatenation without merging, use `cx` instead:
- * // Instead of: cn('bg-red-500', 'bg-blue-500')({ twMerge: false })
- * // Use: cx('bg-red-500', 'bg-blue-500') // => 'bg-red-500 bg-blue-500'
+ * // With twMergeConfig
+ * cnMerge('px-2', 'px-4')({twMergeConfig: {...}}) // => merged with custom config
  * ```
  */
-export declare const cn: <T extends CnOptions>(...classes: T) => CnCallable;
+export declare const cnMerge: <T extends CnOptions>(
+  ...classes: T
+) => (config?: TWMConfig) => CnReturn;
 
 /**
  * Creates a variant-aware component function with Tailwind CSS classes.
