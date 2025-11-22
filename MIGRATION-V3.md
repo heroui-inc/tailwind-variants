@@ -33,5 +33,5 @@ pnpm add tailwind-merge
 If you do not need conflict resolution, switch to the lite build by importing from `tailwind-variants/lite`:
 
 ```ts
-import {createTV, tv, cn, cnBase} from "tailwind-variants/lite";
+import {createTV, tv, cn, cx} from "tailwind-variants/lite";
 ```

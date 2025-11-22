@@ -22,6 +22,16 @@ export type * from "./types.d.ts";
 export declare const cx: <T extends CnOptions>(...classes: T) => CnReturn;
 
 /**
+ * Type representing a callable function that can also be coerced to a string.
+ * This allows `cn` to work both as a function and directly in template literals.
+ */
+type CnCallable = ((config?: TWMConfig) => CnReturn) & {
+  toString(): string;
+  valueOf(): CnReturn;
+  [Symbol.toPrimitive](hint: "string" | "number" | "default"): string | CnReturn;
+} & string;
+
+/**
  * Combines class names and merges conflicting Tailwind CSS classes using `tailwind-merge`.
  * @param classes - Class names to combine (strings, arrays, objects, etc.)
  * @returns A callable function that returns the merged class string. Works directly in template literals (coerces to string) or can be called with optional config.
@@ -39,7 +49,7 @@ export declare const cx: <T extends CnOptions>(...classes: T) => CnReturn;
  * // Use: cx('bg-red-500', 'bg-blue-500') // => 'bg-red-500 bg-blue-500'
  * ```
  */
-export declare const cn: <T extends CnOptions>(...classes: T) => (config?: TWMConfig) => CnReturn;
+export declare const cn: <T extends CnOptions>(...classes: T) => CnCallable;
 
 /**
  * Creates a variant-aware component function with Tailwind CSS classes.
