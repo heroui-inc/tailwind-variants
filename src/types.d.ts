@@ -144,21 +144,34 @@ export type TVProps<
   S extends TVSlots,
   EV extends TVVariants<ES>,
   ES extends TVSlots,
+  RV extends [] | (keyof V | keyof EV)[] = [],
 > = EV extends undefined
   ? V extends undefined
     ? ClassProp<ClassValue>
     : {
-        [K in keyof V]?: StringToBoolean<keyof V[K]> | undefined;
+        [K in keyof V as K extends RV[number] ? never : K]?:
+          | StringToBoolean<keyof V[K]>
+          | undefined;
+      } & {
+        [K in keyof V as K extends RV[number] ? K : never]: StringToBoolean<keyof V[K]>;
       } & ClassProp<ClassValue>
   : V extends undefined
     ? {
-        [K in keyof EV]?: StringToBoolean<keyof EV[K]> | undefined;
+        [K in keyof EV as K extends RV[number] ? never : K]?:
+          | StringToBoolean<keyof EV[K]>
+          | undefined;
+      } & {
+        [K in keyof EV as K extends RV[number] ? K : never]: StringToBoolean<keyof EV[K]>;
       } & ClassProp<ClassValue>
     : {
-        [K in keyof V | keyof EV]?:
+        [K in keyof V | keyof EV as K extends RV[number] ? never : K]?:
           | (K extends keyof V ? StringToBoolean<keyof V[K]> : never)
           | (K extends keyof EV ? StringToBoolean<keyof EV[K]> : never)
           | undefined;
+      } & {
+        [K in keyof V | keyof EV as K extends RV[number] ? K : never]:
+          | (K extends keyof V ? StringToBoolean<keyof V[K]> : never)
+          | (K extends keyof EV ? StringToBoolean<keyof EV[K]> : never);
       } & ClassProp<ClassValue>;
 
 export type TVVariantKeys<V extends TVVariants<S>, S extends TVSlots> = V extends Object
@@ -171,6 +184,7 @@ export type TVReturnProps<
   B extends ClassValue,
   EV extends TVVariants<ES>,
   ES extends TVSlots,
+  RV extends [] | (keyof V | keyof EV)[] = [],
   // @ts-expect-error
   E extends TVReturnType = undefined,
 > = {
@@ -182,6 +196,7 @@ export type TVReturnProps<
   compoundVariants: TVCompoundVariants<V, S, B, EV, ES>;
   compoundSlots: TVCompoundSlots<V, S, B>;
   variantKeys: TVVariantKeys<V, S>;
+  requiredVariants: RV;
 };
 
 type HasSlots<S extends TVSlots, ES extends TVSlots> = S extends undefined
@@ -196,27 +211,31 @@ export type TVReturnType<
   B extends ClassValue,
   EV extends TVVariants<ES>,
   ES extends TVSlots,
+  RV extends [] | (keyof V | keyof EV)[] = [],
   // @ts-expect-error
   E extends TVReturnType = undefined,
 > = {
-  (props?: TVProps<V, S, EV, ES>): HasSlots<S, ES> extends true
+  (props?: TVProps<V, S, EV, ES, RV>): HasSlots<S, ES> extends true
     ? {
         [K in keyof (ES extends undefined ? {} : ES)]: (
-          slotProps?: TVProps<V, S, EV, ES>,
+          slotProps?: TVProps<V, S, EV, ES, RV>,
         ) => string;
       } & {
-        [K in keyof (S extends undefined ? {} : S)]: (slotProps?: TVProps<V, S, EV, ES>) => string;
+        [K in keyof (S extends undefined ? {} : S)]: (
+          slotProps?: TVProps<V, S, EV, ES, RV>,
+        ) => string;
       } & {
-        [K in TVSlotsWithBase<{}, B>]: (slotProps?: TVProps<V, S, EV, ES>) => string;
+        [K in TVSlotsWithBase<{}, B>]: (slotProps?: TVProps<V, S, EV, ES, RV>) => string;
       }
     : string;
-} & TVReturnProps<V, S, B, EV, ES, E>;
+} & TVReturnProps<V, S, B, EV, ES, RV, E>;
 
 export type TV = {
   <
     V extends TVVariants<S, B, EV>,
     CV extends TVCompoundVariants<V, S, B, EV, ES>,
     DV extends TVDefaultVariants<V, S, EV, ES>,
+    RV extends [] | (keyof V | keyof EV)[] = [],
     B extends ClassValue = undefined,
     S extends TVSlots = undefined,
     // @ts-expect-error
@@ -227,7 +246,8 @@ export type TV = {
       // @ts-expect-error
       EV extends undefined ? {} : EV,
       // @ts-expect-error
-      ES extends undefined ? {} : ES
+      ES extends undefined ? {} : ES,
+      RV
     >,
     EV extends TVVariants<ES, B, E["variants"], ES> = E["variants"],
     ES extends TVSlots = E["slots"] extends TVSlots ? E["slots"] : undefined,
@@ -266,13 +286,18 @@ export type TV = {
        * @see https://www.tailwind-variants.org/docs/variants#default-variants
        */
       defaultVariants?: DV;
+      /**
+       * Required variants that must be provided at runtime and are required in the type system.
+       * @see https://www.tailwind-variants.org/docs/variants#required-variants
+       */
+      requiredVariants?: RV;
     },
     /**
      * The config object allows you to modify the default configuration.
      * @see https://www.tailwind-variants.org/docs/api-reference#config-optional
      */
     config?: TVConfig,
-  ): TVReturnType<V, S, B, EV, ES, E>;
+  ): TVReturnType<V, S, B, EV, ES, RV, E>;
 };
 
 export type TVLite = {
@@ -280,6 +305,7 @@ export type TVLite = {
     V extends TVVariants<S, B, EV>,
     CV extends TVCompoundVariants<V, S, B, EV, ES>,
     DV extends TVDefaultVariants<V, S, EV, ES>,
+    RV extends [] | (keyof V | keyof EV)[] = [],
     B extends ClassValue = undefined,
     S extends TVSlots = undefined,
     // @ts-expect-error
@@ -290,7 +316,8 @@ export type TVLite = {
       // @ts-expect-error
       EV extends undefined ? {} : EV,
       // @ts-expect-error
-      ES extends undefined ? {} : ES
+      ES extends undefined ? {} : ES,
+      RV
     >,
     EV extends TVVariants<ES, B, E["variants"], ES> = E["variants"],
     ES extends TVSlots = E["slots"] extends TVSlots ? E["slots"] : undefined,
@@ -328,7 +355,12 @@ export type TVLite = {
      * @see https://www.tailwind-variants.org/docs/variants#default-variants
      */
     defaultVariants?: DV;
-  }): TVReturnType<V, S, B, EV, ES, E>;
+    /**
+     * Required variants that must be provided at runtime and are required in the type system.
+     * @see https://www.tailwind-variants.org/docs/variants#required-variants
+     */
+    requiredVariants?: RV;
+  }): TVReturnType<V, S, B, EV, ES, RV, E>;
 };
 
 export type VariantProps<Component extends (...args: any) => any> = Omit<

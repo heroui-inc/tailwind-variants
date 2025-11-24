@@ -19,6 +19,7 @@ export const getTailwindVariants = (cn) => {
       compoundVariants: compoundVariantsProps = [],
       compoundSlots = [],
       defaultVariants: defaultVariantsProps = {},
+      requiredVariants = [],
     } = options;
 
     const config = {...defaultConfig, ...configProp};
@@ -79,6 +80,25 @@ export const getTailwindVariants = (cn) => {
         throw new TypeError(
           `The "compoundSlots" prop must be an array. Received: ${typeof compoundSlots}`,
         );
+      }
+
+      if (requiredVariants && !Array.isArray(requiredVariants)) {
+        throw new TypeError(
+          `The "requiredVariants" prop must be an array. Received: ${typeof requiredVariants}`,
+        );
+      }
+
+      // Validate required variants
+      if (requiredVariants && Array.isArray(requiredVariants)) {
+        for (let i = 0; i < requiredVariants.length; i++) {
+          const requiredVariant = requiredVariants[i];
+
+          if (props?.[requiredVariant] === undefined) {
+            throw new Error(
+              `Missing required variant: "${requiredVariant}". This variant must be provided.`,
+            );
+          }
+        }
       }
 
       const getVariantValue = (variant, vrs = variants, _slotKey = null, slotProps = null) => {
@@ -326,6 +346,7 @@ export const getTailwindVariants = (cn) => {
     component.defaultVariants = defaultVariants;
     component.compoundSlots = compoundSlots;
     component.compoundVariants = compoundVariants;
+    component.requiredVariants = requiredVariants;
 
     return component;
   };
