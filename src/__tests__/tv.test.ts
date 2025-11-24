@@ -2644,7 +2644,7 @@ describe("Tailwind Variants (TV) - Required Variants", () => {
           large: "text-lg px-6 py-3",
         },
       },
-      requiredVariants: ["intent", "size"] as const,
+      requiredVariants: ["intent", "size"],
     });
 
     // Should throw when intent is missing
@@ -2679,7 +2679,7 @@ describe("Tailwind Variants (TV) - Required Variants", () => {
           large: "text-lg px-6 py-3",
         },
       },
-      requiredVariants: ["intent", "size"] as const,
+      requiredVariants: ["intent", "size"],
     });
 
     const expectedResult =
@@ -2706,7 +2706,7 @@ describe("Tailwind Variants (TV) - Required Variants", () => {
         intent: "primary",
         size: "medium",
       },
-      requiredVariants: ["intent"] as const,
+      requiredVariants: ["intent"],
     });
 
     const expectedResult1 = "font-semibold border bg-white text-blue-500 text-base px-4 py-2";
@@ -2744,7 +2744,7 @@ describe("Tailwind Variants (TV) - Required Variants", () => {
           },
         },
       },
-      requiredVariants: ["size"] as const,
+      requiredVariants: ["size"],
     });
 
     // Should throw when required variant is missing
@@ -2823,7 +2823,7 @@ describe("Tailwind Variants (TV) - Required Variants", () => {
           large: "text-lg",
         },
       },
-      requiredVariants: ["intent"] as const,
+      requiredVariants: ["intent"],
     });
 
     expect(button.requiredVariants).toEqual(["intent"]);
@@ -2838,7 +2838,7 @@ describe("Tailwind Variants (TV) - Required Variants", () => {
           secondary: "bg-white",
         },
       },
-      requiredVariants: ["intent"] as const,
+      requiredVariants: ["intent"],
     });
 
     const iconButton = tv({
@@ -2849,7 +2849,7 @@ describe("Tailwind Variants (TV) - Required Variants", () => {
           large: "p-3",
         },
       },
-      requiredVariants: ["intent", "size"] as const,
+      requiredVariants: ["intent", "size"],
     });
 
     // Should throw when required variants from extended component are missing

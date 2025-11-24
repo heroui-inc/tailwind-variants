@@ -144,7 +144,7 @@ export type TVProps<
   S extends TVSlots,
   EV extends TVVariants<ES>,
   ES extends TVSlots,
-  RV extends readonly (keyof V | keyof EV)[] = [],
+  RV extends [] | (keyof V | keyof EV)[] = [],
 > = EV extends undefined
   ? V extends undefined
     ? ClassProp<ClassValue>
@@ -184,7 +184,7 @@ export type TVReturnProps<
   B extends ClassValue,
   EV extends TVVariants<ES>,
   ES extends TVSlots,
-  RV extends readonly (keyof V | keyof EV)[] = [],
+  RV extends [] | (keyof V | keyof EV)[] = [],
   // @ts-expect-error
   E extends TVReturnType = undefined,
 > = {
@@ -211,7 +211,7 @@ export type TVReturnType<
   B extends ClassValue,
   EV extends TVVariants<ES>,
   ES extends TVSlots,
-  RV extends readonly (keyof V | keyof EV)[] = [],
+  RV extends [] | (keyof V | keyof EV)[] = [],
   // @ts-expect-error
   E extends TVReturnType = undefined,
 > = {
@@ -235,7 +235,7 @@ export type TV = {
     V extends TVVariants<S, B, EV>,
     CV extends TVCompoundVariants<V, S, B, EV, ES>,
     DV extends TVDefaultVariants<V, S, EV, ES>,
-    RV extends readonly (keyof V | keyof EV)[] = [],
+    RV extends [] | (keyof V | keyof EV)[] = [],
     B extends ClassValue = undefined,
     S extends TVSlots = undefined,
     // @ts-expect-error
@@ -305,7 +305,7 @@ export type TVLite = {
     V extends TVVariants<S, B, EV>,
     CV extends TVCompoundVariants<V, S, B, EV, ES>,
     DV extends TVDefaultVariants<V, S, EV, ES>,
-    RV extends readonly (keyof V | keyof EV)[] = [],
+    RV extends [] | (keyof V | keyof EV)[] = [],
     B extends ClassValue = undefined,
     S extends TVSlots = undefined,
     // @ts-expect-error
