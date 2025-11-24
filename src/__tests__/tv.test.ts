@@ -2647,19 +2647,16 @@ describe("Tailwind Variants (TV) - Required Variants", () => {
       requiredVariants: ["intent", "size"],
     });
 
-    // Should throw when intent is missing
     // @ts-expect-error - Testing runtime error with missing required variant
     expect(() => button({size: "small"})).toThrow(
       'Missing required variant: "intent". This variant must be provided.',
     );
 
-    // Should throw when size is missing
     // @ts-expect-error - Testing runtime error with missing required variant
     expect(() => button({intent: "primary"})).toThrow(
       'Missing required variant: "size". This variant must be provided.',
     );
 
-    // Should throw when both are missing
     expect(() => button()).toThrow(
       'Missing required variant: "intent". This variant must be provided.',
     );
@@ -2714,7 +2711,6 @@ describe("Tailwind Variants (TV) - Required Variants", () => {
 
     expect(result1).toBe(expectedResult1);
 
-    // Should still throw when required variant is not provided, even with default
     expect(() => button()).toThrow(
       'Missing required variant: "intent". This variant must be provided.',
     );
@@ -2747,7 +2743,6 @@ describe("Tailwind Variants (TV) - Required Variants", () => {
       requiredVariants: ["size"],
     });
 
-    // Should throw when required variant is missing
     expect(() => card()).toThrow(
       'Missing required variant: "size". This variant must be provided.',
     );
@@ -2852,7 +2847,6 @@ describe("Tailwind Variants (TV) - Required Variants", () => {
       requiredVariants: ["intent", "size"],
     });
 
-    // Should throw when required variants from extended component are missing
     // @ts-expect-error - Testing runtime error with missing required variant
     expect(() => iconButton({size: "small"})).toThrow(
       'Missing required variant: "intent". This variant must be provided.',
@@ -2867,5 +2861,23 @@ describe("Tailwind Variants (TV) - Required Variants", () => {
     const result = iconButton({intent: "primary", size: "small"});
 
     expect(result).toBe(expectedResult);
+  });
+
+  test("should throw error when requiredVariants contains invalid variant names", () => {
+    const button = tv({
+      base: "font-semibold",
+      variants: {
+        intent: {
+          primary: "bg-blue-500",
+          secondary: "bg-white",
+        },
+      },
+      // @ts-expect-error - Testing runtime error with invalid variant name
+      requiredVariants: ["intent", "invalidVariant"],
+    });
+
+    expect(() => button({intent: "primary"})).toThrow(
+      'Missing required variant: "invalidVariant". This variant must be provided.',
+    );
   });
 });
