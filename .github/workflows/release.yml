@@ -2,6 +2,7 @@ name: Release
 
 permissions:
   contents: write
+  id-token: write
 
 on:
   push:
@@ -37,6 +38,6 @@ jobs:
       - name: Publish to npm
         run: |
           npm config set //registry.npmjs.org/:_authToken=$NPM_TOKEN
-          npm publish
+          npm publish --provenance
         env:
           NPM_TOKEN: ${{secrets.NPM_TOKEN}}
