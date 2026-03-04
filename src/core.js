@@ -64,6 +64,67 @@ export const getTailwindVariants = (cn) => {
       ? compoundVariantsProps
       : flatMergeArrays(extend?.compoundVariants, compoundVariantsProps);
 
+    const hasSlots = !isEmptyObject(slotProps) || !isExtendedSlotsEmpty;
+
+    // Variant-level slot caching: shared across all component() calls with the same variant combo.
+    // Layer 1 (variantCache): variant key → slot closures (skips inner function creation + variant resolution)
+    // Layer 2 (stringCache): variant key → resolved class strings (skips tw-merge entirely)
+    const variantCache = hasSlots ? new Map() : null;
+    const stringCache = hasSlots ? new Map() : null;
+
+    // Collect all prop keys that affect slot output: variant keys + compound variant/slot condition keys.
+    // Computed once at definition time, not per call.
+    const cacheRelevantKeys = hasSlots
+      ? (() => {
+          const keys = Object.keys(variants);
+
+          for (let i = 0; i < compoundVariants.length; i++) {
+            for (const key in compoundVariants[i]) {
+              if (key !== "class" && key !== "className" && !keys.includes(key)) {
+                keys.push(key);
+              }
+            }
+          }
+
+          for (let i = 0; i < compoundSlots.length; i++) {
+            for (const key in compoundSlots[i]) {
+              if (
+                key !== "slots" &&
+                key !== "class" &&
+                key !== "className" &&
+                !keys.includes(key)
+              ) {
+                keys.push(key);
+              }
+            }
+          }
+
+          return keys;
+        })()
+      : null;
+
+    const serializeVariantProps = hasSlots
+      ? (props) => {
+          if (!props) return "";
+
+          let key = "";
+
+          for (let i = 0; i < cacheRelevantKeys.length; i++) {
+            const value = props[cacheRelevantKeys[i]];
+
+            if (value !== undefined) {
+              if (typeof value === "object" && value !== null) {
+                key += cacheRelevantKeys[i] + ":" + JSON.stringify(value) + "|";
+              } else {
+                key += cacheRelevantKeys[i] + ":" + String(value) + "|";
+              }
+            }
+          }
+
+          return key;
+        }
+      : null;
+
     const component = (props) => {
       if (isEmptyObject(variants) && isEmptyObject(slotProps) && isExtendedSlotsEmpty) {
         return cn(base, props?.class, props?.className)(config);
@@ -79,6 +140,38 @@ export const getTailwindVariants = (cn) => {
         throw new TypeError(
           `The "compoundSlots" prop must be an array. Received: ${typeof compoundSlots}`,
         );
+      }
+
+      // Slot cache: check for hit before creating inner functions
+      let cacheKey;
+
+      if (hasSlots) {
+        cacheKey = serializeVariantProps(props);
+
+        const cachedClosures = variantCache.get(cacheKey);
+
+        if (cachedClosures) {
+          let cachedStrings = stringCache.get(cacheKey);
+
+          if (!cachedStrings) {
+            cachedStrings = {};
+
+            for (const slotKey in cachedClosures) {
+              cachedStrings[slotKey] = cachedClosures[slotKey]();
+            }
+
+            stringCache.set(cacheKey, cachedStrings);
+          }
+
+          const slotsFns = {};
+
+          for (const slotKey in cachedClosures) {
+            slotsFns[slotKey] = (slotProps) =>
+              slotProps != null ? cachedClosures[slotKey](slotProps) : cachedStrings[slotKey];
+          }
+
+          return slotsFns;
+        }
       }
 
       const getVariantValue = (variant, vrs = variants, _slotKey = null, slotProps = null) => {
@@ -275,8 +368,8 @@ export const getTailwindVariants = (cn) => {
         return result;
       };
 
-      // with slots
-      if (!isEmptyObject(slotProps) || !isExtendedSlotsEmpty) {
+      // with slots (cache miss path — closures are computed and cached)
+      if (hasSlots) {
         const slotsFns = {};
 
         if (typeof slots === "object" && !isEmptyObject(slots)) {
@@ -299,7 +392,26 @@ export const getTailwindVariants = (cn) => {
           }
         }
 
-        return slotsFns;
+        // Cache closures and their resolved strings for this variant combo
+        variantCache.set(cacheKey, slotsFns);
+
+        const cachedStrings = {};
+
+        for (const slotKey in slotsFns) {
+          cachedStrings[slotKey] = slotsFns[slotKey]();
+        }
+
+        stringCache.set(cacheKey, cachedStrings);
+
+        // Return with string cache support: no-arg calls skip tw-merge
+        const result = {};
+
+        for (const slotKey in slotsFns) {
+          result[slotKey] = (slotProps) =>
+            slotProps != null ? slotsFns[slotKey](slotProps) : cachedStrings[slotKey];
+        }
+
+        return result;
       }
 
       // normal variants
