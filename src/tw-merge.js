@@ -23,6 +23,15 @@ const executeMerge = (classnames, config) => {
 
   if (!base || !(config?.twMerge ?? true)) return base;
 
+  // save twMergeConfig to the cache
+  if (
+    !isEmptyObject(config.twMergeConfig) &&
+    !isEqual(config.twMergeConfig, state.cachedTwMergeConfig)
+  ) {
+    state.didTwMergeConfigChange = true;
+    state.cachedTwMergeConfig = config.twMergeConfig;
+  }
+
   if (!state.cachedTwMerge || state.didTwMergeConfigChange) {
     state.didTwMergeConfigChange = false;
 
