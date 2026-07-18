@@ -113,8 +113,8 @@
     }
   },
   "engines": {
-    "node": ">=16.x",
-    "pnpm": ">=7.x"
+    "pnpm": ">=7.x",
+    "node": ">=16.9.x"
   },
   "packageManager": "pnpm@11.13.0"
 }
