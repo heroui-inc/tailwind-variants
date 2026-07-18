@@ -1,6 +1,17 @@
-function createState() {
-  let cachedTwMerge = null;
-  let cachedTwMergeConfig = {};
+import type {TWMergeConfig} from "../config.js";
+
+export type TwMergeFn = (classList: string) => string;
+
+type State = {
+  cachedTwMerge: TwMergeFn | null;
+  cachedTwMergeConfig: TWMergeConfig;
+  didTwMergeConfigChange: boolean;
+  reset: () => void;
+};
+
+function createState(): State {
+  let cachedTwMerge: TwMergeFn | null = null;
+  let cachedTwMergeConfig: TWMergeConfig = {};
   let didTwMergeConfigChange = false;
 
   return {
@@ -36,6 +47,4 @@ function createState() {
   };
 }
 
-const state = createState();
-
-export {state};
+export const state = createState();
