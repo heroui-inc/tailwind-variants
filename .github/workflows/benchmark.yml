@@ -25,7 +25,7 @@ jobs:
     timeout-minutes: 15
     steps:
       - name: Checkout pull request
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Install dependencies
         uses: ./.github/actions/install
