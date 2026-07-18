@@ -1,0 +1,97 @@
+export const scenarioMetadata = [
+  {
+    id: "construction/no-slots",
+    category: "construction",
+    name: "Create no-slots component",
+    description: "One-time factory cost; the returned component is retained.",
+    implementations: ["tv", "cva"],
+  },
+  {
+    id: "lifecycle/no-slots",
+    category: "lifecycle",
+    name: "Create and call no-slots component",
+    description: "Factory cost plus the first call with default variants.",
+    implementations: ["tv", "cva"],
+  },
+  {
+    id: "invocation/defaults",
+    category: "invocation",
+    name: "Call with default variants",
+    description: "A pre-created component called once with default variants.",
+    implementations: ["tv", "cva"],
+  },
+  {
+    id: "invocation/variants",
+    category: "invocation",
+    name: "Call with variant matrix",
+    description: "A batch of five calls covering defaults, booleans, arrays, and compounds.",
+    implementations: ["tv", "cva"],
+  },
+  {
+    id: "invocation/variants-no-merge",
+    category: "invocation",
+    name: "Call variant matrix without merge",
+    description: "The same five-call batch with Tailwind Merge disabled.",
+    implementations: ["tv", "cva"],
+  },
+  {
+    id: "utilities/cx",
+    category: "utilities",
+    name: "Join mixed class names",
+    description: "Strings, arrays, nested arrays, objects, and nullish values.",
+    implementations: ["tv", "cva"],
+  },
+  {
+    id: "construction/slots",
+    category: "construction",
+    name: "Create slots component",
+    description: "TV-only one-time setup for variants, compounds, and three slots.",
+    implementations: ["tv"],
+  },
+  {
+    id: "lifecycle/slots",
+    category: "lifecycle",
+    name: "Create and call slots component",
+    description: "TV-only factory cost plus one invocation of all three slots.",
+    implementations: ["tv"],
+  },
+  {
+    id: "invocation/slots",
+    category: "invocation",
+    name: "Call slots variant matrix",
+    description: "TV-only five-call batch invoking base, icon, and label.",
+    implementations: ["tv"],
+  },
+  {
+    id: "invocation/slots-no-merge",
+    category: "invocation",
+    name: "Call slots matrix without merge",
+    description: "TV-only slots batch with Tailwind Merge disabled.",
+    implementations: ["tv"],
+  },
+  {
+    id: "composition/extend",
+    category: "composition",
+    name: "Create, extend, and call component",
+    description: "TV-only lifecycle for a two-level component composition.",
+    implementations: ["tv"],
+  },
+  {
+    id: "utilities/cn-merge",
+    category: "utilities",
+    name: "Merge pre-bound mixed class names",
+    description: "TV-only public cnMerge closure with Tailwind Merge enabled.",
+    implementations: ["tv"],
+  },
+  {
+    id: "invocation/custom-merge",
+    category: "invocation",
+    name: "Call with custom merge config",
+    description: "TV-only variant matrix using custom spacing and font-size groups.",
+    implementations: ["tv"],
+  },
+];
+
+export const scenarioMetadataById = new Map(
+  scenarioMetadata.map((scenario) => [scenario.id, scenario]),
+);
