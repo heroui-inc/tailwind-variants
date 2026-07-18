@@ -8,6 +8,15 @@
 
 <!-- e.g. is there anything you'd like reviewers to focus on? -->
 
+### What is the purpose of this pull request?
+
+<!-- (put an "X" next to an item) -->
+
+- [ ] Bug fix
+- [ ] New Feature
+- [ ] Documentation update
+- [ ] Other
+
 ### Performance impact
 
 <!--
@@ -23,17 +32,6 @@ trade-off. See benchmark/README.md.
 - [ ] Any confirmed regression above 5% is documented and intentionally bounded.
 
 <!-- Benchmark summary, confirmed regressions, and rationale (if applicable): -->
-
----
-
-### What is the purpose of this pull request?
-
-<!-- (put an "X" next to an item) -->
-
-- [ ] Bug fix
-- [ ] New Feature
-- [ ] Documentation update
-- [ ] Other
 
 ### Before submitting the PR, please make sure you do the following
 
