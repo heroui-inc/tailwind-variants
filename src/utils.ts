@@ -89,7 +89,7 @@ export const joinObjects = <T extends Record<string, unknown>, U extends Record<
   const target = obj1 as Record<string, any>;
 
   for (const key in obj2) {
-    if (Object.hasOwn(obj2, key)) {
+    if (Object.prototype.hasOwnProperty.call(obj2, key)) {
       const val2 = obj2[key];
 
       if (key in target) {
