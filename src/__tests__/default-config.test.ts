@@ -1,6 +1,6 @@
-import {expect, describe, test, beforeEach, afterEach} from "@jest/globals";
+import {afterEach, beforeEach, describe, expect, test} from "vitest";
 
-import {defaultConfig, tv, createTV} from "../index";
+import {createTV, defaultConfig, tv} from "../index";
 
 describe("defaultConfig", () => {
   // Store original values to restore after each test
@@ -19,19 +19,19 @@ describe("defaultConfig", () => {
     defaultConfig.twMergeConfig = {...originalTwMergeConfig};
   });
 
-  test("should be importable as a value (not just a type)", () => {
+  test("is importable as a value (not just a type)", () => {
     expect(defaultConfig).toBeDefined();
     expect(typeof defaultConfig).toBe("object");
     expect(defaultConfig).toHaveProperty("twMerge");
     expect(defaultConfig).toHaveProperty("twMergeConfig");
   });
 
-  test("should have default values", () => {
+  test("has default values", () => {
     expect(defaultConfig.twMerge).toBe(true);
     expect(defaultConfig.twMergeConfig).toEqual({});
   });
 
-  test("should allow modification of twMergeConfig", () => {
+  test("allows modification of twMergeConfig", () => {
     const customConfig = {
       extend: {
         theme: {
@@ -46,7 +46,7 @@ describe("defaultConfig", () => {
     expect(defaultConfig.twMergeConfig.extend?.theme?.spacing).toEqual(["medium", "large"]);
   });
 
-  test("should allow modification of twMerge property", () => {
+  test("allows modification of twMerge property", () => {
     defaultConfig.twMerge = false;
     expect(defaultConfig.twMerge).toBe(false);
 
@@ -54,7 +54,7 @@ describe("defaultConfig", () => {
     expect(defaultConfig.twMerge).toBe(true);
   });
 
-  test("should affect tv behavior when twMergeConfig is modified", () => {
+  test("affects tv behavior when twMergeConfig is modified", () => {
     // Set up a custom twMergeConfig
     defaultConfig.twMergeConfig = {
       extend: {
@@ -72,7 +72,7 @@ describe("defaultConfig", () => {
     expect(button()).toBeDefined();
   });
 
-  test("should allow nested modifications of twMergeConfig", () => {
+  test("allows nested modifications of twMergeConfig", () => {
     defaultConfig.twMergeConfig = {
       extend: {
         theme: {
@@ -93,7 +93,7 @@ describe("defaultConfig", () => {
     ]);
   });
 
-  test("should work with createTV when defaultConfig is modified", () => {
+  test("supports createTV when defaultConfig is modified", () => {
     defaultConfig.twMerge = false;
 
     const tv = createTV({});
@@ -107,7 +107,7 @@ describe("defaultConfig", () => {
     expect(h1()).toContain("text-xl");
   });
 
-  test("should allow setting twMergeConfig with extend.classGroups", () => {
+  test("allows setting twMergeConfig with extend.classGroups", () => {
     const configWithClassGroups = {
       extend: {
         classGroups: {
@@ -128,7 +128,7 @@ describe("defaultConfig", () => {
     ]);
   });
 
-  test("should persist modifications across multiple tv calls", () => {
+  test("persists modifications across multiple tv calls", () => {
     defaultConfig.twMergeConfig = {
       extend: {
         theme: {
@@ -145,7 +145,7 @@ describe("defaultConfig", () => {
     expect(button2()).toBeDefined();
   });
 
-  test("should allow complete replacement of twMergeConfig object", () => {
+  test("allows complete replacement of twMergeConfig object", () => {
     const newConfig = {
       extend: {
         theme: {

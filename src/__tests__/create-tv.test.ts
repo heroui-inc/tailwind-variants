@@ -1,4 +1,4 @@
-import {expect, describe, test} from "@jest/globals";
+import {describe, expect, test} from "vitest";
 
 import {createTV as createTVFull} from "../index";
 import {createTV as createTVLite} from "../lite";
@@ -8,8 +8,8 @@ const variants = [
   {name: "lite - without tailwind-merge", createTV: createTVLite, mode: "lite"},
 ];
 
-describe.each(variants)("createTV - $name", ({createTV, mode}) => {
-  test("should respect twMerge config when creating tv instance", () => {
+describe.each(variants)("createTV ($name)", ({createTV, mode}) => {
+  test("respects twMerge config when creating tv instance", () => {
     const tv = createTV({twMerge: false});
     const h1 = tv({
       base: "text-3xl font-bold text-blue-400 text-xl text-blue-200",
@@ -19,7 +19,7 @@ describe.each(variants)("createTV - $name", ({createTV, mode}) => {
     expect(h1()).toHaveClass("text-3xl font-bold text-blue-400 text-xl text-blue-200");
   });
 
-  test("should override twMerge config on tv call", () => {
+  test("overrides twMerge config on tv call", () => {
     const tv = createTV({twMerge: false});
     const h1 = tv(
       {base: "text-3xl font-bold text-blue-400 text-xl text-blue-200"},

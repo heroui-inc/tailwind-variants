@@ -1,4 +1,4 @@
-import {expect, describe, test, jest} from "@jest/globals";
+import {describe, expect, test, vi} from "vitest";
 
 import {tv as tvFull} from "../index";
 import {tv as tvLite} from "../lite";
@@ -8,8 +8,8 @@ const variants = [
   {name: "lite - without tailwind-merge", tv: tvLite, mode: "lite"},
 ];
 
-describe.each(variants)("Tailwind Variants (TV) - twMerge: false - $name", ({tv}) => {
-  test("should keep all classes including conflicting ones when twMerge is false", () => {
+describe.each(variants)("tv with twMerge disabled ($name)", ({tv}) => {
+  test("keeps conflicting base classes", () => {
     const button = tv(
       {
         base: "px-4 px-2 py-2 py-4 bg-blue-500 bg-red-500",
@@ -24,7 +24,7 @@ describe.each(variants)("Tailwind Variants (TV) - twMerge: false - $name", ({tv}
     expect(button()).toBe("px-4 px-2 py-2 py-4 bg-blue-500 bg-red-500");
   });
 
-  test("should not resolve conflicts in variants when twMerge is false", () => {
+  test("keeps conflicting variant classes", () => {
     const button = tv(
       {
         base: "font-medium",
@@ -51,7 +51,7 @@ describe.each(variants)("Tailwind Variants (TV) - twMerge: false - $name", ({tv}
     );
   });
 
-  test("should not resolve conflicts in compound variants when twMerge is false", () => {
+  test("keeps conflicting compound variant classes", () => {
     const button = tv(
       {
         base: "font-semibold",
@@ -84,7 +84,7 @@ describe.each(variants)("Tailwind Variants (TV) - twMerge: false - $name", ({tv}
     );
   });
 
-  test("should not resolve conflicts in slots when twMerge is false", () => {
+  test("keeps conflicting slot classes", () => {
     const card = tv(
       {
         slots: {
@@ -106,7 +106,7 @@ describe.each(variants)("Tailwind Variants (TV) - twMerge: false - $name", ({tv}
     expect(slots.body()).toBe("text-gray-600 text-gray-700 mt-2 mt-4");
   });
 
-  test("should not resolve conflicts with class/className props when twMerge is false", () => {
+  test("keeps conflicts from class and className props", () => {
     const button = tv(
       {
         base: "px-4 py-2 rounded",
@@ -123,7 +123,7 @@ describe.each(variants)("Tailwind Variants (TV) - twMerge: false - $name", ({tv}
     );
   });
 
-  test("should work with non-tailwind classes when twMerge is false", () => {
+  test("supports non-Tailwind classes", () => {
     const button = tv(
       {
         base: "button",
@@ -149,7 +149,7 @@ describe.each(variants)("Tailwind Variants (TV) - twMerge: false - $name", ({tv}
     expect(button({size: "lg", variant: "secondary"})).toBe("button button--lg button--secondary");
   });
 
-  test("should handle empty/falsy values correctly when twMerge is false", () => {
+  test("handles empty and falsy values", () => {
     const button = tv(
       {
         base: "base",
@@ -171,7 +171,7 @@ describe.each(variants)("Tailwind Variants (TV) - twMerge: false - $name", ({tv}
     expect(button({size: "lg"})).toBe("base");
   });
 
-  test("should handle arrays of classes when twMerge is false", () => {
+  test("handles arrays of classes", () => {
     const button = tv(
       {
         base: ["px-4", "py-2", ["rounded", ["bg-blue-500"]]],
@@ -190,11 +190,11 @@ describe.each(variants)("Tailwind Variants (TV) - twMerge: false - $name", ({tv}
     expect(button({size: "sm"})).toBe("px-4 py-2 rounded bg-blue-500 text-sm px-2 py-1");
   });
 
-  test("should not require tailwind-merge in bundle when twMerge is false", () => {
+  test("does not require tailwind-merge in the lite bundle", () => {
     // This test verifies that the createTwMerge function is not called
     // when twMerge is false. In a real bundle, this would mean
     // tailwind-merge is not included.
-    const mockCreateTwMerge = jest.fn();
+    const mockCreateTwMerge = vi.fn();
 
     // Override require for this test
     const originalRequire = require;
