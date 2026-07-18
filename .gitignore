@@ -1,43 +1,28 @@
+# Dependencies
+node_modules/
+.pnp
+.pnp.*
 
-# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
-
-# dependencies
-node_modules
-/.pnp
-.pnp.js
-
-# testing
-/coverage
-coverage
-
-
-# production
-/build
+# Build and generated output
 dist/
+build/
+esm/
+types/
+*.tsbuildinfo
 
-# misc
-.DS_Store
+# Tests
+coverage/
 
 # Logs
-logs
+logs/
 *.log
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
-# debug
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-.yarn-integrity
-.idea
-.now
-dist
-esm
-examples/**/yarn.lock
-examples/**/out
-examples/**/.next
-types
+# Editors and operating systems
+.DS_Store
+.idea/
 
-# package
+# Package artifacts
 tailwind-variants-*.tgz

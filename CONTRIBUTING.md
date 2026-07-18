@@ -5,7 +5,7 @@ Welcome, and thanks for your interest in contributing! Please take a moment to r
 ## Style Guide
 
 - **Commits** follow the ["Conventional Commits" specification](https://www.conventionalcommits.org/en/v1.0.0/). This allows for changelogs to be generated automatically upon release.
-- **Code** is formatted via [Prettier](https://prettier.io/)
+- **Code** is formatted and linted with [Biome](https://biomejs.dev/).
 - **JavaScript** is written as [TypeScript](https://www.typescriptlang.org/) where possible.
 
 ## Getting Started
@@ -24,8 +24,11 @@ Welcome, and thanks for your interest in contributing! Please take a moment to r
 ### Scripts
 
 - `pnpm build` – production build
-- `pnpm check` – type checks
-- `pnpm test` – runs jest, watching for file changes
+- `pnpm typecheck` – type checks
+- `pnpm lint` – checks formatting and lint rules
+- `pnpm lint:fix` – applies safe formatting and lint fixes
+- `pnpm test` – runs the Vitest unit test suite
+- `pnpm test:watch` – runs Vitest in watch mode
 
 ### Commit Convention
 

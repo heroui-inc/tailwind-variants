@@ -68,8 +68,8 @@ pnpm add tailwind-merge
 
 > **⚠️ Upgrading?**
 >
-> - From v2 to v3: See the [v3 migration guide](./MIGRATION-V3.md)
-> - From v1 to v2: See the [v2 migration guide](./MIGRATION-V2.md)
+> - From v2 to v3: See the [v3 migration guide](./.docs/migrations/v2-to-v3.md)
+> - From v1 to v2: See the [v2 migration guide](./.docs/migrations/v1-to-v2.md)
 
 2. Usage:
 

@@ -1,17 +1,18 @@
 {
   "$schema": "https://json.schemastore.org/tsconfig",
-  "include": ["**/*.ts"],
-  "exclude": ["node_modules", "dist"],
+  "include": ["src/**/*.ts", ".config/**/*.ts"],
+  "exclude": ["node_modules", "dist", "src/__tests__/__types__", ".config/tsup.config.ts"],
   "compilerOptions": {
-    "types": ["jest"],
+    "types": ["node"],
     "target": "esnext",
     "module": "esnext",
     "isolatedModules": true,
     "esModuleInterop": true,
-    "moduleResolution": "node",
+    "moduleResolution": "bundler",
     "resolveJsonModule": true,
     "strict": true,
     "exactOptionalPropertyTypes": true,
+    "stripInternal": true,
     "declaration": true,
     "allowJs": false,
     "outDir": "./dist"

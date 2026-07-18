@@ -12,7 +12,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        script: [lint, test, build]
+        script: [lint, test, build, typecheck]
     steps:
       - name: Checkout Codebase
         uses: actions/checkout@v4

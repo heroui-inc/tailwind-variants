@@ -1,0 +1,5 @@
+saveExact: true
+
+allowBuilds:
+  "@swc/core": false
+  esbuild: true

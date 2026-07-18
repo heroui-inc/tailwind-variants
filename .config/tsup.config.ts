@@ -1,9 +1,10 @@
 import {defineConfig} from "tsup";
 
 export default defineConfig({
-  entry: ["src/index.js", "src/lite.js", "src/utils.js"],
+  entry: ["src/index.ts", "src/lite.ts", "src/utils.ts"],
   format: ["cjs", "esm"],
-  dts: false,
+  dts: true,
+  tsconfig: "tsconfig.json",
   clean: true,
   minify: false,
   treeshake: true,

@@ -23,7 +23,7 @@ jobs:
         id: run_commitlint
         uses: wagoid/commitlint-github-action@v6
         with:
-          configFile: .commitlintrc.mjs
+          configFile: .config/commitlint.config.ts
         env:
           NODE_PATH: ${{ github.workspace }}/node_modules
 

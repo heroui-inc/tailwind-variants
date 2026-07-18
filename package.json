@@ -52,59 +52,38 @@
     "access": "public"
   },
   "scripts": {
-    "dev": "tsup --watch",
-    "build": "tsup && node copy-types.cjs",
-    "typecheck": "tsc --noEmit",
-    "prepack": "clean-package",
-    "benchmark": "node benchmark.js",
-    "postpack": "clean-package restore",
-    "lint": "eslint . src/**/*.{js,ts}",
-    "lint:fix": "eslint --fix . src/**/*.{js,ts}",
-    "test": "jest --verbose",
-    "test:watch": "jest --watch --no-verbose",
+    "dev": "tsup --config .config/tsup.config.ts --watch",
+    "build": "tsup --config .config/tsup.config.ts",
+    "typecheck": "tsc --noEmit && pnpm typecheck:types",
+    "typecheck:types": "tsc -p .config/tsconfig.type-tests.json",
+    "benchmark": "pnpm build && node benchmark/run.mjs",
+    "lint": "biome check .",
+    "lint:fix": "biome check --write .",
+    "test": "vitest run --config .config/vitest.config.ts",
+    "test:watch": "vitest --config .config/vitest.config.ts",
     "changelog": "conventional-changelog -p angular -i CHANGELOG.md -s --commit-path .",
     "release": "bumpp --execute='pnpm run changelog' --all",
     "prepublishOnly": "pnpm run build",
-    "release:check": "pnpm run lint && pnpm run typecheck && pnpm run test && pnpm run build"
+    "release:check": "pnpm run lint && pnpm run typecheck && pnpm run test && pnpm run build",
+    "clean": "pnpm clean:cache && pnpm i",
+    "clean:cache": "find . \\( -name 'dist' -o -name 'node_modules' -o -name 'pnpm-lock.yaml' \\) -prune -exec rm -rf '{}' +"
   },
   "devDependencies": {
-    "@commitlint/cli": "19.5.0",
-    "@commitlint/config-conventional": "19.5.0",
-    "@jest/globals": "29.7.0",
-    "@swc-node/jest": "1.8.12",
-    "@swc/cli": "0.5.0",
-    "@swc/core": "1.9.2",
-    "@swc/helpers": "0.5.15",
-    "@swc/jest": "0.2.37",
-    "@types/jest": "29.5.14",
-    "@types/node": "22.9.0",
-    "@typescript-eslint/eslint-plugin": "8.14.0",
-    "@typescript-eslint/parser": "8.14.0",
-    "benchmark": "2.1.4",
-    "bumpp": "10.2.0",
-    "changelogithub": "13.16.0",
-    "class-variance-authority": "0.7.0",
-    "clean-package": "2.2.0",
-    "conventional-changelog-cli": "5.0.0",
-    "eslint": "8.57.0",
-    "eslint-config-prettier": "9.1.0",
-    "eslint-config-ts-lambdas": "1.2.3",
-    "eslint-import-resolver-typescript": "3.6.3",
-    "eslint-plugin-import": "2.31.0",
-    "eslint-plugin-jest": "28.9.0",
-    "eslint-plugin-node": "11.1.0",
-    "eslint-plugin-prettier": "5.2.1",
-    "eslint-plugin-promise": "7.1.0",
-    "expect": "29.7.0",
-    "jest": "29.7.0",
-    "postcss": "8.5.6",
-    "prettier": "3.3.3",
-    "prettier-eslint": "16.3.0",
-    "prettier-eslint-cli": "8.0.1",
-    "tailwindcss": "4.1.11",
-    "ts-node": "10.9.2",
-    "tsup": "8.5.0",
-    "typescript": "5.6.3"
+    "@biomejs/biome": "2.5.4",
+    "@commitlint/cli": "21.2.1",
+    "@commitlint/config-conventional": "21.2.0",
+    "@commitlint/types": "21.2.0",
+    "@types/node": "26.1.1",
+    "bumpp": "11.1.0",
+    "changelogithub": "14.0.0",
+    "class-variance-authority": "0.7.1",
+    "conventional-changelog": "8.1.0",
+    "conventional-changelog-angular": "9.2.1",
+    "esbuild": "0.28.1",
+    "tinybench": "6.0.2",
+    "tsup": "8.5.1",
+    "typescript": "5.6.3",
+    "vitest": "4.1.10"
   },
   "peerDependencies": {
     "tailwind-merge": ">=3.0.0",
@@ -113,11 +92,14 @@
   "peerDependenciesMeta": {
     "tailwind-merge": {
       "optional": true
+    },
+    "tailwindcss": {
+      "optional": true
     }
   },
   "engines": {
-    "node": ">=16.x",
-    "pnpm": ">=7.x"
+    "pnpm": ">=11.x",
+    "node": ">=22.13.x"
   },
-  "packageManager": "pnpm@10.14.0"
+  "packageManager": "pnpm@11.13.0"
 }

@@ -1,20 +1,17 @@
-import conventional from "@commitlint/config-conventional";
+import type {UserConfig} from "@commitlint/types";
+import {RuleConfigSeverity} from "@commitlint/types";
 
-
-const commitLintConfig = {
+const config: UserConfig = {
   extends: ["@commitlint/config-conventional"],
-  plugins: ["commitlint-plugin-function-rules"],
   helpUrl:
     "https://github.com/jrgarciadev/tailwind-variants/blob/main/CONTRIBUTING.MD#commit-convention",
   rules: {
-    ...conventional.rules,
     "type-enum": [
-      2,
+      RuleConfigSeverity.Error,
       "always",
       ["feat", "feature", "fix", "refactor", "docs", "build", "test", "ci", "chore"],
     ],
-    "function-rules/header-max-length": [0],
   },
 };
 
-export default commitLintConfig;
+export default config;
