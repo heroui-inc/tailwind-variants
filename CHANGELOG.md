@@ -104,4 +104,4 @@ All notable changes to this project will be documented in this file. See [standa
 * Cached regex patterns
 * Streamlined string operations
 
-For migration instructions, see [MIGRATION-V2.md](./MIGRATION-V2.md)
+For migration instructions, see the [v2 migration guide](./.docs/migrations/v1-to-v2.md).
