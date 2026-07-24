@@ -5,6 +5,7 @@ import {
   CACHE_MISS,
   createLazyOverrideMerge,
   createResultCache,
+  type ResultCache,
 } from "./cache.js";
 import {compileResolvedOptions} from "./resolve-options.js";
 import type {
@@ -235,7 +236,7 @@ const createVariantResolver = (resolved: ResolvedOptions, cn: CnAdapter): Runtim
   let compiledCompoundVariants = resolved.compiledCompoundVariants;
   let compiledVariants = resolved.compiledVariants;
   let compiledCompoundSlots: CompiledCompoundSlot[] = EMPTY_ARRAY;
-  const cache = createResultCache();
+  let cache: ResultCache | null = null;
   const mergeOverride = createLazyOverrideMerge(cn, config);
   // First invoke skips cache.
   let coldInvokesRemaining = 1;
@@ -272,6 +273,8 @@ const createVariantResolver = (resolved: ResolvedOptions, cn: CnAdapter): Runtim
       coldInvokesRemaining--;
       core = computeCore(props);
     } else {
+      cache ??= createResultCache();
+
       const propsFingerprint = buildPropsFingerprint(variantKeys, defaultVariants, props);
 
       if (propsFingerprint !== null) {
@@ -325,7 +328,7 @@ const createSlotsResolver = (resolved: ResolvedOptions, cn: CnAdapter): RuntimeC
       const compoundSlotsBySlot = resolved.compiledCompoundSlotsBySlot!;
       const keys = resolved.slotKeys!;
       const hasCompounds = compoundVariants.length > 0 || compoundSlots.length > 0;
-      const cache = createResultCache();
+      let cache: ResultCache | null = null;
       const mergeOverride = createLazyOverrideMerge(cn, config);
       const nextSlotsFns: Record<string, (slotProps?: AnyRecord) => string | undefined> = {};
 
@@ -360,6 +363,8 @@ const createSlotsResolver = (resolved: ResolvedOptions, cn: CnAdapter): RuntimeC
           if (!useResultCache) {
             core = computeCore(propsRef, slotProps);
           } else {
+            cache ??= createResultCache();
+
             const propsFingerprint = buildPropsFingerprint(
               variantKeys,
               defaultVariants,
@@ -414,7 +419,16 @@ const createSlotsResolver = (resolved: ResolvedOptions, cn: CnAdapter): RuntimeC
 
 export const createClassResolver = (resolved: ResolvedOptions, cn: CnAdapter): RuntimeComponent => {
   if (resolved.mode === "plain") return createPlainResolver(resolved, cn);
-  if (resolved.mode === "slots") return createSlotsResolver(resolved, cn);
 
-  return createVariantResolver(resolved, cn);
+  let resolver: RuntimeComponent | undefined;
+
+  // Defer slots/variants resolver setup until first call so tv() construction stays cheap.
+  return ((props?: AnyRecord): RuntimeResult => {
+    resolver ??=
+      resolved.mode === "slots"
+        ? createSlotsResolver(resolved, cn)
+        : createVariantResolver(resolved, cn);
+
+    return resolver(props);
+  }) as RuntimeComponent;
 };
