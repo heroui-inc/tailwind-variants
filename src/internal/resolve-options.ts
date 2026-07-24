@@ -73,6 +73,28 @@ const compileCompoundSlots = (compoundSlots: unknown): CompiledCompoundSlot[] =>
   return result;
 };
 
+const indexCompoundSlotsBySlot = (
+  compiledCompoundSlots: CompiledCompoundSlot[],
+): Record<string, CompiledCompoundSlot[]> => {
+  const index: Record<string, CompiledCompoundSlot[]> = {};
+
+  for (let i = 0; i < compiledCompoundSlots.length; i++) {
+    const compoundSlot = compiledCompoundSlots[i];
+    const slots = compoundSlot.source.slots;
+
+    if (!Array.isArray(slots)) continue;
+
+    for (let j = 0; j < slots.length; j++) {
+      const slotKey = slots[j];
+
+      if (!index[slotKey]) index[slotKey] = [];
+      index[slotKey].push(compoundSlot);
+    }
+  }
+
+  return index;
+};
+
 export const resolveOptions = (options: AnyRecord, configProp?: TVConfig): ResolvedOptions => {
   const {
     extend = null,
@@ -151,6 +173,7 @@ export const resolveOptions = (options: AnyRecord, configProp?: TVConfig): Resol
     compiledVariants: null,
     compiledCompoundVariants: null,
     compiledCompoundSlots: null,
+    compiledCompoundSlotsBySlot: null,
     deferredError,
     mode,
     slotKeys: null,
@@ -164,6 +187,7 @@ export const compileResolvedOptions = (resolved: ResolvedOptions): ResolvedOptio
   resolved.compiledVariants = compileVariants(resolved.variants, resolved.variantKeys);
   resolved.compiledCompoundVariants = compileCompoundVariants(resolved.compoundVariants);
   resolved.compiledCompoundSlots = compileCompoundSlots(resolved.compoundSlots);
+  resolved.compiledCompoundSlotsBySlot = indexCompoundSlotsBySlot(resolved.compiledCompoundSlots);
   resolved.slotKeys =
     resolved.slots && typeof resolved.slots === "object" ? Object.keys(resolved.slots) : [];
 

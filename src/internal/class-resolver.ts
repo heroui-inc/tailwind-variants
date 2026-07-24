@@ -1,8 +1,16 @@
 import {falsyToString} from "../utils.js";
+import {
+  buildCompoundsSignature,
+  buildPropsFingerprint,
+  CACHE_MISS,
+  createLazyOverrideMerge,
+  createResultCache,
+} from "./cache.js";
 import {compileResolvedOptions} from "./resolve-options.js";
 import type {
   AnyRecord,
   CnAdapter,
+  CompiledCompoundSlot,
   CompiledCompoundVariant,
   CompiledVariant,
   ResolvedOptions,
@@ -10,13 +18,34 @@ import type {
   RuntimeResult,
 } from "./types.js";
 
-const omitUndefined = (values?: AnyRecord): AnyRecord => {
+const EMPTY_ARRAY: never[] = [];
+
+const variantClassesScratch: any[] = [];
+const compoundClassesScratch: any[] = [];
+const compoundVariantBySlotScratch: any[] = [];
+const compoundSlotClassesScratch: any[] = [];
+
+const getCompleteProps = (
+  defaultVariants: AnyRecord,
+  props?: AnyRecord,
+  slotProps?: AnyRecord,
+): AnyRecord => {
   const result: AnyRecord = {};
 
-  if (!values) return result;
+  for (const key in defaultVariants) {
+    result[key] = defaultVariants[key];
+  }
 
-  for (const key in values) {
-    if (values[key] !== undefined) result[key] = values[key];
+  if (props) {
+    for (const key in props) {
+      if (props[key] !== undefined) result[key] = props[key];
+    }
+  }
+
+  if (slotProps) {
+    for (const key in slotProps) {
+      if (slotProps[key] !== undefined) result[key] = slotProps[key];
+    }
   }
 
   return result;
@@ -62,16 +91,6 @@ const getVariantValue = (
   return variant.values[key || "false"];
 };
 
-const getCompleteProps = (
-  defaultVariants: AnyRecord,
-  props?: AnyRecord,
-  slotProps?: AnyRecord,
-): AnyRecord => ({
-  ...defaultVariants,
-  ...omitUndefined(props),
-  ...omitUndefined(slotProps),
-});
-
 const matchesConditions = (
   compound: CompiledCompoundVariant,
   completeProps: AnyRecord,
@@ -87,12 +106,22 @@ const matchesConditions = (
   return true;
 };
 
+const pushCompoundClassForSlot = (result: any[], slotKey: string, classValue: any): void => {
+  if (typeof classValue === "string") {
+    if (slotKey === "base") result.push(classValue);
+  } else if (classValue && typeof classValue === "object" && classValue[slotKey]) {
+    result.push(classValue[slotKey]);
+  }
+};
+
 const getVariantClassNames = (
   variants: CompiledVariant[],
   defaultVariants: AnyRecord,
   props?: AnyRecord,
 ): any[] => {
-  const result = [];
+  const result = variantClassesScratch;
+
+  result.length = 0;
 
   for (let i = 0; i < variants.length; i++) {
     const value = getVariantValue(variants[i], defaultVariants, props);
@@ -110,7 +139,9 @@ const getVariantClassNamesBySlot = (
   props?: AnyRecord,
   slotProps?: AnyRecord,
 ): any[] => {
-  const result = [];
+  const result = variantClassesScratch;
+
+  result.length = 0;
 
   for (let i = 0; i < variants.length; i++) {
     const variantValue = getVariantValue(variants[i], defaultVariants, props, slotProps);
@@ -129,7 +160,9 @@ const getCompoundVariantClasses = (
   compoundVariants: CompiledCompoundVariant[],
   completeProps: AnyRecord,
 ): any[] => {
-  const result = [];
+  const result = compoundClassesScratch;
+
+  result.length = 0;
 
   for (let i = 0; i < compoundVariants.length; i++) {
     const compoundVariant = compoundVariants[i];
@@ -147,46 +180,71 @@ const getCompoundVariantClassesBySlot = (
   compoundVariants: CompiledCompoundVariant[],
   completeProps: AnyRecord,
 ): any[] => {
-  const result = [];
+  const result = compoundVariantBySlotScratch;
+
+  result.length = 0;
 
   for (let i = 0; i < compoundVariants.length; i++) {
     const compoundVariant = compoundVariants[i];
 
     if (!matchesConditions(compoundVariant, completeProps)) continue;
 
-    for (const classValue of [compoundVariant.source.class, compoundVariant.source.className]) {
-      if (typeof classValue === "string") {
-        if (slotKey === "base") result.push(classValue);
-      } else if (classValue && typeof classValue === "object" && classValue[slotKey]) {
-        result.push(classValue[slotKey]);
-      }
-    }
+    pushCompoundClassForSlot(result, slotKey, compoundVariant.source.class);
+    pushCompoundClassForSlot(result, slotKey, compoundVariant.source.className);
   }
 
   return result;
 };
 
-const createPlainResolver = (resolved: ResolvedOptions, cn: CnAdapter): RuntimeComponent =>
-  ((props?: AnyRecord): RuntimeResult =>
-    cn(resolved.config, resolved.base, props?.class, props?.className)) as RuntimeComponent;
+const getCompoundSlotClasses = (
+  compoundSlotsForKey: CompiledCompoundSlot[],
+  completeProps: AnyRecord,
+): any[] => {
+  const result = compoundSlotClassesScratch;
 
-const createVariantResolver = (resolved: ResolvedOptions, cn: CnAdapter): RuntimeComponent => {
-  const {base, config, defaultVariants, deferredError} = resolved;
-  let compiledCompoundVariants = resolved.compiledCompoundVariants;
-  let compiledVariants = resolved.compiledVariants;
+  result.length = 0;
+
+  for (let i = 0; i < compoundSlotsForKey.length; i++) {
+    const compoundSlot = compoundSlotsForKey[i];
+
+    if (!matchesConditions(compoundSlot, completeProps)) continue;
+
+    if (compoundSlot.source.class) result.push(compoundSlot.source.class);
+    if (compoundSlot.source.className) result.push(compoundSlot.source.className);
+  }
+
+  return result;
+};
+
+const createPlainResolver = (resolved: ResolvedOptions, cn: CnAdapter): RuntimeComponent => {
+  const {base, config} = resolved;
+  let core: string | undefined | typeof CACHE_MISS = CACHE_MISS;
+  const mergeOverride = createLazyOverrideMerge(cn, config);
 
   return ((props?: AnyRecord): RuntimeResult => {
-    if (deferredError) throw deferredError;
-    if (compiledVariants === null || compiledCompoundVariants === null) {
-      compileResolvedOptions(resolved);
-      compiledVariants = resolved.compiledVariants!;
-      compiledCompoundVariants = resolved.compiledCompoundVariants!;
+    if (core === CACHE_MISS) {
+      core = cn(config, base);
     }
 
+    return mergeOverride(core, props);
+  }) as RuntimeComponent;
+};
+
+const createVariantResolver = (resolved: ResolvedOptions, cn: CnAdapter): RuntimeComponent => {
+  const {base, config, defaultVariants, deferredError, variantKeys} = resolved;
+  let compiledCompoundVariants = resolved.compiledCompoundVariants;
+  let compiledVariants = resolved.compiledVariants;
+  let compiledCompoundSlots: CompiledCompoundSlot[] = EMPTY_ARRAY;
+  const cache = createResultCache();
+  const mergeOverride = createLazyOverrideMerge(cn, config);
+  // First invoke skips cache.
+  let coldInvokesRemaining = 1;
+
+  const computeCore = (props?: AnyRecord) => {
     const compoundClasses =
-      compiledCompoundVariants.length > 0
+      compiledCompoundVariants!.length > 0
         ? getCompoundVariantClasses(
-            compiledCompoundVariants,
+            compiledCompoundVariants!,
             getCompleteProps(defaultVariants, props),
           )
         : undefined;
@@ -194,80 +252,160 @@ const createVariantResolver = (resolved: ResolvedOptions, cn: CnAdapter): Runtim
     return cn(
       config,
       base,
-      getVariantClassNames(compiledVariants, defaultVariants, props),
+      getVariantClassNames(compiledVariants!, defaultVariants, props),
       compoundClasses,
-      props?.class,
-      props?.className,
     );
+  };
+
+  return ((props?: AnyRecord): RuntimeResult => {
+    if (deferredError) throw deferredError;
+    if (compiledVariants === null || compiledCompoundVariants === null) {
+      compileResolvedOptions(resolved);
+      compiledVariants = resolved.compiledVariants!;
+      compiledCompoundVariants = resolved.compiledCompoundVariants!;
+      compiledCompoundSlots = resolved.compiledCompoundSlots ?? EMPTY_ARRAY;
+    }
+
+    let core: string | undefined;
+
+    if (coldInvokesRemaining > 0) {
+      coldInvokesRemaining--;
+      core = computeCore(props);
+    } else {
+      const propsFingerprint = buildPropsFingerprint(variantKeys, defaultVariants, props);
+
+      if (propsFingerprint !== null) {
+        const compoundsSig =
+          compiledCompoundVariants.length > 0 || compiledCompoundSlots.length > 0
+            ? buildCompoundsSignature(compiledCompoundVariants, compiledCompoundSlots)
+            : "";
+        const cacheKey = propsFingerprint + "#" + compoundsSig;
+        const cached = cache.get(cacheKey);
+
+        if (cached !== CACHE_MISS) {
+          core = cached;
+        } else {
+          core = computeCore(props);
+          cache.set(cacheKey, core);
+        }
+      } else {
+        core = computeCore(props);
+      }
+    }
+
+    return mergeOverride(core, props);
   }) as RuntimeComponent;
 };
 
 const createSlotsResolver = (resolved: ResolvedOptions, cn: CnAdapter): RuntimeComponent => {
-  const {config, defaultVariants, deferredError, slots} = resolved;
-  let compiledCompoundSlots = resolved.compiledCompoundSlots;
-  let compiledCompoundVariants = resolved.compiledCompoundVariants;
-  let compiledVariants = resolved.compiledVariants;
-  let slotKeys = resolved.slotKeys;
+  const {config, defaultVariants, deferredError, slots, variantKeys} = resolved;
+  let currentProps: AnyRecord | undefined;
+  let currentCompoundsSig = "";
+  let useResultCache = false;
+  let coldParentInvokesRemaining = 1;
+  let slotsFns: Record<string, (slotProps?: AnyRecord) => string | undefined> | null = null;
 
   return ((props?: AnyRecord): RuntimeResult => {
     if (deferredError) throw deferredError;
-    if (
-      compiledVariants === null ||
-      compiledCompoundVariants === null ||
-      compiledCompoundSlots === null ||
-      slotKeys === null
-    ) {
-      compileResolvedOptions(resolved);
-      compiledVariants = resolved.compiledVariants!;
-      compiledCompoundVariants = resolved.compiledCompoundVariants!;
-      compiledCompoundSlots = resolved.compiledCompoundSlots!;
-      slotKeys = resolved.slotKeys!;
+
+    if (slotsFns === null) {
+      if (
+        resolved.compiledVariants === null ||
+        resolved.compiledCompoundVariants === null ||
+        resolved.compiledCompoundSlots === null ||
+        resolved.compiledCompoundSlotsBySlot === null ||
+        resolved.slotKeys === null
+      ) {
+        compileResolvedOptions(resolved);
+      }
+
+      const variants = resolved.compiledVariants!;
+      const compoundVariants = resolved.compiledCompoundVariants!;
+      const compoundSlots = resolved.compiledCompoundSlots!;
+      const compoundSlotsBySlot = resolved.compiledCompoundSlotsBySlot!;
+      const keys = resolved.slotKeys!;
+      const hasCompounds = compoundVariants.length > 0 || compoundSlots.length > 0;
+      const cache = createResultCache();
+      const mergeOverride = createLazyOverrideMerge(cn, config);
+      const nextSlotsFns: Record<string, (slotProps?: AnyRecord) => string | undefined> = {};
+
+      for (let i = 0; i < keys.length; i++) {
+        const slotKey = keys[i];
+        const compoundSlotsForKey = compoundSlotsBySlot[slotKey] ?? EMPTY_ARRAY;
+
+        const computeCore = (propsRef: AnyRecord | undefined, slotProps?: AnyRecord) => {
+          const completeProps = hasCompounds
+            ? getCompleteProps(defaultVariants, propsRef, slotProps)
+            : undefined;
+          const compoundVariantClasses = completeProps
+            ? getCompoundVariantClassesBySlot(slotKey, compoundVariants, completeProps)
+            : undefined;
+          const compoundSlotClasses = completeProps
+            ? getCompoundSlotClasses(compoundSlotsForKey, completeProps)
+            : undefined;
+
+          return cn(
+            config,
+            slots[slotKey],
+            getVariantClassNamesBySlot(slotKey, variants, defaultVariants, propsRef, slotProps),
+            compoundVariantClasses,
+            compoundSlotClasses,
+          );
+        };
+
+        nextSlotsFns[slotKey] = (slotProps) => {
+          const propsRef = currentProps;
+          let core: string | undefined;
+
+          if (!useResultCache) {
+            core = computeCore(propsRef, slotProps);
+          } else {
+            const propsFingerprint = buildPropsFingerprint(
+              variantKeys,
+              defaultVariants,
+              propsRef,
+              slotProps,
+            );
+
+            if (propsFingerprint !== null) {
+              const cacheKey = slotKey + "|" + propsFingerprint + "#" + currentCompoundsSig;
+              const cached = cache.get(cacheKey);
+
+              if (cached !== CACHE_MISS) {
+                core = cached;
+              } else {
+                core = computeCore(propsRef, slotProps);
+                cache.set(cacheKey, core);
+              }
+            } else {
+              core = computeCore(propsRef, slotProps);
+            }
+          }
+
+          return mergeOverride(core, slotProps);
+        };
+      }
+
+      slotsFns = nextSlotsFns;
     }
 
-    const slotsFns: Record<string, (slotProps?: AnyRecord) => string | undefined> = {};
-    const variants = compiledVariants;
-    const compoundVariants = compiledCompoundVariants;
-    const compoundSlots = compiledCompoundSlots;
-    const keys = slotKeys;
-    const hasCompounds = compoundVariants.length > 0 || compoundSlots.length > 0;
+    currentProps = props;
 
-    for (let i = 0; i < keys.length; i++) {
-      const slotKey = keys[i];
+    if (coldParentInvokesRemaining > 0) {
+      coldParentInvokesRemaining--;
+      useResultCache = false;
+      currentCompoundsSig = "";
+    } else {
+      useResultCache = true;
+      const compoundVariants = resolved.compiledCompoundVariants;
+      const compoundSlots = resolved.compiledCompoundSlots;
 
-      slotsFns[slotKey] = (slotProps) => {
-        const completeProps = hasCompounds
-          ? getCompleteProps(defaultVariants, props, slotProps)
-          : undefined;
-        const compoundVariantClasses = completeProps
-          ? getCompoundVariantClassesBySlot(slotKey, compoundVariants, completeProps)
-          : undefined;
-        const compoundSlotClasses = [];
-
-        if (completeProps) {
-          for (let j = 0; j < compoundSlots.length; j++) {
-            const compoundSlot = compoundSlots[j];
-
-            if (
-              !matchesConditions(compoundSlot, completeProps) ||
-              !(compoundSlot.source.slots ?? []).includes(slotKey)
-            ) {
-              continue;
-            }
-
-            compoundSlotClasses.push([compoundSlot.source.class, compoundSlot.source.className]);
-          }
-        }
-
-        return cn(
-          config,
-          slots[slotKey],
-          getVariantClassNamesBySlot(slotKey, variants, defaultVariants, props, slotProps),
-          compoundVariantClasses,
-          compoundSlotClasses,
-          slotProps?.class,
-          slotProps?.className,
-        );
-      };
+      currentCompoundsSig =
+        compoundVariants &&
+        compoundSlots &&
+        (compoundVariants.length > 0 || compoundSlots.length > 0)
+          ? buildCompoundsSignature(compoundVariants, compoundSlots)
+          : "";
     }
 
     return slotsFns;
@@ -276,15 +414,7 @@ const createSlotsResolver = (resolved: ResolvedOptions, cn: CnAdapter): RuntimeC
 
 export const createClassResolver = (resolved: ResolvedOptions, cn: CnAdapter): RuntimeComponent => {
   if (resolved.mode === "plain") return createPlainResolver(resolved, cn);
+  if (resolved.mode === "slots") return createSlotsResolver(resolved, cn);
 
-  let resolver: RuntimeComponent | undefined;
-
-  return ((props?: AnyRecord): RuntimeResult => {
-    resolver ??=
-      resolved.mode === "slots"
-        ? createSlotsResolver(resolved, cn)
-        : createVariantResolver(resolved, cn);
-
-    return resolver(props);
-  }) as RuntimeComponent;
+  return createVariantResolver(resolved, cn);
 };

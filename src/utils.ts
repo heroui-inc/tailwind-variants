@@ -1,6 +1,7 @@
 import type {CnOptions, CnReturn} from "./types.js";
 
 const SPACE_REGEX = /\s+/g;
+const isArray = Array.isArray;
 
 export const removeExtraSpaces = (str: string): string => {
   if (typeof str !== "string" || !str) return str;
@@ -8,14 +9,52 @@ export const removeExtraSpaces = (str: string): string => {
   return str.replace(SPACE_REGEX, " ").trim();
 };
 
+const stringNeedsNormalize = (str: string): boolean => {
+  for (let i = 0, len = str.length; i < len; i++) {
+    const code = str.charCodeAt(i);
+
+    if (code === 32 || (code >= 9 && code <= 13) || code === 160) return true;
+  }
+
+  return false;
+};
+
 export const cx = <T extends CnOptions>(...classnames: T): CnReturn => {
+  const len = classnames.length;
+  let result = "";
+  let needsNormalize = false;
+  let allStrings = true;
+
+  for (let i = 0; i < len; i++) {
+    const c = classnames[i];
+
+    if (typeof c !== "string") {
+      allStrings = false;
+      break;
+    }
+
+    if (!c) continue;
+
+    if (!needsNormalize && stringNeedsNormalize(c)) needsNormalize = true;
+
+    if (result) result += " ";
+    result += c;
+  }
+
+  if (allStrings) {
+    if (!result) return undefined;
+
+    return needsNormalize ? removeExtraSpaces(result) : result;
+  }
+
   const classList: string[] = [];
+  needsNormalize = false;
 
   const buildClassString = (input: any): void => {
     if (!input && input !== 0 && input !== 0n) return;
 
-    if (Array.isArray(input)) {
-      for (let i = 0, len = input.length; i < len; i++) buildClassString(input[i]);
+    if (isArray(input)) {
+      for (let i = 0, arrLen = input.length; i < arrLen; i++) buildClassString(input[i]);
 
       return;
     }
@@ -24,29 +63,46 @@ export const cx = <T extends CnOptions>(...classnames: T): CnReturn => {
 
     if (type === "string" || type === "number" || type === "bigint") {
       if (type === "number" && input !== input) return;
-      classList.push(String(input));
+
+      const value = String(input);
+
+      if (!needsNormalize && type === "string" && stringNeedsNormalize(value)) {
+        needsNormalize = true;
+      }
+
+      classList.push(value);
     } else if (type === "object") {
       const keys = Object.keys(input);
 
-      for (let i = 0, len = keys.length; i < len; i++) {
+      for (let i = 0, keysLen = keys.length; i < keysLen; i++) {
         const key = keys[i];
 
-        if (input[key]) classList.push(key);
+        if (input[key]) {
+          if (!needsNormalize && stringNeedsNormalize(key)) needsNormalize = true;
+          classList.push(key);
+        }
       }
     }
   };
 
-  for (let i = 0, len = classnames.length; i < len; i++) {
+  for (let i = 0; i < len; i++) {
     const c = classnames[i];
 
     if (typeof c === "string") {
-      if (c) classList.push(c);
+      if (c) {
+        if (!needsNormalize && stringNeedsNormalize(c)) needsNormalize = true;
+        classList.push(c);
+      }
     } else if (c !== null && c !== undefined) {
       buildClassString(c);
     }
   }
 
-  return classList.length > 0 ? removeExtraSpaces(classList.join(" ")) : undefined;
+  if (classList.length === 0) return undefined;
+
+  const joined = classList.join(" ");
+
+  return needsNormalize ? removeExtraSpaces(joined) : joined;
 };
 
 export const falsyToString = <T>(value: T): T | string =>
@@ -107,7 +163,7 @@ export const flat = <T>(arr: unknown[], target: T[]): void => {
   for (let i = 0; i < arr.length; i++) {
     const el = arr[i];
 
-    if (Array.isArray(el)) flat(el, target);
+    if (isArray(el)) flat(el, target);
     else if (el) target.push(el as T);
   }
 };
@@ -147,7 +203,7 @@ export const mergeObjects = <T extends object, U extends object>(
     if (key in record2) {
       const val2 = record2[key];
 
-      if (Array.isArray(val1) || Array.isArray(val2)) {
+      if (isArray(val1) || isArray(val2)) {
         result[key] = flatMergeArrays(val2, val1);
       } else if (typeof val1 === "object" && typeof val2 === "object" && val1 && val2) {
         result[key] = mergeObjects(val1, val2);

@@ -26,6 +26,8 @@ const executeMerge = (classnames: CnOptions, config?: TWMConfig): CnReturn => {
 
   if (!base || !(config?.twMerge ?? true)) return base;
 
+  if (base.indexOf(" ") === -1) return base;
+
   if (!state.cachedTwMerge || state.didTwMergeConfigChange) {
     state.didTwMergeConfigChange = false;
     state.cachedTwMerge = createTwMerge(state.cachedTwMergeConfig);

@@ -48,6 +48,7 @@ export type ResolvedOptions = {
   compiledVariants: CompiledVariant[] | null;
   compiledCompoundVariants: CompiledCompoundVariant[] | null;
   compiledCompoundSlots: CompiledCompoundSlot[] | null;
+  compiledCompoundSlotsBySlot: Record<string, CompiledCompoundSlot[]> | null;
   deferredError: TypeError | null;
   mode: "plain" | "variants" | "slots";
   slotKeys: string[] | null;
