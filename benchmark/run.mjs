@@ -3,8 +3,13 @@ import path from "node:path";
 
 import {Bench} from "tinybench";
 
-import {createAdapter, loadImplementations} from "./harness.mjs";
+import {createAdapter, createUtilityAdapter, loadImplementations} from "./harness.mjs";
 import {assertEquivalentOutputs, hasRetainedResult, scenarios} from "./scenarios.mjs";
+import {
+  assertEquivalentUtilityOutputs,
+  hasRetainedUtilityResult,
+  utilityScenarios,
+} from "./utility-scenarios.mjs";
 
 const noiseThreshold = 5;
 const compactNumber = new Intl.NumberFormat("en-US", {
@@ -75,16 +80,18 @@ const toResult = (task, implementationId) => {
 const formatOps = (result) =>
   result ? `${compactNumber.format(result.hz)} ±${result.rme.toFixed(2)}%` : "—";
 
-const formatDelta = (tv, reference) => {
-  const delta = ((tv.hz - reference.hz) / reference.hz) * 100;
+const formatDelta = (left, right) => {
+  if (!left || !right) return "—";
+
+  const delta = ((left.hz - right.hz) / right.hz) * 100;
   const status = Math.abs(delta) <= noiseThreshold ? "noise" : delta > 0 ? "faster" : "slower";
 
   return `${delta >= 0 ? "+" : ""}${delta.toFixed(1)}% ${status}`;
 };
 
-const summarizeReleasedDelta = (results) => {
+const summarizeBaselineDelta = (results, leftId, rightId) => {
   const resultsByScenario = new Map();
-  const summary = {improved: 0, regressed: 0, noise: 0};
+  const summary = {improved: 0, regressed: 0, noise: 0, compared: 0};
 
   for (const result of results) {
     const entries = resultsByScenario.get(result.scenarioId) ?? new Map();
@@ -94,9 +101,13 @@ const summarizeReleasedDelta = (results) => {
   }
 
   for (const entries of resultsByScenario.values()) {
-    const tv = entries.get("tv");
-    const released = entries.get("released");
-    const delta = ((tv.hz - released.hz) / released.hz) * 100;
+    const left = entries.get(leftId);
+    const right = entries.get(rightId);
+
+    if (!left || !right) continue;
+
+    summary.compared++;
+    const delta = ((left.hz - right.hz) / right.hz) * 100;
 
     if (delta > noiseThreshold) summary.improved++;
     else if (delta < -noiseThreshold) summary.regressed++;
@@ -106,7 +117,7 @@ const summarizeReleasedDelta = (results) => {
   return summary;
 };
 
-const createRows = (results) => {
+const createComparisonRows = (suiteScenarios, results, columns) => {
   const resultsByScenario = new Map();
 
   for (const result of results) {
@@ -116,21 +127,22 @@ const createRows = (results) => {
     resultsByScenario.set(result.scenarioId, entries);
   }
 
-  return scenarios.map((scenario) => {
-    const entries = resultsByScenario.get(scenario.id);
-    const tv = entries.get("tv");
-    const released = entries.get("released");
-    const cva = entries.get("cva");
-
-    return {
+  return suiteScenarios.map((scenario) => {
+    const entries = resultsByScenario.get(scenario.id) ?? new Map();
+    const row = {
       Category: scenario.category,
       Scenario: scenario.name,
-      tv: formatOps(tv),
-      "released ops/s": formatOps(released),
-      "tv vs released": formatDelta(tv, released),
-      "cva ops/s": formatOps(cva),
-      "tv vs cva": cva ? formatDelta(tv, cva) : "—",
     };
+
+    for (const column of columns) {
+      if (column.type === "ops") {
+        row[column.header] = formatOps(entries.get(column.id));
+      } else if (column.type === "delta") {
+        row[column.header] = formatDelta(entries.get(column.left), entries.get(column.right));
+      }
+    }
+
+    return row;
   });
 };
 
@@ -142,7 +154,7 @@ const colorDelta = (value) => {
   return color(value, colors.dim);
 };
 
-const renderTerminalTable = (rows) => {
+const renderTerminalTable = (rows, valueStyles) => {
   const headers = Object.keys(rows[0]);
   const widths = headers.map((header) =>
     Math.max(header.length, ...rows.map((row) => stripColor(row[header]).length)),
@@ -158,15 +170,6 @@ const renderTerminalTable = (rows) => {
         return style ? style(padded) : padded;
       })
       .join(" │ ")} │`;
-  const valueStyles = [
-    (value) => color(value, colors.dim),
-    undefined,
-    (value) => color(value, colors.cyan),
-    (value) => color(value, colors.blue),
-    colorDelta,
-    (value) => color(value, colors.magenta),
-    colorDelta,
-  ];
 
   console.log(border("┌", "┬", "┐"));
   console.log(
@@ -195,22 +198,15 @@ const markdownDelta = (value) => {
   return value;
 };
 
-const renderMarkdown = (rows, summary, implementations, options) => {
-  const released = implementations.find(({id}) => id === "released");
-  const cva = implementations.find(({id}) => id === "cva");
-  const lines = [
-    "## Runtime benchmarks",
-    "",
-    `**tv vs released:** 🟢 ${summary.improved} improved · 🔴 ${summary.regressed} regressed · 🟡 ${summary.noise} within ±${noiseThreshold}% noise`,
-    "",
-    `| Category | Scenario | tv ops/s | released ${released.version} ops/s | tv vs released | cva ${cva.version} ops/s | tv vs cva |`,
-    "| --- | --- | ---: | ---: | ---: | ---: | ---: |",
-  ];
+const renderMarkdownTable = ({title, summaryLine, headerLine, alignmentLine, rows, options}) => {
+  const lines = ["## " + title, "", summaryLine, "", headerLine, alignmentLine];
 
   for (const row of rows) {
-    lines.push(
-      `| ${row.Category} | ${row.Scenario} | ${row.tv} | ${row["released ops/s"]} | ${markdownDelta(row["tv vs released"])} | ${row["cva ops/s"]} | ${markdownDelta(row["tv vs cva"])} |`,
+    const values = Object.values(row).map((value, index) =>
+      index >= 2 ? markdownDelta(value) : value,
     );
+
+    lines.push(`| ${values.join(" | ")} |`);
   }
 
   lines.push(
@@ -220,27 +216,6 @@ const renderMarkdown = (rows, summary, implementations, options) => {
   );
 
   return lines.join("\n");
-};
-
-const renderResults = (results, implementations, options) => {
-  const summary = summarizeReleasedDelta(results);
-  const rows = createRows(results);
-
-  console.log("\nBenchmark summary");
-  console.log(
-    `  ${color("tv", colors.cyan)} vs ${color("released", colors.blue)}: ` +
-      `${color(`${summary.improved} improved`, colors.green)} · ` +
-      `${color(`${summary.regressed} regressed`, colors.red)} · ` +
-      `${color(`${summary.noise} within noise`, colors.yellow)}\n`,
-  );
-  renderTerminalTable(rows);
-
-  if (process.env.GITHUB_STEP_SUMMARY) {
-    appendFileSync(
-      process.env.GITHUB_STEP_SUMMARY,
-      renderMarkdown(rows, summary, implementations, options),
-    );
-  }
 };
 
 const runScenarioGroup = async (selectedScenarios, adapters, options) => {
@@ -276,25 +251,23 @@ const runScenarioGroup = async (selectedScenarios, adapters, options) => {
   });
 };
 
-export const runBenchmarks = async (rawOptions = {}) => {
-  const options = {
-    time: 1000,
-    warmupTime: 200,
-    ...rawOptions,
-  };
-  const implementations = await loadImplementations();
+const countTasks = (suiteScenarios, adapters) =>
+  suiteScenarios.reduce(
+    (count, scenario) =>
+      count + adapters.filter((adapter) => scenario.implementations.includes(adapter.kind)).length,
+    0,
+  );
+
+const runVariantsSuite = async (implementations, options) => {
   const adapters = implementations.map(createAdapter);
 
   assertEquivalentOutputs(adapters);
 
   const isolatedScenario = scenarios.find((scenario) => scenario.id === "invocation/custom-merge");
   const regularScenarios = scenarios.filter((scenario) => scenario !== isolatedScenario);
-  const taskCount = scenarios.reduce(
-    (count, scenario) =>
-      count + adapters.filter((adapter) => scenario.implementations.includes(adapter.kind)).length,
-    0,
-  );
+  const taskCount = countTasks(scenarios, adapters);
 
+  console.log(`\n${color("Suite 1/2 · variants", colors.bold)}`);
   console.log(
     `Running ${taskCount} tasks (${options.time}ms measure, ${options.warmupTime}ms warmup).`,
   );
@@ -305,22 +278,147 @@ export const runBenchmarks = async (rawOptions = {}) => {
     results.push(...(await runScenarioGroup([isolatedScenario], adapters, options)));
   }
   if (!hasRetainedResult()) {
-    throw new Error("Benchmark results were not retained; the workload may have been eliminated.");
+    throw new Error(
+      "Variant benchmark results were not retained; the workload may have been eliminated.",
+    );
   }
 
-  renderResults(results, implementations, options);
+  const summary = summarizeBaselineDelta(results, "tv", "released");
+  const columns = [
+    {type: "ops", id: "tv", header: "tv"},
+    {type: "ops", id: "released", header: "released ops/s"},
+    {type: "delta", left: "tv", right: "released", header: "tv vs released"},
+    {type: "ops", id: "cva", header: "cva ops/s"},
+    {type: "delta", left: "tv", right: "cva", header: "tv vs cva"},
+  ];
+  const rows = createComparisonRows(scenarios, results, columns);
   const released = implementations.find(({id}) => id === "released");
   const cva = implementations.find(({id}) => id === "cva");
 
+  console.log("\nVariants summary");
+  console.log(
+    `  ${color("tv", colors.cyan)} vs ${color("released", colors.blue)}: ` +
+      `${color(`${summary.improved} improved`, colors.green)} · ` +
+      `${color(`${summary.regressed} regressed`, colors.red)} · ` +
+      `${color(`${summary.noise} within noise`, colors.yellow)}\n`,
+  );
+  renderTerminalTable(rows, [
+    (value) => color(value, colors.dim),
+    undefined,
+    (value) => color(value, colors.cyan),
+    (value) => color(value, colors.blue),
+    colorDelta,
+    (value) => color(value, colors.magenta),
+    colorDelta,
+  ]);
   console.log(
     `${color("tv current", colors.cyan)} · ` +
       `${color(`tv released v${released.version}`, colors.blue)} · ` +
       `${color(`cva v${cva.version}`, colors.magenta)} · ` +
       `${options.time}ms measure · ${options.warmupTime}ms warmup`,
   );
-  console.log("Variant and slots matrix rows are five-call batches.");
+
+  if (process.env.GITHUB_STEP_SUMMARY) {
+    appendFileSync(
+      process.env.GITHUB_STEP_SUMMARY,
+      renderMarkdownTable({
+        title: "Runtime benchmarks · variants",
+        summaryLine: `**tv vs released:** 🟢 ${summary.improved} improved · 🔴 ${summary.regressed} regressed · 🟡 ${summary.noise} within ±${noiseThreshold}% noise`,
+        headerLine: `| Category | Scenario | tv ops/s | released ${released.version} ops/s | tv vs released | cva ${cva.version} ops/s | tv vs cva |`,
+        alignmentLine: "| --- | --- | ---: | ---: | ---: | ---: | ---: |",
+        rows,
+        options,
+      }),
+    );
+  }
 
   return results;
+};
+
+const runUtilitiesSuite = async (implementations, options) => {
+  const adapters = implementations.map(createUtilityAdapter);
+
+  assertEquivalentUtilityOutputs(adapters);
+
+  const taskCount = countTasks(utilityScenarios, adapters);
+
+  console.log(`\n${color("Suite 2/2 · utilities", colors.bold)}`);
+  console.log(
+    `Running ${taskCount} tasks (${options.time}ms measure, ${options.warmupTime}ms warmup).`,
+  );
+
+  const results = await runScenarioGroup(utilityScenarios, adapters, options);
+
+  if (!hasRetainedUtilityResult()) {
+    throw new Error(
+      "Utility benchmark results were not retained; the workload may have been eliminated.",
+    );
+  }
+
+  const summary = summarizeBaselineDelta(results, "tv", "released");
+  const columns = [
+    {type: "ops", id: "tv", header: "tv"},
+    {type: "ops", id: "released", header: "released ops/s"},
+    {type: "delta", left: "tv", right: "released", header: "tv vs released"},
+    {type: "ops", id: "cnfast", header: "cnfast ops/s"},
+    {type: "delta", left: "tv", right: "cnfast", header: "tv vs cnfast"},
+  ];
+  const rows = createComparisonRows(utilityScenarios, results, columns);
+  const released = implementations.find(({id}) => id === "released");
+  const cnfast = implementations.find(({id}) => id === "cnfast");
+
+  console.log("\nUtilities summary");
+  console.log(
+    `  ${color("tv", colors.cyan)} vs ${color("released", colors.blue)}: ` +
+      `${color(`${summary.improved} improved`, colors.green)} · ` +
+      `${color(`${summary.regressed} regressed`, colors.red)} · ` +
+      `${color(`${summary.noise} within noise`, colors.yellow)}\n`,
+  );
+  renderTerminalTable(rows, [
+    (value) => color(value, colors.dim),
+    undefined,
+    (value) => color(value, colors.cyan),
+    (value) => color(value, colors.blue),
+    colorDelta,
+    (value) => color(value, colors.magenta),
+    colorDelta,
+  ]);
+  console.log(
+    `${color("tv current", colors.cyan)} · ` +
+      `${color(`tv released v${released.version}`, colors.blue)} · ` +
+      `${color(`cnfast v${cnfast.version}`, colors.magenta)} · ` +
+      `${options.time}ms measure · ${options.warmupTime}ms warmup`,
+  );
+
+  if (process.env.GITHUB_STEP_SUMMARY) {
+    appendFileSync(
+      process.env.GITHUB_STEP_SUMMARY,
+      renderMarkdownTable({
+        title: "Runtime benchmarks · utilities (cx/cn vs cnfast)",
+        summaryLine: `**tv vs released:** 🟢 ${summary.improved} improved · 🔴 ${summary.regressed} regressed · 🟡 ${summary.noise} within ±${noiseThreshold}% noise`,
+        headerLine: `| Category | Scenario | tv ops/s | released ${released.version} ops/s | tv vs released | cnfast ${cnfast.version} ops/s | tv vs cnfast |`,
+        alignmentLine: "| --- | --- | ---: | ---: | ---: | ---: | ---: |",
+        rows,
+        options,
+      }),
+    );
+  }
+
+  return results;
+};
+
+export const runBenchmarks = async (rawOptions = {}) => {
+  const options = {
+    time: 1000,
+    warmupTime: 200,
+    ...rawOptions,
+  };
+  const {variants, utilities} = await loadImplementations();
+
+  const variantResults = await runVariantsSuite(variants, options);
+  const utilityResults = await runUtilitiesSuite(utilities, options);
+
+  return {variants: variantResults, utilities: utilityResults};
 };
 
 if (process.argv[1] && path.resolve(process.argv[1]) === import.meta.filename) {

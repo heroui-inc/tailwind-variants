@@ -15,15 +15,30 @@ pnpm benchmark
 pnpm benchmark --quick
 ```
 
-Each run queries npm for the latest published `tailwind-variants`, caches that exact package in the
-system temporary directory, and compares:
+Each run queries npm for the latest published `tailwind-variants`,
+`class-variance-authority`, and `cnfast`, caches those exact packages in the system temporary
+directory, and runs two suites in order:
+
+### Suite 1 · variants
 
 - `tv`: the package built from the current checkout.
-- `tv(released-{version})`: the latest package published to npm.
-- `cva`: the installed `class-variance-authority` development dependency.
+- `tv(released-{version})`: the latest `tailwind-variants` published to npm.
+- `cva({version})`: the latest `class-variance-authority` published to npm.
 
-The npm registry must be reachable even when the released package is already cached, so the cache
-cannot silently turn a stale release into the baseline.
+### Suite 2 · utilities (`cx` / `cn` vs `cnfast`)
+
+Compares equivalent class-utility APIs:
+
+| Scenario | TV / released | cnfast |
+| --- | --- | --- |
+| Join mixed values | `cx` | `clsx` |
+| Join string tokens | `cx` | `twJoin` |
+| Join and merge | `cn` | `cn` |
+| Curried merge with config | `cnMerge` | — |
+| Direct Tailwind merge | — | `twMerge` |
+
+The npm registry must be reachable even when packages are already cached, so the cache cannot
+silently turn a stale release into the baseline.
 
 Results are printed as one comparison table. Throughput uses compact human-readable units such as
 `2.5M`, while relative margin of error and current-to-reference deltas remain visible. The summary

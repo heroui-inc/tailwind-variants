@@ -122,3 +122,23 @@ export const classInputs = [
   null,
   "trailing",
 ];
+
+/** String/falsy tokens shared by TV `cx` and cnfast `twJoin`. */
+export const tokenInputs = ["px-2", false, null, undefined, "py-2", "", "rounded", "shadow"];
+
+/** Mixed inputs that exercise join + conflict resolution (`cn`). */
+export const mergeClassInputs = [
+  "button px-2 py-2 text-sm",
+  ["px-4", {active: true, hidden: false}],
+  undefined,
+  "text-lg trailing",
+];
+
+/** Token inputs for direct `twMerge` (no object dictionaries). */
+export const mergeTokenInputs = [
+  "button px-2 py-2 text-sm",
+  false,
+  null,
+  "px-4",
+  "text-lg trailing",
+];

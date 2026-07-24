@@ -84,18 +84,17 @@
     "clean:cache": "find . \\( -name 'dist' -o -name 'node_modules' -o -name 'pnpm-lock.yaml' \\) -prune -exec rm -rf '{}' +"
   },
   "devDependencies": {
-    "@biomejs/biome": "2.5.4",
+    "@biomejs/biome": "2.5.5",
     "@commitlint/cli": "21.2.1",
     "@commitlint/config-conventional": "21.2.0",
     "@commitlint/types": "21.2.0",
     "@types/node": "26.1.1",
     "bumpp": "11.1.0",
     "changelogithub": "14.0.0",
-    "class-variance-authority": "0.7.1",
     "conventional-changelog": "8.1.0",
     "conventional-changelog-angular": "9.2.1",
     "esbuild": "0.28.1",
-    "tinybench": "6.0.2",
+    "tinybench": "6.1.2",
     "tsup": "8.5.1",
     "typescript": "5.6.3",
     "vitest": "4.1.10"
@@ -116,5 +115,5 @@
     "pnpm": ">=7.x",
     "node": ">=16.9.x"
   },
-  "packageManager": "pnpm@11.13.0"
+  "packageManager": "pnpm@11.17.0"
 }

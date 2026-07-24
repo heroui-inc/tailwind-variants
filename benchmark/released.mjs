@@ -19,12 +19,6 @@ const runPnpm = (args, options = {}) => {
   return typeof output === "string" ? output.trim() : "";
 };
 
-const readLatestVersion = () =>
-  JSON.parse(runPnpm(["view", "tailwind-variants", "version", "--json"]));
-
-const readTailwindMergeVersion = () =>
-  readJson(path.join(repoRoot, "node_modules", "tailwind-merge", "package.json")).version;
-
 const validateVersion = (version, packageName) => {
   if (typeof version !== "string" || !safeVersion.test(version)) {
     throw new TypeError(`Received an invalid ${packageName} version.`);
@@ -33,19 +27,32 @@ const validateVersion = (version, packageName) => {
   return version;
 };
 
-export const installReleasedTV = () => {
-  const version = validateVersion(readLatestVersion(), "tailwind-variants");
-  const tailwindMergeVersion = validateVersion(readTailwindMergeVersion(), "tailwind-merge");
-  const installDir = path.join(cacheRoot, `${version}-tw-merge-${tailwindMergeVersion}`);
-  const packageDir = path.join(installDir, "node_modules", "tailwind-variants");
-  const distPath = path.join(packageDir, "dist", "index.js");
+const readLatestVersion = (packageName) =>
+  validateVersion(JSON.parse(runPnpm(["view", packageName, "version", "--json"])), packageName);
 
-  if (!existsSync(distPath)) {
+const readTailwindMergeVersion = () =>
+  validateVersion(
+    readJson(path.join(repoRoot, "node_modules", "tailwind-merge", "package.json")).version,
+    "tailwind-merge",
+  );
+
+const installExactPackage = ({
+  cacheKey,
+  packageName,
+  version,
+  extraPackages = [],
+  entryRelativePath,
+}) => {
+  const installDir = path.join(cacheRoot, cacheKey);
+  const packageDir = path.join(installDir, "node_modules", packageName);
+  const entryPath = path.join(packageDir, entryRelativePath);
+
+  if (!existsSync(entryPath)) {
     rmSync(installDir, {force: true, recursive: true});
     mkdirSync(installDir, {recursive: true});
     writeFileSync(
       path.join(installDir, "package.json"),
-      `${JSON.stringify({name: "tailwind-variants-benchmark-release", private: true}, null, 2)}\n`,
+      `${JSON.stringify({name: `tailwind-variants-benchmark-${packageName}`, private: true}, null, 2)}\n`,
     );
     runPnpm(
       [
@@ -53,8 +60,8 @@ export const installReleasedTV = () => {
         "--ignore-workspace",
         "--ignore-scripts",
         "--save-exact",
-        `tailwind-variants@${version}`,
-        `tailwind-merge@${tailwindMergeVersion}`,
+        `${packageName}@${version}`,
+        ...extraPackages,
       ],
       {cwd: installDir, stdio: "inherit"},
     );
@@ -63,11 +70,58 @@ export const installReleasedTV = () => {
   const installedPackage = readJson(path.join(packageDir, "package.json"));
 
   if (installedPackage.version !== version) {
-    throw new Error(`Expected tailwind-variants ${version}, received ${installedPackage.version}.`);
+    throw new Error(`Expected ${packageName} ${version}, received ${installedPackage.version}.`);
   }
 
   return {
-    distPath,
+    entryPath,
     version,
+  };
+};
+
+export const installReleasedTV = () => {
+  const version = readLatestVersion("tailwind-variants");
+  const tailwindMergeVersion = readTailwindMergeVersion();
+  const {entryPath, version: installedVersion} = installExactPackage({
+    cacheKey: `tv-${version}-tw-merge-${tailwindMergeVersion}`,
+    packageName: "tailwind-variants",
+    version,
+    extraPackages: [`tailwind-merge@${tailwindMergeVersion}`],
+    entryRelativePath: path.join("dist", "index.js"),
+  });
+
+  return {
+    distPath: entryPath,
+    version: installedVersion,
+  };
+};
+
+export const installLatestCVA = () => {
+  const version = readLatestVersion("class-variance-authority");
+  const {entryPath, version: installedVersion} = installExactPackage({
+    cacheKey: `cva-${version}`,
+    packageName: "class-variance-authority",
+    version,
+    entryRelativePath: path.join("dist", "index.mjs"),
+  });
+
+  return {
+    entryPath,
+    version: installedVersion,
+  };
+};
+
+export const installLatestCnfast = () => {
+  const version = readLatestVersion("cnfast");
+  const {entryPath, version: installedVersion} = installExactPackage({
+    cacheKey: `cnfast-${version}`,
+    packageName: "cnfast",
+    version,
+    entryRelativePath: path.join("dist", "index.mjs"),
+  });
+
+  return {
+    entryPath,
+    version: installedVersion,
   };
 };
