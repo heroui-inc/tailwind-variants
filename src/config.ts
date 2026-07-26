@@ -1,21 +1,27 @@
-import type {extendTailwindMerge} from "tailwind-merge";
+/*
+ * Compatible with common `extend` / `override` merger config shapes.
+ *
+ * @see https://github.com/dcastil/tailwind-merge
+ * @see https://github.com/dcastil/tailwind-merge/blob/main/LICENSE.md
+ */
 
-type MergeConfig = Parameters<typeof extendTailwindMerge>[0];
-type LegacyMergeConfig = Extract<MergeConfig, {extend?: unknown}>["extend"];
+import type {AnyConfig, ConfigExtension} from "./internal/merge/types.js";
 
-export type TWMergeConfig = MergeConfig & LegacyMergeConfig;
+/** Merger config for the built-in Tailwind conflict resolver. */
+export type TWMergeConfig = ConfigExtension &
+  Partial<AnyConfig> & {
+    extend?: Partial<AnyConfig>;
+    override?: Partial<AnyConfig>;
+  };
 
 export type TWMConfig = {
   /**
-   * Whether to merge the class names with `tailwind-merge` library.
-   * It's avoid to have duplicate tailwind classes. (Recommended)
-   * @see https://github.com/dcastil/tailwind-merge/blob/v2.2.0/README.md
+   * Whether to merge conflicting Tailwind classes.
    * @default true
    */
   twMerge?: boolean;
   /**
-   * The config object for `tailwind-merge` library.
-   * @see https://github.com/dcastil/tailwind-merge/blob/v2.2.0/docs/configuration.md
+   * Custom merger config (`extend` / `override`, or legacy flat fields).
    */
   twMergeConfig?: TWMergeConfig;
 };

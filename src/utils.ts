@@ -1,3 +1,4 @@
+import {type JoinClassValue, joinClassValue} from "./internal/join-class-value.js";
 import type {CnOptions, CnReturn} from "./types.js";
 
 const SPACE_REGEX = /\s+/g;
@@ -9,100 +10,42 @@ export const removeExtraSpaces = (str: string): string => {
   return str.replace(SPACE_REGEX, " ").trim();
 };
 
+/** Dirty leading/trailing/doubled/non-space whitespace on the final joined string. */
 const stringNeedsNormalize = (str: string): boolean => {
-  for (let i = 0, len = str.length; i < len; i++) {
+  const len = str.length;
+
+  if (len === 0) return false;
+
+  const first = str.charCodeAt(0);
+  const last = str.charCodeAt(len - 1);
+
+  if (
+    first === 32 ||
+    last === 32 ||
+    (first >= 9 && first <= 13) ||
+    first === 160 ||
+    (last >= 9 && last <= 13) ||
+    last === 160
+  ) {
+    return true;
+  }
+
+  for (let i = 0; i < len; i++) {
     const code = str.charCodeAt(i);
 
-    if (code === 32 || (code >= 9 && code <= 13) || code === 160) return true;
+    if ((code >= 9 && code <= 13) || code === 160) return true;
+    if (code === 32 && i + 1 < len && str.charCodeAt(i + 1) === 32) return true;
   }
 
   return false;
 };
 
 export const cx = <T extends CnOptions>(...classnames: T): CnReturn => {
-  const len = classnames.length;
-  let result = "";
-  let needsNormalize = false;
-  let allStrings = true;
+  const result = joinClassValue(classnames as JoinClassValue[]);
 
-  for (let i = 0; i < len; i++) {
-    const c = classnames[i];
+  if (!result) return undefined;
 
-    if (typeof c !== "string") {
-      allStrings = false;
-      break;
-    }
-
-    if (!c) continue;
-
-    if (!needsNormalize && stringNeedsNormalize(c)) needsNormalize = true;
-
-    if (result) result += " ";
-    result += c;
-  }
-
-  if (allStrings) {
-    if (!result) return undefined;
-
-    return needsNormalize ? removeExtraSpaces(result) : result;
-  }
-
-  const classList: string[] = [];
-  needsNormalize = false;
-
-  const buildClassString = (input: any): void => {
-    if (!input && input !== 0 && input !== 0n) return;
-
-    if (isArray(input)) {
-      for (let i = 0, arrLen = input.length; i < arrLen; i++) buildClassString(input[i]);
-
-      return;
-    }
-
-    const type = typeof input;
-
-    if (type === "string" || type === "number" || type === "bigint") {
-      if (type === "number" && input !== input) return;
-
-      const value = String(input);
-
-      if (!needsNormalize && type === "string" && stringNeedsNormalize(value)) {
-        needsNormalize = true;
-      }
-
-      classList.push(value);
-    } else if (type === "object") {
-      const keys = Object.keys(input);
-
-      for (let i = 0, keysLen = keys.length; i < keysLen; i++) {
-        const key = keys[i];
-
-        if (input[key]) {
-          if (!needsNormalize && stringNeedsNormalize(key)) needsNormalize = true;
-          classList.push(key);
-        }
-      }
-    }
-  };
-
-  for (let i = 0; i < len; i++) {
-    const c = classnames[i];
-
-    if (typeof c === "string") {
-      if (c) {
-        if (!needsNormalize && stringNeedsNormalize(c)) needsNormalize = true;
-        classList.push(c);
-      }
-    } else if (c !== null && c !== undefined) {
-      buildClassString(c);
-    }
-  }
-
-  if (classList.length === 0) return undefined;
-
-  const joined = classList.join(" ");
-
-  return needsNormalize ? removeExtraSpaces(joined) : joined;
+  return stringNeedsNormalize(result) ? removeExtraSpaces(result) : result;
 };
 
 export const falsyToString = <T>(value: T): T | string =>

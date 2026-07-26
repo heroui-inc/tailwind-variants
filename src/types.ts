@@ -1,5 +1,5 @@
-import type {ClassNameValue as ClassValue} from "tailwind-merge";
 import type {TVConfig} from "./config.js";
+import type {ClassNameValue as ClassValue} from "./internal/merge/types.js";
 
 export type {ClassValue};
 
