@@ -285,7 +285,7 @@ const runVariantsSuite = async (implementations, options) => {
 
   const summary = summarizeBaselineDelta(results, "tv", "released");
   const columns = [
-    {type: "ops", id: "tv", header: "tv"},
+    {type: "ops", id: "tv", header: "tv ops/s"},
     {type: "ops", id: "released", header: "released ops/s"},
     {type: "delta", left: "tv", right: "released", header: "tv vs released"},
     {type: "ops", id: "cva", header: "cva ops/s"},
@@ -357,7 +357,7 @@ const runUtilitiesSuite = async (implementations, options) => {
 
   const summary = summarizeBaselineDelta(results, "tv", "released");
   const columns = [
-    {type: "ops", id: "tv", header: "tv"},
+    {type: "ops", id: "tv", header: "tv ops/s"},
     {type: "ops", id: "released", header: "released ops/s"},
     {type: "delta", left: "tv", right: "released", header: "tv vs released"},
     {type: "ops", id: "cnfast", header: "cnfast ops/s"},
