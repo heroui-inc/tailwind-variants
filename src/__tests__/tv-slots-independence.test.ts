@@ -48,6 +48,9 @@ describe.each([
   test("reuses the same result object for the same props fingerprint", () => {
     const v = createTv(slotsConfig);
 
+    // First parent invoke is a cold path (no cache); warm reuse starts afterward.
+    v({size: "sm"});
+
     const a = v({size: "sm"});
     const b = v({size: "sm"});
 

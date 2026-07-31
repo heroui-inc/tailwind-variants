@@ -302,18 +302,20 @@ const createVariantResolver = (resolved: ResolvedOptions, cn: CnAdapter): Runtim
 };
 
 type SlotsResult = Record<string, (slotProps?: AnyRecord) => string | undefined>;
+type SlotComputer = (propsRef?: AnyRecord, slotProps?: AnyRecord) => string | undefined;
 
 const createSlotsResolver = (resolved: ResolvedOptions, cn: CnAdapter): RuntimeComponent => {
   const {config, defaultVariants, deferredError, slots, variantKeys} = resolved;
 
-  let variants: CompiledVariant[] | null = null;
   let compoundVariants: CompiledCompoundVariant[] | null = null;
   let compoundSlots: CompiledCompoundSlot[] | null = null;
-  let compoundSlotsBySlot: Record<string, CompiledCompoundSlot[]> | null = null;
   let keys: string[] | null = null;
+  let slotComputers: SlotComputer[] | null = null;
   let hasCompounds = false;
   let mergeOverride: ReturnType<typeof createLazyOverrideMerge> | null = null;
   let parentCache: ReturnType<typeof createBoundedCache<SlotsResult>> | null = null;
+  // First parent invoke skips fingerprint/cache setup (lifecycle create+call once).
+  let coldParentInvokesRemaining = 1;
 
   const ensureCompiled = () => {
     if (keys !== null) return;
@@ -328,34 +330,27 @@ const createSlotsResolver = (resolved: ResolvedOptions, cn: CnAdapter): RuntimeC
       compileResolvedOptions(resolved);
     }
 
-    variants = resolved.compiledVariants!;
+    const variants = resolved.compiledVariants!;
     compoundVariants = resolved.compiledCompoundVariants!;
     compoundSlots = resolved.compiledCompoundSlots!;
-    compoundSlotsBySlot = resolved.compiledCompoundSlotsBySlot!;
+    const compoundSlotsBySlot = resolved.compiledCompoundSlotsBySlot!;
     keys = resolved.slotKeys!;
     hasCompounds = compoundVariants.length > 0 || compoundSlots.length > 0;
     mergeOverride = createLazyOverrideMerge(cn, config);
-  };
 
-  const createSlotsResult = (props?: AnyRecord): SlotsResult => {
-    const compiledVariants = variants!;
-    const compiledCompoundVariants = compoundVariants!;
-    const compiledCompoundSlotsBySlot = compoundSlotsBySlot!;
-    const slotKeys = keys!;
-    const overrideMerge = mergeOverride!;
-    const cachedCores: Record<string, string | undefined> = {};
-    const result: SlotsResult = {};
+    // One computer per slot for the lifetime of this tv() instance.
+    const computers: SlotComputer[] = new Array(keys.length);
 
-    for (let i = 0; i < slotKeys.length; i++) {
-      const slotKey = slotKeys[i];
-      const compoundSlotsForKey = compiledCompoundSlotsBySlot[slotKey] ?? EMPTY_ARRAY;
+    for (let i = 0; i < keys.length; i++) {
+      const slotKey = keys[i];
+      const compoundSlotsForKey = compoundSlotsBySlot[slotKey] ?? EMPTY_ARRAY;
 
-      const computeCore = (propsRef: AnyRecord | undefined, slotProps?: AnyRecord) => {
+      computers[i] = (propsRef, slotProps) => {
         const completeProps = hasCompounds
           ? getCompleteProps(defaultVariants, propsRef, slotProps)
           : undefined;
         const compoundVariantClasses = completeProps
-          ? getCompoundVariantClassesBySlot(slotKey, compiledCompoundVariants, completeProps)
+          ? getCompoundVariantClassesBySlot(slotKey, compoundVariants!, completeProps)
           : undefined;
         const compoundSlotClasses = completeProps
           ? getCompoundSlotClasses(compoundSlotsForKey, completeProps)
@@ -364,23 +359,29 @@ const createSlotsResolver = (resolved: ResolvedOptions, cn: CnAdapter): RuntimeC
         return cn(
           config,
           slots[slotKey],
-          getVariantClassNamesBySlot(
-            slotKey,
-            compiledVariants,
-            defaultVariants,
-            propsRef,
-            slotProps,
-          ),
+          getVariantClassNamesBySlot(slotKey, variants, defaultVariants, propsRef, slotProps),
           compoundVariantClasses,
           compoundSlotClasses,
         );
       };
+    }
 
+    slotComputers = computers;
+  };
+
+  const createSlotsResult = (props?: AnyRecord): SlotsResult => {
+    const slotKeys = keys!;
+    const computers = slotComputers!;
+    const overrideMerge = mergeOverride!;
+    const result: SlotsResult = {};
+
+    for (let i = 0; i < slotKeys.length; i++) {
+      const compute = computers[i];
       // Capture parent props for this result instance (not shared mutable state).
-      cachedCores[slotKey] = computeCore(props);
+      const core = compute(props);
 
-      result[slotKey] = (slotProps) => {
-        if (slotProps == null) return cachedCores[slotKey];
+      result[slotKeys[i]] = (slotProps) => {
+        if (slotProps == null) return core;
 
         let hasVariantOverride = false;
 
@@ -393,12 +394,10 @@ const createSlotsResolver = (resolved: ResolvedOptions, cn: CnAdapter): RuntimeC
         }
 
         if (!hasVariantOverride) {
-          return overrideMerge(cachedCores[slotKey], slotProps);
+          return overrideMerge(core, slotProps);
         }
 
-        const core = computeCore(props, slotProps);
-
-        return overrideMerge(core, slotProps);
+        return overrideMerge(compute(props, slotProps), slotProps);
       };
     }
 
@@ -409,6 +408,13 @@ const createSlotsResolver = (resolved: ResolvedOptions, cn: CnAdapter): RuntimeC
     if (deferredError) throw deferredError;
 
     ensureCompiled();
+
+    // Cold path: avoid fingerprint/compoundsSig/Map overhead on first invoke.
+    if (coldParentInvokesRemaining > 0) {
+      coldParentInvokesRemaining--;
+
+      return createSlotsResult(props);
+    }
 
     const propsFingerprint = buildPropsFingerprint(variantKeys, defaultVariants, props);
 
