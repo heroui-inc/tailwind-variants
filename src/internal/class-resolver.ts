@@ -3,6 +3,7 @@ import {
   buildCompoundsSignature,
   buildPropsFingerprint,
   CACHE_MISS,
+  createBoundedCache,
   createLazyOverrideMerge,
   createResultCache,
   type ResultCache,
@@ -300,120 +301,139 @@ const createVariantResolver = (resolved: ResolvedOptions, cn: CnAdapter): Runtim
   }) as RuntimeComponent;
 };
 
+type SlotsResult = Record<string, (slotProps?: AnyRecord) => string | undefined>;
+
 const createSlotsResolver = (resolved: ResolvedOptions, cn: CnAdapter): RuntimeComponent => {
   const {config, defaultVariants, deferredError, slots, variantKeys} = resolved;
-  let currentProps: AnyRecord | undefined;
-  let currentCompoundsSig = "";
-  let useResultCache = false;
-  let coldParentInvokesRemaining = 1;
-  let slotsFns: Record<string, (slotProps?: AnyRecord) => string | undefined> | null = null;
+
+  let variants: CompiledVariant[] | null = null;
+  let compoundVariants: CompiledCompoundVariant[] | null = null;
+  let compoundSlots: CompiledCompoundSlot[] | null = null;
+  let compoundSlotsBySlot: Record<string, CompiledCompoundSlot[]> | null = null;
+  let keys: string[] | null = null;
+  let hasCompounds = false;
+  let mergeOverride: ReturnType<typeof createLazyOverrideMerge> | null = null;
+  let parentCache: ReturnType<typeof createBoundedCache<SlotsResult>> | null = null;
+
+  const ensureCompiled = () => {
+    if (keys !== null) return;
+
+    if (
+      resolved.compiledVariants === null ||
+      resolved.compiledCompoundVariants === null ||
+      resolved.compiledCompoundSlots === null ||
+      resolved.compiledCompoundSlotsBySlot === null ||
+      resolved.slotKeys === null
+    ) {
+      compileResolvedOptions(resolved);
+    }
+
+    variants = resolved.compiledVariants!;
+    compoundVariants = resolved.compiledCompoundVariants!;
+    compoundSlots = resolved.compiledCompoundSlots!;
+    compoundSlotsBySlot = resolved.compiledCompoundSlotsBySlot!;
+    keys = resolved.slotKeys!;
+    hasCompounds = compoundVariants.length > 0 || compoundSlots.length > 0;
+    mergeOverride = createLazyOverrideMerge(cn, config);
+  };
+
+  const createSlotsResult = (props?: AnyRecord): SlotsResult => {
+    const compiledVariants = variants!;
+    const compiledCompoundVariants = compoundVariants!;
+    const compiledCompoundSlotsBySlot = compoundSlotsBySlot!;
+    const slotKeys = keys!;
+    const overrideMerge = mergeOverride!;
+    const cachedCores: Record<string, string | undefined> = {};
+    const result: SlotsResult = {};
+
+    for (let i = 0; i < slotKeys.length; i++) {
+      const slotKey = slotKeys[i];
+      const compoundSlotsForKey = compiledCompoundSlotsBySlot[slotKey] ?? EMPTY_ARRAY;
+
+      const computeCore = (propsRef: AnyRecord | undefined, slotProps?: AnyRecord) => {
+        const completeProps = hasCompounds
+          ? getCompleteProps(defaultVariants, propsRef, slotProps)
+          : undefined;
+        const compoundVariantClasses = completeProps
+          ? getCompoundVariantClassesBySlot(slotKey, compiledCompoundVariants, completeProps)
+          : undefined;
+        const compoundSlotClasses = completeProps
+          ? getCompoundSlotClasses(compoundSlotsForKey, completeProps)
+          : undefined;
+
+        return cn(
+          config,
+          slots[slotKey],
+          getVariantClassNamesBySlot(
+            slotKey,
+            compiledVariants,
+            defaultVariants,
+            propsRef,
+            slotProps,
+          ),
+          compoundVariantClasses,
+          compoundSlotClasses,
+        );
+      };
+
+      // Capture parent props for this result instance (not shared mutable state).
+      cachedCores[slotKey] = computeCore(props);
+
+      result[slotKey] = (slotProps) => {
+        if (slotProps == null) return cachedCores[slotKey];
+
+        let hasVariantOverride = false;
+
+        for (const key in slotProps) {
+          if (key === "class" || key === "className") continue;
+          if (slotProps[key] !== undefined) {
+            hasVariantOverride = true;
+            break;
+          }
+        }
+
+        if (!hasVariantOverride) {
+          return overrideMerge(cachedCores[slotKey], slotProps);
+        }
+
+        const core = computeCore(props, slotProps);
+
+        return overrideMerge(core, slotProps);
+      };
+    }
+
+    return result;
+  };
 
   return ((props?: AnyRecord): RuntimeResult => {
     if (deferredError) throw deferredError;
 
-    if (slotsFns === null) {
-      if (
-        resolved.compiledVariants === null ||
-        resolved.compiledCompoundVariants === null ||
-        resolved.compiledCompoundSlots === null ||
-        resolved.compiledCompoundSlotsBySlot === null ||
-        resolved.slotKeys === null
-      ) {
-        compileResolvedOptions(resolved);
-      }
+    ensureCompiled();
 
-      const variants = resolved.compiledVariants!;
-      const compoundVariants = resolved.compiledCompoundVariants!;
-      const compoundSlots = resolved.compiledCompoundSlots!;
-      const compoundSlotsBySlot = resolved.compiledCompoundSlotsBySlot!;
-      const keys = resolved.slotKeys!;
-      const hasCompounds = compoundVariants.length > 0 || compoundSlots.length > 0;
-      let cache: ResultCache | null = null;
-      const mergeOverride = createLazyOverrideMerge(cn, config);
-      const nextSlotsFns: Record<string, (slotProps?: AnyRecord) => string | undefined> = {};
+    const propsFingerprint = buildPropsFingerprint(variantKeys, defaultVariants, props);
 
-      for (let i = 0; i < keys.length; i++) {
-        const slotKey = keys[i];
-        const compoundSlotsForKey = compoundSlotsBySlot[slotKey] ?? EMPTY_ARRAY;
-
-        const computeCore = (propsRef: AnyRecord | undefined, slotProps?: AnyRecord) => {
-          const completeProps = hasCompounds
-            ? getCompleteProps(defaultVariants, propsRef, slotProps)
-            : undefined;
-          const compoundVariantClasses = completeProps
-            ? getCompoundVariantClassesBySlot(slotKey, compoundVariants, completeProps)
-            : undefined;
-          const compoundSlotClasses = completeProps
-            ? getCompoundSlotClasses(compoundSlotsForKey, completeProps)
-            : undefined;
-
-          return cn(
-            config,
-            slots[slotKey],
-            getVariantClassNamesBySlot(slotKey, variants, defaultVariants, propsRef, slotProps),
-            compoundVariantClasses,
-            compoundSlotClasses,
-          );
-        };
-
-        nextSlotsFns[slotKey] = (slotProps) => {
-          const propsRef = currentProps;
-          let core: string | undefined;
-
-          if (!useResultCache) {
-            core = computeCore(propsRef, slotProps);
-          } else {
-            cache ??= createResultCache();
-
-            const propsFingerprint = buildPropsFingerprint(
-              variantKeys,
-              defaultVariants,
-              propsRef,
-              slotProps,
-            );
-
-            if (propsFingerprint !== null) {
-              const cacheKey = slotKey + "|" + propsFingerprint + "#" + currentCompoundsSig;
-              const cached = cache.get(cacheKey);
-
-              if (cached !== CACHE_MISS) {
-                core = cached;
-              } else {
-                core = computeCore(propsRef, slotProps);
-                cache.set(cacheKey, core);
-              }
-            } else {
-              core = computeCore(propsRef, slotProps);
-            }
-          }
-
-          return mergeOverride(core, slotProps);
-        };
-      }
-
-      slotsFns = nextSlotsFns;
+    if (propsFingerprint === null) {
+      return createSlotsResult(props);
     }
 
-    currentProps = props;
+    // Recompute each call so in-place compound metadata mutations invalidate cache keys
+    // (aligned with createVariantResolver / tv-default mutation coverage).
+    const compoundsSig = hasCompounds
+      ? buildCompoundsSignature(compoundVariants!, compoundSlots!)
+      : "";
+    const cacheKey = propsFingerprint + "#" + compoundsSig;
 
-    if (coldParentInvokesRemaining > 0) {
-      coldParentInvokesRemaining--;
-      useResultCache = false;
-      currentCompoundsSig = "";
-    } else {
-      useResultCache = true;
-      const compoundVariants = resolved.compiledCompoundVariants;
-      const compoundSlots = resolved.compiledCompoundSlots;
+    parentCache ??= createBoundedCache<SlotsResult>();
 
-      currentCompoundsSig =
-        compoundVariants &&
-        compoundSlots &&
-        (compoundVariants.length > 0 || compoundSlots.length > 0)
-          ? buildCompoundsSignature(compoundVariants, compoundSlots)
-          : "";
-    }
+    const cached = parentCache.get(cacheKey);
 
-    return slotsFns;
+    if (cached !== CACHE_MISS) return cached;
+
+    const next = createSlotsResult(props);
+
+    parentCache.set(cacheKey, next);
+
+    return next;
   }) as RuntimeComponent;
 };
 

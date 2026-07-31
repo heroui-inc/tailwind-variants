@@ -202,35 +202,50 @@ export const buildCompoundsSignature = (
   return signature;
 };
 
-/** Two-generation bounded Map cache. */
-export const createResultCache = (limit = VARIANT_CACHE_LIMIT): ResultCache => {
-  let primary: Map<string, CacheValue> = new Map();
-  let secondary: Map<string, CacheValue> | null = null;
+type BoundedCache<T> = {
+  get(key: string): T | CacheMiss;
+  set(key: string, value: T): void;
+};
+
+/** Two-generation bounded Map cache for arbitrary values. */
+export const createBoundedCache = <T>(limit = VARIANT_CACHE_LIMIT): BoundedCache<T> => {
+  let primary: Map<string, T> = new Map();
+  let secondary: Map<string, T> | null = null;
 
   return {
-    get(key: string): CacheLookup {
-      let value = primary.get(key);
+    get(key: string): T | CacheMiss {
+      if (primary.has(key)) return primary.get(key) as T;
 
-      if (value !== undefined || primary.has(key)) return value;
+      if (secondary?.has(key)) {
+        const value = secondary.get(key) as T;
 
-      if (secondary) {
-        value = secondary.get(key);
+        primary.set(key, value);
 
-        if (value !== undefined || secondary.has(key)) {
-          primary.set(key, value);
-
-          return value;
-        }
+        return value;
       }
 
       return CACHE_MISS;
     },
-    set(key: string, value: CacheValue) {
+    set(key: string, value: T) {
       if (primary.size >= limit) {
         secondary = primary;
         primary = new Map();
       }
       primary.set(key, value);
+    },
+  };
+};
+
+/** Two-generation bounded Map cache. */
+export const createResultCache = (limit = VARIANT_CACHE_LIMIT): ResultCache => {
+  const cache = createBoundedCache<CacheValue>(limit);
+
+  return {
+    get(key: string): CacheLookup {
+      return cache.get(key);
+    },
+    set(key: string, value: CacheValue) {
+      cache.set(key, value);
     },
   };
 };
