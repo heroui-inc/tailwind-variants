@@ -77,7 +77,7 @@
     "test": "vitest run --config .config/vitest.config.ts",
     "test:watch": "vitest --config .config/vitest.config.ts",
     "changelog": "conventional-changelog -p angular -i CHANGELOG.md -s --commit-path .",
-    "release": "bumpp --execute='pnpm run changelog' --all",
+    "release": "node .config/release.ts",
     "prepublishOnly": "pnpm run build",
     "release:check": "pnpm run lint && pnpm run typecheck && pnpm run test && pnpm run build",
     "clean": "pnpm clean:cache && pnpm i",
