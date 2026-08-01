@@ -12,7 +12,10 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        script: [lint, test, build, typecheck]
+        # `test:leak` is the same suite with garbage collection exposed. The reachability
+        # assertions cannot run without it and skip themselves, so without this entry they would
+        # never run on a pull request at all.
+        script: [lint, test, test:leak, build, typecheck]
     steps:
       - name: Checkout Codebase
         uses: actions/checkout@v7
