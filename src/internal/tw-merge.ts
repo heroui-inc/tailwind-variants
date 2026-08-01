@@ -121,16 +121,53 @@ interface ArgCacheEntry {
 }
 
 const ARG_CACHE_BUCKET_SIZE = 64;
-const ARG_CACHE_SIZE = 500;
+export const ARG_CACHE_SIZE = 500;
+
+/**
+ * The same budget the merge cache carries, for the same reason and on the same axis.
+ *
+ * An entry count says nothing about what a generation holds, and this cache retains more per entry
+ * than the merge cache does — the key, every remaining argument, and the merged result. A workload
+ * merging long class lists therefore grows it linearly without ever approaching 500 entries.
+ */
+export const ARG_CACHE_BYTES = 1 << 20;
 
 let argCache = new Map<string, ArgCacheEntry[]>();
 let previousArgCache = new Map<string, ArgCacheEntry[]>();
 let argCacheCount = 0;
+let argCacheBytes = 0;
+let argCacheRotations = 0;
+let argCacheEntriesAtLastRotation = 0;
+
+/**
+ * What this cache has done, for the test that holds its byte bound to its claim.
+ *
+ * The merge cache's eviction is observable through a class validator, because a validator runs only
+ * on a miss. This one is not reachable that way: it is consulted only when the config IS the default
+ * one, and a custom config — the only way to install a counting validator — routes past it. So the
+ * counters are read directly rather than inferred, which keeps the assertion a count rather than a
+ * duration or a heap weight.
+ *
+ * `rotations` is what the byte bound actually changes. `entriesAtLastRotation` is captured before the
+ * counter resets, so a test can assert the generation was still far below `ARG_CACHE_SIZE` when it
+ * rotated — without that, the entry bound could have done the work and the byte bound would be
+ * untested while looking covered.
+ */
+export const readArgCacheStats = (): {
+  bytes: number;
+  entriesAtLastRotation: number;
+  rotations: number;
+} => ({
+  bytes: argCacheBytes,
+  entriesAtLastRotation: argCacheEntriesAtLastRotation,
+  rotations: argCacheRotations,
+});
 
 const clearArgCache = (): void => {
   argCache = new Map();
   previousArgCache = new Map();
   argCacheCount = 0;
+  argCacheBytes = 0;
 };
 
 const mergeStringDefault = (joined: string): CnReturn => {
@@ -149,8 +186,14 @@ const storeArgCache = (firstKey: string, rest: string[], result: string): void =
   if (target.length >= ARG_CACHE_BUCKET_SIZE) target.shift();
   target.push({rest, result});
 
-  if (++argCacheCount > ARG_CACHE_SIZE) {
+  argCacheBytes += firstKey.length + result.length;
+  for (let index = 0; index < rest.length; index++) argCacheBytes += rest[index].length;
+
+  if (++argCacheCount > ARG_CACHE_SIZE || argCacheBytes > ARG_CACHE_BYTES) {
+    argCacheRotations++;
+    argCacheEntriesAtLastRotation = argCacheCount;
     argCacheCount = 0;
+    argCacheBytes = 0;
     previousArgCache = argCache;
     argCache = new Map();
   }
