@@ -9,10 +9,59 @@ const safeVersion = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/;
 
 const readJson = (filePath) => JSON.parse(readFileSync(filePath, "utf8"));
 
+/** Argument shapes the Windows shell cannot reinterpret: no spaces, quotes or metacharacters. */
+const shellSafeArgument = /^[\w@./+:-]+$/;
+
+/**
+ * How to invoke pnpm on a given platform.
+ *
+ * Everywhere but Windows, `pnpm` is an executable and `execFileSync` runs it directly.
+ *
+ * On Windows it is a `.cmd` shim, and both obvious spellings fail: the bare name is ENOENT
+ * because `execFileSync` does not apply `PATHEXT`, and naming the shim is EINVAL because Node
+ * refuses to spawn a batch file without a shell (the fix for CVE-2024-27980). A shell is
+ * therefore required, and the command is pre-joined into a single string rather than passed as
+ * an args array — that combination is what Node deprecates in DEP0190, because it concatenates
+ * arguments without escaping them.
+ *
+ * Concatenation is only safe if nothing needs escaping, so this refuses anything that is not a
+ * bare token. Every current call site passes literals plus a package name and a version already
+ * matched against `safeVersion`; a future one that passes a path would fail loudly here rather
+ * than silently becoming shell syntax.
+ *
+ * Why a package manager at all, when the rest of this branch's tooling spawns nothing:
+ *
+ * - The install needs dependency RESOLUTION, not just a download. `class-variance-authority`
+ *   depends on `clsx@^2.1.1`, so fetching the named tarball and unpacking it is not equivalent —
+ *   matching that range means a semver resolver, which is a package manager.
+ * - Resolving versions over the registry API instead would hardcode `registry.npmjs.org` and
+ *   ignore the `.npmrc` a mirror or private registry configures, while `pnpm add` below would
+ *   still honour it. Reading the version from one registry and the tarball from another is worse
+ *   than a shell.
+ *
+ * pnpm is also guaranteed present here: the entry point is `pnpm build && node benchmark/run.mjs`,
+ * so it is the process that started this one.
+ */
+export const buildPnpmInvocation = (args, platform = process.platform) => {
+  if (platform !== "win32") return {file: "pnpm", args, useShell: false};
+
+  for (const argument of args) {
+    if (!shellSafeArgument.test(argument)) {
+      throw new TypeError(
+        `Refusing to pass ${JSON.stringify(argument)} through the Windows shell unescaped.`,
+      );
+    }
+  }
+
+  return {file: `pnpm ${args.join(" ")}`, args: [], useShell: true};
+};
+
 const runPnpm = (args, options = {}) => {
-  const output = execFileSync("pnpm", args, {
+  const invocation = buildPnpmInvocation(args);
+  const output = execFileSync(invocation.file, invocation.args, {
     encoding: "utf8",
     stdio: ["ignore", "pipe", "inherit"],
+    shell: invocation.useShell,
     ...options,
   });
 
