@@ -408,7 +408,6 @@ const createVariantResolver = (resolved: ResolvedOptions, cn: CnAdapter): Runtim
   let cache: BoundedCache<CacheValue> | null = null;
   let tracker: CompoundsTracker | null = null;
   let dependencyKeys: string[] | null = null;
-  let hasCompounds = false;
   // Taken from the COMPILED state, never from `resolved` — the latter is the array published as
   // `component.variantKeys`, and a consumer mutating it in place would re-key every later result.
   let variantKeys: string[] = EMPTY_ARRAY;
@@ -434,20 +433,32 @@ const createVariantResolver = (resolved: ResolvedOptions, cn: CnAdapter): Runtim
     compiled = state;
     compounds = state.compounds;
     variantKeys = state.variantKeys;
-    hasCompounds = compounds.compoundVariants.length > 0;
 
     return state;
   };
+
+  /**
+   * Whether this call needs change detection, asked PER CALL rather than fixed at compile time.
+   *
+   * A definition built with an empty `compoundVariants` used to decide once that it would never
+   * need a tracker, so a compound pushed onto that array afterwards could not be seen however many
+   * calls followed. Two property reads answer it instead.
+   *
+   * Sticky once a tracker exists, so a list that shrinks back to empty still reports the shrink —
+   * otherwise the last compound could be removed and the cache would go on serving it.
+   */
+  const needsChangeDetection = (): boolean =>
+    tracker !== null || resolved.compoundVariants.length > 0;
 
   // `dependencyKeys` is derived on first USE rather than in `prepare()`, so a definition that is
   // built and never called does not pay for a key nobody asks for. Both invoke paths need it —
   // the cold one captures too — so in practice it is derived on the first call either way.
   const trackerFor = (): CompoundsTracker =>
-    (tracker ??= createCompoundsTracker(compounds.compoundVariants, EMPTY_ARRAY, () => {
+    (tracker ??= createCompoundsTracker(resolved.compoundVariants, EMPTY_ARRAY, () => {
       // Both derivations computed BEFORE either is published, then assigned with nothing between
       // them: consumer code runs during the rebuild, so a reader must never find one moved and
       // the other not.
-      const next = refreshCompoundIndex(compounds);
+      const next = refreshCompoundIndex(resolved.compoundVariants, resolved.compoundSlots);
       const nextKeys = collectDependencyKeys(variantKeys, next.compoundVariants, EMPTY_ARRAY);
 
       compounds = next;
@@ -537,7 +548,7 @@ const createVariantResolver = (resolved: ResolvedOptions, cn: CnAdapter): Runtim
       // could not run. Recomputing without touching the cache is the only answer that is neither
       // stale nor destructive: dropping the cache on every such call would stop results ever
       // stabilising, and trusting it could serve output the mutation invalidated.
-      const change = hasCompounds ? trackerFor().takeChange() : "unchanged";
+      const change = needsChangeDetection() ? trackerFor().takeChange() : "unchanged";
 
       // L1: the same values as last time, and nothing moved underneath them. Answer from the last
       // core without building a key or touching the Map — the shape a React re-render actually is.
@@ -626,7 +637,6 @@ const createSlotsResolver = (resolved: ResolvedOptions, cn: CnAdapter): RuntimeC
   let prepared: PreparedSlots | null = null;
   let compounds: CompoundIndex = EMPTY_COMPOUND_INDEX;
   let dependencyKeys: string[] = EMPTY_ARRAY;
-  let hasCompounds = false;
   // From the COMPILED state, not `resolved` — see the variants resolver's note.
   let variantKeys: string[] = EMPTY_ARRAY;
   // Reused across calls, so reading the dependency props allocates nothing in the steady state.
@@ -656,7 +666,6 @@ const createSlotsResolver = (resolved: ResolvedOptions, cn: CnAdapter): RuntimeC
 
     compounds = compiled.compounds;
     variantKeys = compiled.variantKeys;
-    hasCompounds = compounds.compoundVariants.length > 0 || compounds.compoundSlots.length > 0;
 
     const overrideMerge = createLazyOverrideMerge(cn, config);
 
@@ -670,9 +679,13 @@ const createSlotsResolver = (resolved: ResolvedOptions, cn: CnAdapter): RuntimeC
         enterResolveFrame();
 
         try {
-          const completeProps = hasCompounds
-            ? getCompleteProps(defaultVariants, propsRef, slotProps)
-            : undefined;
+          // Read from the INDEX this computer was handed, not from a flag fixed when the
+          // definition compiled: the index is rebuilt from the consumer's live arrays whenever
+          // detection fires, so a compound pushed after the first call is present here.
+          const completeProps =
+            index.compoundVariants.length > 0 || index.compoundSlots.length > 0
+              ? getCompleteProps(defaultVariants, propsRef, slotProps)
+              : undefined;
           const compoundVariantClasses = completeProps
             ? getCompoundVariantClassesBySlot(slotKey, index.compoundVariants, completeProps)
             : undefined;
@@ -703,13 +716,21 @@ const createSlotsResolver = (resolved: ResolvedOptions, cn: CnAdapter): RuntimeC
     return prepared;
   };
 
+  /**
+   * The slots twin of the variants resolver's derivation, and it reads BOTH arrays: either one can
+   * gain its first entry after the definition was built, and a `compoundSlots` push is as invisible
+   * to a compile-time flag as a `compoundVariants` one.
+   */
+  const needsChangeDetection = (): boolean =>
+    tracker !== null || resolved.compoundVariants.length > 0 || resolved.compoundSlots.length > 0;
+
   const trackerFor = (): CompoundsTracker =>
-    (tracker ??= createCompoundsTracker(compounds.compoundVariants, compounds.compoundSlots, () => {
+    (tracker ??= createCompoundsTracker(resolved.compoundVariants, resolved.compoundSlots, () => {
       // Both derivations computed BEFORE either is published, then assigned with nothing between
       // them. Rebuilding the index reads consumer `slots` getters, so a reader can arrive while
       // this runs; it must never find the matcher's key sets moved and the per-slot index not,
       // which would let a compound match and then apply to nothing.
-      const next = refreshCompoundIndex(compounds);
+      const next = refreshCompoundIndex(resolved.compoundVariants, resolved.compoundSlots);
       const nextKeys = collectDependencyKeys(
         variantKeys,
         next.compoundVariants,
@@ -817,7 +838,7 @@ const createSlotsResolver = (resolved: ResolvedOptions, cn: CnAdapter): RuntimeC
     // Then detected, still AHEAD of the unkeyable early return: the slot index the computers read
     // is derived from this same metadata, so a call that bypasses the CACHE must not also bypass
     // DETECTION or it renders from a stale index.
-    const change = hasCompounds ? trackerFor().takeChange() : "unchanged";
+    const change = needsChangeDetection() ? trackerFor().takeChange() : "unchanged";
 
     // Detection can WIDEN the dependency set: a compound that gained a condition key conditions on
     // a prop the snapshot above never read. Re-taken whole rather than patched, so the key and the

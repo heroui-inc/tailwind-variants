@@ -35,6 +35,83 @@ describe.each([
     expect(menu({color: "red"}).root()).toHaveClass(["root", "cv-new"]);
   });
 
+  test("sees a compound PUSHED onto the array after the first call", () => {
+    // Every case above mutates a compound that already exists, which the compiled snapshot can
+    // still be walked for. A push changes the array's LENGTH, and a walk over the snapshot has
+    // nothing to report — 3.2.2 honours it because it iterates the consumer's array live.
+    const compoundVariants: LooseRecord[] = [{size: "sm", class: "cv-first"}];
+    const button = defineVariants(createTv, {
+      base: "b",
+      variants: {size: {sm: "is-sm"}},
+      compoundVariants,
+      defaultVariants: {size: "sm"},
+    });
+
+    expect(warm(() => button({size: "sm"}))).toHaveClass(["b", "is-sm", "cv-first"]);
+
+    compoundVariants.push({size: "sm", class: "cv-pushed"});
+
+    expect(button({size: "sm"})).toHaveClass(["b", "is-sm", "cv-first", "cv-pushed"]);
+  });
+
+  test("sees a compound SPLICED out of the array after the first call", () => {
+    // The other direction, and the worse one: a stale entry keeps applying a compound the
+    // consumer removed, so classes appear that the current definition does not declare.
+    const compoundVariants: LooseRecord[] = [
+      {size: "sm", class: "cv-first"},
+      {size: "sm", class: "cv-second"},
+    ];
+    const button = defineVariants(createTv, {
+      base: "b",
+      variants: {size: {sm: "is-sm"}},
+      compoundVariants,
+      defaultVariants: {size: "sm"},
+    });
+
+    expect(warm(() => button({size: "sm"}))).toHaveClass(["b", "is-sm", "cv-first", "cv-second"]);
+
+    compoundVariants.splice(1, 1);
+
+    expect(button({size: "sm"})).toHaveClass(["b", "is-sm", "cv-first"]);
+  });
+
+  test("sees the FIRST compound added to a definition created with none", () => {
+    // The hardest of the three. A definition with no compounds decides at compile time that it
+    // needs no change detection at all, so nothing is watching the array when the first one
+    // arrives — the component can never see it, however many calls follow.
+    const compoundVariants: LooseRecord[] = [];
+    const button = defineVariants(createTv, {
+      base: "b",
+      variants: {size: {sm: "is-sm"}},
+      compoundVariants,
+      defaultVariants: {size: "sm"},
+    });
+
+    expect(warm(() => button({size: "sm"}))).toHaveClass(["b", "is-sm"]);
+
+    compoundVariants.push({size: "sm", class: "cv-late"});
+
+    expect(button({size: "sm"})).toHaveClass(["b", "is-sm", "cv-late"]);
+  });
+
+  test("sees a compoundSlots entry pushed after the first call", () => {
+    // The slots resolver keeps its own detection, so the variants cases above are not coverage
+    // for it.
+    const compoundSlots: LooseRecord[] = [];
+    const menu = defineSlots(createTv, {
+      slots: {root: "root"},
+      variants: {size: {sm: {root: "is-sm"}}},
+      compoundSlots,
+      defaultVariants: {size: "sm"},
+    });
+
+    expect(warm(() => menu({size: "sm"}).root())).toHaveClass(["root", "is-sm"]);
+
+    compoundSlots.push({slots: ["root"], size: "sm", class: "cs-late"});
+
+    expect(menu({size: "sm"}).root()).toHaveClass(["root", "is-sm", "cs-late"]);
+  });
+
   test("sees a mutation on the variants path", () => {
     // The two resolvers keep separate caches and separate change detection; a slots case is
     // not coverage for this one.

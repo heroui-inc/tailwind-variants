@@ -1,4 +1,4 @@
-import type {AnyRecord, CompiledCompoundSlot, CompiledCompoundVariant} from "./types.js";
+import type {AnyRecord} from "./types.js";
 
 /**
  * Four bounds, because no one of them is sufficient and each covers what the others cannot. One is
@@ -134,8 +134,8 @@ export type CompoundsTracker = {
  * state that is halfway through being rebuilt.
  */
 export const createCompoundsTracker = (
-  compoundVariants: CompiledCompoundVariant[],
-  compoundSlots: CompiledCompoundSlot[],
+  compoundVariants: readonly AnyRecord[],
+  compoundSlots: readonly AnyRecord[],
   applyChange: () => void,
 ): CompoundsTracker => {
   // Read ONCE, into locals. Two reasons, and the second is the load-bearing one: the hot loop then
@@ -335,12 +335,17 @@ export const createCompoundsTracker = (
     truncated = false;
     mismatched = false;
 
+    // The CONSUMER's own arrays, not the compiled wrappers derived from them. Walking the compiled
+    // copy means the loop bound is the length as it was at compile time, so a `push` or a `splice`
+    // produces no signal at all — the entries that remain compare equal and the walk simply never
+    // reaches the new one. Reading the live arrays makes the length part of what is recorded:
+    // `cursor` ends somewhere else, which `compareThenRecord` already treats as a change.
     for (let i = 0; i < compoundVariants.length && !halted; i++) {
-      walkCompound(compoundVariants[i].source, false);
+      walkCompound(compoundVariants[i], false);
     }
 
     for (let i = 0; i < compoundSlots.length && !halted; i++) {
-      walkCompound(compoundSlots[i].source, true);
+      walkCompound(compoundSlots[i], true);
     }
   };
 

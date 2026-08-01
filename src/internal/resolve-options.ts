@@ -84,21 +84,11 @@ const compileCompounds = (compounds: unknown, withSlots: boolean): CompiledCompo
   return result;
 };
 
-const recompileCompounds = (
-  compounds: CompiledCompoundVariant[],
-  withSlots: boolean,
-): CompiledCompoundVariant[] => {
-  const result: CompiledCompoundVariant[] = [];
-
-  // A NEW wrapper per entry, never a write into the old one: a reader holding the previous index
-  // has to keep seeing a consistent view of it. The `source` is the consumer's own object and is
-  // deliberately shared, which is what lets change detection keep watching it.
-  for (let i = 0; i < compounds.length; i++) {
-    result.push(compileCompound(compounds[i].source, withSlots));
-  }
-
-  return result;
-};
+// There is deliberately no "recompile the previous wrappers" path. Compiling from the compiled
+// copy carries its length forward, so an entry the consumer pushed after the definition was built
+// could never appear and one it spliced out could never leave. Every rebuild starts from the
+// consumer's own array instead — `compileCompounds` above — which is the same source the first
+// compile used and the same one change detection watches.
 
 /**
  * Every prop name a resolved class string can depend on: `matchesConditions` reads exactly
@@ -205,10 +195,13 @@ const buildCompoundIndex = (
  * out of the cache key AND out of the props the computers see, which fails in opposite directions
  * on the two paths.
  */
-export const refreshCompoundIndex = (previous: CompoundIndex): CompoundIndex =>
+export const refreshCompoundIndex = (
+  compoundVariants: unknown,
+  compoundSlots: unknown,
+): CompoundIndex =>
   buildCompoundIndex(
-    recompileCompounds(previous.compoundVariants, false),
-    recompileCompounds(previous.compoundSlots, true),
+    compileCompounds(compoundVariants, false),
+    compileCompounds(compoundSlots, true),
   );
 
 export const resolveOptions = (options: AnyRecord, configProp?: TVConfig): ResolvedOptions => {
