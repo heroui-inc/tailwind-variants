@@ -82,6 +82,33 @@ export type PropsSnapshot = {
 const createRecord = (): AnyRecord => ({__proto__: null});
 
 /**
+ * Whether the CALLER supplied `key`, as opposed to it being reachable only through
+ * `Object.prototype`.
+ *
+ * Props are read by NAME rather than by own-key test, deliberately: a consumer that passes props
+ * through its own prototype chain — a class instance, an object built with `Object.create` — is
+ * supplying them, and an own-key test would drop every one. That read has one collision, and it is
+ * with the eight names `Object.prototype` itself carries: on any ordinary object `props.toString`
+ * answers with the inherited function, so a key nobody passed reads as supplied and a compound
+ * conditioned on `toString: undefined` never matches.
+ *
+ * Walking to `Object.prototype` and stopping there separates the two exactly. Anything found below
+ * it belongs to the caller; anything found only on it does not. The walk terminates on the first
+ * step for an own property, which is every ordinary call.
+ */
+const isSuppliedByCaller = (props: AnyRecord, key: string): boolean => {
+  let current: object | null = props;
+
+  while (current !== null && current !== Object.prototype) {
+    if (Object.hasOwn(current, key)) return true;
+
+    current = Object.getPrototypeOf(current) as object | null;
+  }
+
+  return false;
+};
+
+/**
  * Reads every dependency prop once, into a reused array, alongside what the key will actually use.
  *
  * Two slots per key, because a repeat call is only answerable from a previous result if BOTH halves
@@ -110,7 +137,7 @@ export const readDependencyValues = (
     // Nullish-guarded because `component(null)` is legal and reaches here. By NAME, which is what
     // both readers in resolution do — see `capturePropsSnapshot`.
     const value = props?.[key];
-    const provided = value !== undefined;
+    const provided = value !== undefined && props != null && isSuppliedByCaller(props, key);
 
     out[i] = provided ? value : defaultVariants[key];
     out[length + i] = provided;

@@ -836,22 +836,22 @@ describe.each([
     expect(warm(() => menu({["__proto__"]: "b"}).root())).toHaveClass(["root", "proto-b"]);
     expect(menu({["__proto__"]: "a"}).root()).toHaveClass(["root", "proto-a"]);
 
-    // The ABSENT case, pinned to the behaviour every published version already has rather than to
-    // the one that reads better. The caller supplied nothing, so `props.toString` answers with
-    // `Object.prototype.toString` — not `undefined` — and that shadows the default, leaving the
-    // variant resolving to nothing at all. The same is true of `getCompleteProps`, which builds a
-    // plain `{}` and reads it back the same way.
+    // The ABSENT case: the default applies, as it does for a variant with any other name. Every
+    // published version resolves this to `base` alone — the caller supplied nothing, so
+    // `props.toString` answers with `Object.prototype.toString` rather than `undefined`, and that
+    // shadows the default so the variant contributes nothing at all.
     //
-    // It is pinned HERE because the capture is what could change it: reading own keys only would
-    // make the default apply, which is a behaviour change and not this PR's to make. Fixing it
-    // means null-prototype records in both places, and that is its own report.
+    // Two changes together make it behave: the capture treats a value reachable only through
+    // `Object.prototype` as not supplied, so the default is what reaches the key; and the record
+    // compounds are matched against carries no prototype, so the miss reads back as `undefined`
+    // there too. Reddens if either is reverted.
     const withDefault = defineVariants(createTv, {
       base: "base",
       variants: {toString: {a: "to-string-a"}},
       defaultVariants: {toString: "a"},
     });
 
-    expect(warm(() => withDefault({}))).toHaveClass(["base"]);
+    expect(warm(() => withDefault({}))).toHaveClass(["base", "to-string-a"]);
   });
 
   test("a prop inherited from the caller's prototype resolves, and keys, like an own one", () => {
@@ -903,11 +903,7 @@ describe.each([
   test("a COMPOUND condition named after an Object.prototype member matches when supplied", () => {
     // A supplied value shadows the inherited member, so this half works on every version and is
     // pinned here because the capture is what carries it: a capture that read inherited members,
-    // or one built on a prototype, would break it.
-    //
-    // The ABSENT half is deliberately not asserted. `getCompleteProps` builds a plain record, so
-    // a condition of `toString: undefined` compares against `Object.prototype.toString` and never
-    // matches — pre-existing in every published version, and left alone here on purpose.
+    // or one built on a prototype, would break it. The ABSENT half is the case below.
     const button = defineVariants(createTv, {
       base: "base",
       variants: {tone: {a: "text-a"}},
@@ -918,6 +914,46 @@ describe.each([
     expect(warm(() => button({toString: "on"}))).toHaveClass(["base", "text-a", "cv"]);
     expect(button({toString: "off"})).toHaveClass(["base", "text-a"]);
     expect(button({})).toHaveClass(["base", "text-a"]);
+  });
+
+  test("a COMPOUND condition named after an Object.prototype member matches when ABSENT", () => {
+    // `undefined` as a condition means "the caller did not supply this", and that has to hold for
+    // these eight exactly as it does for every ordinary name. The record the matcher reads carries
+    // no prototype, so a key nobody supplied reads back as `undefined` rather than as whatever
+    // `Object.prototype` happens to carry under that name.
+    //
+    // Reddens with that record built as a plain `{}` — then `toString` reads back as the inherited
+    // function, the comparison against `undefined` fails, and the compound silently never applies.
+    // All eight are swept rather than one representative, because the eight are the whole of the
+    // affected surface and a fix that reached only some of them would look correct.
+    const PROTOTYPE_MEMBERS = [
+      "toString",
+      "valueOf",
+      "constructor",
+      "hasOwnProperty",
+      "isPrototypeOf",
+      "propertyIsEnumerable",
+      "toLocaleString",
+      "__proto__",
+    ] as const;
+
+    const unmatched: string[] = [];
+
+    for (const member of PROTOTYPE_MEMBERS) {
+      const button = defineVariants(createTv, {
+        base: "base",
+        variants: {tone: {a: "text-a"}},
+        compoundVariants: [{tone: "a", [member]: undefined, class: "cv"}],
+        defaultVariants: {tone: "a"},
+      });
+
+      // Cold AND warm: the two invoke paths build that record from different call sites, so a fix
+      // reaching only one of them leaves the first render disagreeing with every later one.
+      if (button({}) !== "base text-a cv") unmatched.push(`${member} (cold)`);
+      if (button({}) !== "base text-a cv") unmatched.push(`${member} (warm)`);
+    }
+
+    expect(unmatched).toEqual([]);
   });
 
   test("an unkeyable value ends the KEY but not the capture", () => {

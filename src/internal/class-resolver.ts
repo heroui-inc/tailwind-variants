@@ -155,24 +155,26 @@ const getCompleteProps = (
   props?: AnyRecord,
   slotProps?: AnyRecord,
 ): AnyRecord => {
-  // A plain record, deliberately, and it is the one place a prototype member can still be read
-  // back for a key the caller never supplied — so a compound conditioned on `toString: undefined`
-  // compares against `Object.prototype.toString` and never matches. That is pre-existing in every
-  // published version, it is a behaviour change to fix rather than a regression to repair, and a
-  // null-prototype record here measured 4% on create-and-call. It has its own report.
+  // NO prototype, which is what makes `undefined` mean "the caller did not supply this" for EVERY
+  // key. On a plain record the eight `Object.prototype` member names read back as inherited
+  // functions for a key nobody passed, so a compound conditioned on `toString: undefined` compares
+  // against `Object.prototype.toString` and silently never matches, while the identical condition
+  // on any other name matches correctly (contribution 111).
   //
-  // `__proto__` is the one key that cannot simply be copied, and it is handled HERE rather than at
-  // the call sites. `result[key] = value` runs the inherited SETTER for it: nothing is stored, and
-  // the record every compound condition is then matched against is re-parented onto whatever the
-  // caller supplied — so `JSON.parse('{"__proto__":{"role":"admin"}}')` hands the matcher condition
-  // keys nobody passed. Skipping the key changes no behaviour that ever worked, because the
-  // assignment never stored anything in the first place.
+  // It is only safe because both invoke paths now resolve from a dependency capture. While the
+  // variants resolver's cold path handed the caller's own object through here, the prototype was
+  // load-bearing for a second reason: it hid a disagreement between the two paths about inherited
+  // members, since a capture reads BY NAME and the `for...in` below does not see non-enumerable
+  // ones. Removing it without that symmetry makes a warmed component and a freshly built one
+  // resolve differently under a polluted prototype — the invariant
+  // `security-prototype-pollution.test.ts` pins.
   //
-  // Fixed at this one hop on purpose. There are FOUR ways into this function, and guarding them
-  // individually is how three of them ended up safe and the fourth did not — a capture per call
-  // site also cost 44% on the slot path and 9 points on create-and-call, for a guarantee one
-  // comparison gives.
-  const result: AnyRecord = {};
+  // It also removes the `__proto__` write hazard at its source rather than guarding it: with no
+  // prototype there is no inherited setter, so `result[key] = value` stores an own property like
+  // any other key instead of re-parenting the record onto whatever the caller supplied. The
+  // explicit skips below are kept anyway — they cost one comparison and they keep the copy loops
+  // correct on their own terms, rather than depending on the record's shape from a distance.
+  const result: AnyRecord = {__proto__: null};
 
   for (const key in defaultVariants) {
     if (key === "__proto__") continue;
@@ -494,16 +496,30 @@ const createVariantResolver = (resolved: ResolvedOptions, cn: CnAdapter): Runtim
 
     if (coldInvokesRemaining > 0) {
       coldInvokesRemaining--;
-      // The raw props, and this stays the one place the two invoke paths differ. Nothing is cached
-      // here, so there is no key for a second read of a prop to disagree with — the only thing a
-      // capture buys — and building one costs a `collectDependencyKeys` on the very call that has
-      // no use for it. Measured at 9 points of the create-and-call regression.
+      // Captured, exactly as the slots resolver's cold path already does, so BOTH invoke paths
+      // resolve from the same shape. Handing the raw object through here instead is cheaper — it
+      // skips a `collectDependencyKeys` on the one call with no key to build — and it is what made
+      // the two paths disagree about inherited props: a capture reads each dependency key BY NAME
+      // and so sees an inherited member whether or not it is enumerable, while `getCompleteProps`'
+      // `for...in` over the caller's own object sees only the enumerable ones. The same definition
+      // and the same props then resolved differently on the first call than on every later one.
       //
-      // What made this WRONG until `getCompleteProps` refused `__proto__` was that the cold path
-      // and the warm path then disagreed: the capture dropped an injected prototype and the raw
-      // object did not, so the first render applied a compound no later render applied. That is
-      // fixed at the hop where the copy happens, so both shapes are now equivalent here.
-      core = computeCore(state, compounds, props);
+      // Symmetry here is what lets that record carry no prototype, which is the whole of
+      // contribution 111: with the misses no longer read off `Object.prototype`, `undefined` means
+      // "not supplied" for `toString` and its seven siblings as it already did for every other name.
+      dependencyKeys ??= collectDependencyKeys(
+        variantKeys,
+        compounds.compoundVariants,
+        EMPTY_ARRAY,
+      );
+
+      readDependencyValues(dependencyKeys, defaultVariants, currentValues, props);
+
+      core = computeCore(
+        state,
+        compounds,
+        capturePropsSnapshot(dependencyKeys, currentValues).captured,
+      );
     } else {
       cache ??= createBoundedCache<CacheValue>();
       dependencyKeys ??= collectDependencyKeys(
