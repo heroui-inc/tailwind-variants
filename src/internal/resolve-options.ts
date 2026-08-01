@@ -1,7 +1,6 @@
 import type {TVConfig} from "../config.js";
-import {cx, flatMergeArrays, isEmptyObject, isEqual, joinObjects, mergeObjects} from "../utils.js";
+import {cx, flatMergeArrays, isEmptyObject, joinObjects, mergeObjects} from "../utils.js";
 import {defaultConfig} from "./default-config.js";
-import {state} from "./state.js";
 import type {
   AnyRecord,
   CompiledCompoundSlot,
@@ -9,16 +8,6 @@ import type {
   CompiledVariant,
   ResolvedOptions,
 } from "./types.js";
-
-const synchronizeTwMergeConfig = (config: TVConfig): void => {
-  if (
-    !isEmptyObject(config.twMergeConfig) &&
-    !isEqual(config.twMergeConfig as object, state.cachedTwMergeConfig)
-  ) {
-    state.didTwMergeConfigChange = true;
-    state.cachedTwMergeConfig = config.twMergeConfig!;
-  }
-};
 
 const compileVariants = (variants: AnyRecord, variantKeys: string[]): CompiledVariant[] => {
   const compiledVariants: CompiledVariant[] = [];
@@ -116,8 +105,6 @@ export const resolveOptions = (options: AnyRecord, configProp?: TVConfig): Resol
     extend?.defaultVariants && !isEmptyObject(extend.defaultVariants)
       ? {...extend.defaultVariants, ...defaultVariantsProps}
       : defaultVariantsProps;
-
-  synchronizeTwMergeConfig(config);
 
   const isExtendedSlotsEmpty = !extend?.slots || isEmptyObject(extend.slots);
   const componentBase = hasSlots

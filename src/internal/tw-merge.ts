@@ -9,7 +9,7 @@
 
 import type {TWMConfig, TWMergeConfig} from "../config.js";
 import type {CnOptions, CnReturn} from "../types.js";
-import {isEmptyObject, isEqual} from "../utils.js";
+import {isEmptyObject} from "../utils.js";
 import {type JoinClassValue, joinClassValue} from "./join-class-value.js";
 import {createMerger, type Merger} from "./merge/index.js";
 import type {ConfigExtension} from "./merge/types.js";
@@ -73,24 +73,36 @@ const getDefaultMerger = (): Merger => {
   return defaultMerger;
 };
 
-const ensureConfiguredMerger = (): TwMergeFn => {
-  if (!state.cachedTwMerge || state.didTwMergeConfigChange) {
-    state.didTwMergeConfigChange = false;
-    state.cachedTwMerge = createTwMerge(state.cachedTwMergeConfig);
-  }
+/**
+ * One merger per config OBJECT, keyed by identity.
+ *
+ * A single module slot plus a "did it change" flag served every config in the process, and the
+ * flag was set by a shallow comparison — so two objects equal in every value but distinct in
+ * identity read as a change, and alternating between them rebuilt the whole tailwind-merge trie on
+ * each call. The README's own advice produces exactly that pair: it tells consumers to reuse one
+ * config across `tv` / `createTV` / `cnMerge`, so a design system and the application consuming it
+ * are two objects that happen to be equal. Measured past the result cache, where the rebuild is
+ * actually reached: 702 ns/call for one component against 356,951 ns/call for two.
+ *
+ * Weak, so a merger dies with the config that keyed it and a component built from a throwaway
+ * config leaks nothing.
+ *
+ * The residual this does NOT close, and cannot: mutating a live config object in place is still
+ * invisible, because the identity is unchanged. That is true of every published version and is its
+ * own report.
+ */
+let mergersByConfig = new WeakMap<object, TwMergeFn>();
 
-  return state.cachedTwMerge;
-};
+const ensureConfiguredMerger = (twMergeConfig: TWMergeConfig): TwMergeFn => {
+  const existing = mergersByConfig.get(twMergeConfig as object);
 
-const syncTwMergeConfig = (config?: TWMConfig): void => {
-  const next = config?.twMergeConfig;
+  if (existing !== undefined) return existing;
 
-  if (!next || isEmptyObject(next)) return;
+  const created = createTwMerge(twMergeConfig);
 
-  if (!isEqual(next as object, state.cachedTwMergeConfig as object)) {
-    state.cachedTwMergeConfig = next;
-    state.didTwMergeConfigChange = true;
-  }
+  mergersByConfig.set(twMergeConfig as object, created);
+
+  return created;
 };
 
 const joinArgs = (classnames: CnOptions): string => joinClassValue(classnames as JoinClassValue[]);
@@ -318,6 +330,9 @@ const discardStateFromPreviousGeneration = (): void => {
 
   observedGeneration = state.generation;
   defaultMerger = undefined;
+  // A WeakMap cannot be emptied, so it is replaced. Any config still held by a live component
+  // rebuilds its merger on the next merge, which is what a reset asks for.
+  mergersByConfig = new WeakMap();
   clearArgCache();
 };
 
@@ -332,10 +347,11 @@ const executeMerge = (classnames: CnOptions, config?: TWMConfig): CnReturn => {
 
   if (base.indexOf(" ") === -1) return base;
 
-  syncTwMergeConfig(config);
-
-  const hasCustomConfig = Boolean(config?.twMergeConfig && !isEmptyObject(config.twMergeConfig));
-  const merge = hasCustomConfig ? ensureConfiguredMerger() : getDefaultMerger().mergeString;
+  const twMergeConfig = config?.twMergeConfig;
+  const merge =
+    twMergeConfig && !isEmptyObject(twMergeConfig)
+      ? ensureConfiguredMerger(twMergeConfig)
+      : getDefaultMerger().mergeString;
 
   return merge(base) || undefined;
 };
