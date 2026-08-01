@@ -84,6 +84,13 @@ export const scenarioMetadata = [
     implementations: ["tv"],
   },
   {
+    id: "invocation/slots-compound-heavy",
+    category: "invocation",
+    name: "Call slots matrix with many compounds",
+    description: "A design-system button: 4 intents x 3 sizes with a compound per pairing.",
+    implementations: ["tv"],
+  },
+  {
     id: "invocation/custom-merge",
     category: "invocation",
     name: "Call with custom merge config",

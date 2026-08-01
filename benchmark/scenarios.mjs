@@ -7,6 +7,8 @@ import {
   buttonConfig,
   buttonProps,
   classInputs,
+  compoundHeavyConfig,
+  compoundHeavyProps,
   customButtonConfig,
   customMergeConfig,
   slotsConfig,
@@ -37,6 +39,16 @@ const callButtonBatch = (adapter, component) => {
 const callSlotsBatch = (component) => {
   for (let i = 0; i < slotsProps.length; i++) {
     const slots = component(slotsProps[i]);
+
+    consume(slots.base());
+    consume(slots.icon());
+    consume(slots.label());
+  }
+};
+
+const callCompoundHeavyBatch = (component) => {
+  for (let i = 0; i < compoundHeavyProps.length; i++) {
+    const slots = component(compoundHeavyProps[i]);
 
     consume(slots.base());
     consume(slots.icon());
@@ -159,6 +171,14 @@ export const scenarios = [
       const run = adapter.bindMerge(classInputs, {twMerge: true});
 
       return () => consume(run());
+    },
+  },
+  {
+    ...metadata("invocation/slots-compound-heavy"),
+    createTask(adapter) {
+      const component = adapter.createSlots(compoundHeavyConfig);
+
+      return () => callCompoundHeavyBatch(component);
     },
   },
   {

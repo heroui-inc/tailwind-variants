@@ -93,6 +93,70 @@ export const slotsProps = [
   {intent: "danger", size: "lg"},
 ];
 
+// A design-system button rather than a minimal one: four intents x three sizes with a
+// compound per pairing, which is the shape a real component library produces. The other slots
+// workload declares two compound variants, and anything whose cost scales with compound count
+// is invisible at that size.
+const COMPOUND_HEAVY_INTENTS = ["primary", "secondary", "warning", "danger"];
+const COMPOUND_HEAVY_SIZES = ["sm", "md", "lg"];
+
+export const compoundHeavyConfig = {
+  slots: {
+    base: "inline-flex items-center rounded border",
+    icon: "shrink-0",
+    label: "truncate",
+  },
+  variants: {
+    intent: Object.fromEntries(
+      COMPOUND_HEAVY_INTENTS.map((intent) => [
+        intent,
+        {base: `bg-${intent}-500 text-white`, icon: `text-${intent}-100`},
+      ]),
+    ),
+    size: Object.fromEntries(
+      COMPOUND_HEAVY_SIZES.map((size) => [
+        size,
+        {base: `h-8 px-2 size-${size}`, icon: `size-${size}`, label: `text-${size}`},
+      ]),
+    ),
+    disabled: {
+      true: {base: "cursor-not-allowed opacity-50"},
+      false: {base: "cursor-pointer opacity-100"},
+    },
+    iconOnly: {true: {label: "sr-only"}, false: {}},
+  },
+  compoundVariants: [
+    ...COMPOUND_HEAVY_INTENTS.flatMap((intent) =>
+      COMPOUND_HEAVY_SIZES.map((size) => ({
+        intent,
+        size,
+        class: {base: `px-${size}-${intent}`},
+      })),
+    ),
+    ...COMPOUND_HEAVY_INTENTS.map((intent) => ({
+      intent,
+      disabled: true,
+      class: {base: `bg-${intent}-200`, label: `text-${intent}-400`},
+    })),
+    ...COMPOUND_HEAVY_SIZES.map((size) => ({
+      size,
+      iconOnly: true,
+      class: {base: `size-only-${size}`},
+    })),
+    {intent: ["warning", "danger"], class: {base: "border-red-500"}},
+  ],
+  compoundSlots: [{slots: ["icon", "label"], size: ["md", "lg"], class: "leading-none"}],
+  defaultVariants: {disabled: false, iconOnly: false, intent: "primary", size: "md"},
+};
+
+export const compoundHeavyProps = [
+  {},
+  {intent: "primary", disabled: true},
+  {intent: "secondary", size: "lg"},
+  {intent: "danger", size: "sm", iconOnly: true},
+  {intent: "warning", size: "md", disabled: true},
+];
+
 export const customMergeConfig = {
   theme: {
     spacing: ["unit-2", "unit-4", "unit-6"],
