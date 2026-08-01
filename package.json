@@ -81,7 +81,7 @@
     "prepublishOnly": "pnpm run build",
     "release:check": "pnpm run lint && pnpm run typecheck && pnpm run test && pnpm run build",
     "clean": "pnpm clean:cache && pnpm i",
-    "clean:cache": "find . \\( -name 'dist' -o -name 'node_modules' -o -name 'pnpm-lock.yaml' \\) -prune -exec rm -rf '{}' +"
+    "clean:cache": "node .config/clean-cache.ts"
   },
   "devDependencies": {
     "@biomejs/biome": "2.5.5",
