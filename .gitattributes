@@ -1,0 +1,14 @@
+# Every text file is LF, in the repository and in the working tree, on every platform.
+#
+# `biome.json` sets `lineEnding: "lf"`, so a CRLF working tree fails `pnpm lint` on every file at
+# once. Windows checkouts default to `core.autocrlf=true`, which produces exactly that: the format
+# check reports the entire tree as misformatted, for a reason no diff will show and that reproduces
+# on no other platform.
+#
+# Declared here rather than left to each contributor's git config, because the requirement belongs
+# to the repository. `.editorconfig` states the same rule for editors, so a file is authored with
+# LF and checked out with LF.
+* text=auto eol=lf
+
+# Never inspected or rewritten as text.
+*.png binary
