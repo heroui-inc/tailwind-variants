@@ -112,6 +112,63 @@ describe.each([
     expect(menu({size: "sm"}).root()).toHaveClass(["root", "is-sm", "cs-late"]);
   });
 
+  test("a mutation of the VARIANTS or SLOTS map is NOT seen, and that is the trade", () => {
+    // Pinned as it behaves, not as it should behave, because which one is right is a trade rather
+    // than a defect — and an untested trade is one that changes by accident.
+    //
+    // Measured across arms: 3.2.2 SEES a `variants` mutation, the whole 3.3.0 line does not, and
+    // NO version has ever seen a `slots` one. So the first is a 3.3.0 regression this branch
+    // inherits and the second is not a regression at all.
+    //
+    // Watching them is possible — the tracker already walks consumer metadata — and the cost is
+    // why it is not done here. That walk runs on EVERY call, and a real component's `variants` map
+    // holds more class strings than its compound list does, so covering it roughly doubles the
+    // per-call detection cost to support mutating a definition after it was built. Covering
+    // `slots` would additionally be a behaviour change no published version has made.
+    //
+    // If a future edit starts watching them, this case fails and the change gets stated rather
+    // than shipped silently — which is exactly what happened when 3.3.0 stopped watching.
+    const variants = {color: {red: "text-red"}};
+    const button = defineVariants(createTv, {
+      base: "base",
+      variants,
+      defaultVariants: {color: "red"},
+    });
+
+    expect(warm(() => button({color: "red"}))).toHaveClass(["base", "text-red"]);
+
+    variants.color.red = "text-crimson";
+
+    expect(button({color: "red"})).toHaveClass(["base", "text-red"]);
+
+    const slots = {root: "root-old"};
+    const menu = defineSlots(createTv, {slots});
+
+    expect(warm(() => menu({}).root())).toHaveClass(["root-old"]);
+
+    slots.root = "root-new";
+
+    expect(menu({}).root()).toHaveClass(["root-old"]);
+  });
+
+  test("a COMPOUND mutation still is seen, so the case above is not just a dead cache", () => {
+    // Capability guard for it. A component that detected nothing at all would satisfy every
+    // assertion above, and this is what separates "deliberately not watched" from "broken".
+    const compoundVariants: LooseRecord[] = [{color: "red", class: "cv-old"}];
+    const button = defineVariants(createTv, {
+      base: "base",
+      variants: {color: {red: "text-red"}},
+      compoundVariants,
+      defaultVariants: {color: "red"},
+    });
+
+    expect(warm(() => button({color: "red"}))).toHaveClass(["base", "text-red", "cv-old"]);
+
+    compoundVariants[0].class = "cv-new";
+
+    expect(button({color: "red"})).toHaveClass(["base", "text-red", "cv-new"]);
+  });
+
   test("sees a mutation on the variants path", () => {
     // The two resolvers keep separate caches and separate change detection; a slots case is
     // not coverage for this one.
