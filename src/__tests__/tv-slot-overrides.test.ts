@@ -1,6 +1,7 @@
 import {describe, expect, test} from "vitest";
 
 import {tv} from "../index";
+import {defineSlots} from "./support/loose.js";
 
 describe("tv (slot overrides)", () => {
   test("supports slots and compoundVariants", () => {
@@ -538,5 +539,23 @@ describe("tv (slot overrides)", () => {
     expect(concat()).toBe("bg-white size-10");
     expect(link()).toBe("cursor-pointer size-10");
     expect(map()).toBe("bg-black size-10");
+  });
+
+  test("an explicit undefined in slot props falls back instead of clearing the parent value", () => {
+    // A component spreading its own props into a slot call produces `undefined` for every
+    // optional prop it was not given, so a slot call routinely carries keys with no value beside
+    // the ones it means. Those have to be skipped: writing them through erases what the parent
+    // call established, and a compound keyed on it silently stops matching.
+    const component = defineSlots(tv, {
+      slots: {base: "base", title: "title"},
+      variants: {tone: {loud: {base: "tone-loud"}}, size: {lg: {title: "size-lg"}}},
+      compoundVariants: [{tone: "loud", size: "lg", class: {title: "cv"}}],
+    });
+
+    const parent = component({tone: "loud", size: "lg"});
+
+    // `size` is a real override, so the slot recomputes rather than serving its cached core — and
+    // `tone: undefined` riding along must not take `loud` with it.
+    expect(parent.title({tone: undefined, size: "lg"})).toHaveClass(["title", "size-lg", "cv"]);
   });
 });
