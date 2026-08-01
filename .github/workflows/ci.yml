@@ -8,10 +8,18 @@ on:
 
 jobs:
   pnpm:
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
+        # Both, because the failures this catches are ones Linux cannot see. Two package scripts
+        # were POSIX-only and each broke on Windows as something else: a `find`/`rm` pipeline that
+        # Windows answers with "FIND: Parameter format not correct", and `--execute='…'` quoting
+        # that `cmd.exe` splits at the first space. A Linux-only matrix reported green through both,
+        # for as long as they had been broken.
+        #
+        # `fail-fast: false` so a Windows-only failure still leaves the Linux results readable.
+        os: [ubuntu-latest, windows-latest]
         script: [lint, test, build, typecheck]
     steps:
       - name: Checkout Codebase
