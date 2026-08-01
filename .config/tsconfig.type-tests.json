@@ -5,6 +5,11 @@
   "compilerOptions": {
     "types": [],
     "lib": ["ES2022"],
+    // The inputs live in ../src, so the root has to be the package rather than this directory.
+    // TypeScript 5 infers it from the common source directory and is satisfied; TypeScript 7
+    // defaults it to the config's own directory and reports TS6059 for every included file.
+    // Nothing is emitted here, so stating it costs nothing and makes both compilers agree.
+    "rootDir": "..",
     "noEmit": true,
     "declaration": false,
     "stripInternal": false
