@@ -299,15 +299,33 @@ const mergeVariadicFromGetter = (length: number, getItem: (index: number) => unk
   return result || undefined;
 };
 
-const originalStateReset = state.reset.bind(state);
+/**
+ * The generation this module's derived state was built under.
+ *
+ * Read on the way IN rather than cleared on the way out, because clearing would mean writing to
+ * `state.reset` at evaluation time — and `"sideEffects": false` tells every bundler it may drop a
+ * module imported only for such a write. It did: the `lite` entry never pulls this module, so a
+ * reset there cleared the cached config and left the merger and the argument cache alive, a partial
+ * reset that reads as a complete one.
+ *
+ * One integer comparison per merge, and both entries now behave the same whichever modules a
+ * bundler kept.
+ */
+let observedGeneration = state.generation;
 
-state.reset = () => {
+const discardStateFromPreviousGeneration = (): void => {
+  if (state.generation === observedGeneration) return;
+
+  observedGeneration = state.generation;
   defaultMerger = undefined;
   clearArgCache();
-  originalStateReset();
 };
 
 const executeMerge = (classnames: CnOptions, config?: TWMConfig): CnReturn => {
+  // Ahead of `joinArgs`, which reads the argument cache — a stale entry there survives a reset just
+  // as a stale merger does.
+  discardStateFromPreviousGeneration();
+
   const base = joinArgs(classnames);
 
   if (!base || !(config?.twMerge ?? true)) return base || undefined;
