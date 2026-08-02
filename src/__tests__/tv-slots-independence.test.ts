@@ -1,7 +1,7 @@
 import {describe, expect, test} from "vitest";
 
-import {tv} from "../index";
-import {tv as tvLite} from "../lite";
+import {createTV, tv} from "../index";
+import {createTV as createTVLite, tv as tvLite} from "../lite";
 
 const slotsConfig = {
   slots: {
@@ -10,18 +10,58 @@ const slotsConfig = {
   },
   variants: {
     size: {
-      sm: {root: "root-sm"},
-      lg: {root: "root-lg"},
+      sm: {root: "root-sm", icon: "icon-sm"},
+      lg: {root: "root-lg", icon: "icon-lg"},
     },
   },
   defaultVariants: {size: "sm" as const},
 };
 
-describe.each([
+/**
+ * HeroUI Chip / React pattern (no React runtime):
+ *   const slots = useMemo(() => chip({...}), [deps]);
+ *   slots.base({ className }) // every render
+ */
+const chipConfig = {
+  slots: {
+    base: "chip",
+    label: "chip__label",
+  },
+  variants: {
+    color: {
+      warning: {base: "chip--warning"},
+      success: {base: "chip--success"},
+      default: {base: "chip--default"},
+    },
+    size: {
+      sm: {base: "chip--sm"},
+      md: {base: "chip--md"},
+    },
+    variant: {
+      soft: {base: "chip--soft"},
+      primary: {base: "chip--primary"},
+    },
+  },
+  defaultVariants: {
+    color: "default" as const,
+    size: "md" as const,
+    variant: "soft" as const,
+  },
+};
+
+const warningSoft = ["chip", "chip--warning", "chip--sm", "chip--soft"] as const;
+const successPrimary = ["chip", "chip--success", "chip--sm", "chip--primary"] as const;
+
+const runtimes = [
   ["tv", tv],
   ["tv/lite", tvLite],
-] as const)("%s slots independence (#304)", (_label, createTv) => {
-  test("keeps interleaved parent calls independent", () => {
+  ["createTV", createTV({})],
+  ["createTV/lite", createTVLite()],
+] as const;
+
+describe.each(runtimes)("%s slots independence (#304)", (_label, createTv) => {
+  // ryuji — https://github.com/heroui-inc/tailwind-variants/issues/304
+  test("ryuji: interleaved calls keep independent results and identity", () => {
     const v = createTv(slotsConfig);
 
     const s1 = v({size: "sm"});
@@ -32,24 +72,48 @@ describe.each([
     expect(s1.root()).not.toHaveClass(["root-lg"]);
     expect(s2.root()).toHaveClass(["root-base", "root-lg"]);
     expect(s2.root()).not.toHaveClass(["root-sm"]);
-  });
 
-  test("does not contaminate a held result after a later call", () => {
-    const v = createTv(slotsConfig);
+    // Held / cold-path result must not pick up later props (incl. multi-slot).
+    expect(s1.icon()).toHaveClass(["icon-base", "icon-sm"]);
+    expect(s1.icon()).not.toHaveClass(["icon-lg"]);
 
-    const held = v({size: "sm"});
+    const viaDefault = v();
 
     v({size: "lg"});
-
-    expect(held.root()).toHaveClass(["root-base", "root-sm"]);
-    expect(held.root()).not.toHaveClass(["root-lg"]);
+    expect(viaDefault.root()).toHaveClass(["root-base", "root-sm"]);
+    expect(viaDefault.root()).not.toHaveClass(["root-lg"]);
   });
 
-  test("reuses the same result object for the same props fingerprint", () => {
+  // lightsound — issue comment (HeroUI Chip + useMemo + className every render)
+  test("lightsound: held slots survive sibling mounts when re-applying className", () => {
+    const chip = createTv(chipConfig);
+
+    const slotsA = chip({color: "warning", size: "sm", variant: "soft"});
+
+    expect(slotsA.base({className: "badge"})).toHaveClass([...warningSoft, "badge"]);
+
+    const slotsB = chip({color: "success", size: "sm", variant: "primary"});
+
+    expect(slotsB.base({className: "other"})).toHaveClass([...successPrimary, "other"]);
+
+    // A re-renders without useMemo recompute
+    expect(slotsA.base({className: "badge"})).toHaveClass([...warningSoft, "badge"]);
+    expect(slotsA.base({className: "badge"})).not.toHaveClass([
+      "chip--success",
+      "chip--primary",
+      "chip--default",
+    ]);
+
+    chip({color: "default", size: "sm", variant: "soft"});
+
+    expect(slotsA.base({className: "badge"})).toHaveClass([...warningSoft, "badge"]);
+    expect(slotsA.label({className: "badge-label"})).toHaveClass(["chip__label", "badge-label"]);
+  });
+
+  test("reuses the same result object for the same props after cold invoke", () => {
     const v = createTv(slotsConfig);
 
-    // First parent invoke is a cold path (no cache); warm reuse starts afterward.
-    v({size: "sm"});
+    v({size: "sm"}); // cold path (uncached)
 
     const a = v({size: "sm"});
     const b = v({size: "sm"});
@@ -58,17 +122,64 @@ describe.each([
     expect(a.root()).toHaveClass(["root-base", "root-sm"]);
   });
 
-  test("slot class overrides do not poison sibling instances", () => {
+  test("class and slot-level variant overrides do not poison siblings", () => {
     const v = createTv(slotsConfig);
-
     const s1 = v({size: "sm"});
     const s2 = v({size: "lg"});
 
     expect(s1.root({class: "extra"})).toHaveClass(["root-base", "root-sm", "extra"]);
+    expect(s1.root({size: "lg"})).toHaveClass(["root-base", "root-lg"]);
+    expect(s1.root({size: "lg"})).not.toHaveClass(["root-sm"]);
+
     expect(s2.root()).toHaveClass(["root-base", "root-lg"]);
-    expect(s2.root()).not.toHaveClass(["extra"]);
+    expect(s2.root()).not.toHaveClass(["extra", "root-sm"]);
     expect(s1.root()).toHaveClass(["root-base", "root-sm"]);
-    expect(s1.root()).not.toHaveClass(["extra"]);
+    expect(s1.icon({size: "lg"})).toHaveClass(["icon-base", "icon-lg"]);
+    expect(s2.icon()).toHaveClass(["icon-base", "icon-lg"]);
+  });
+
+  test("keeps results independent when props fingerprint cannot be built", () => {
+    const v = createTv({
+      slots: {root: "root-base"},
+      variants: {
+        size: {
+          sm: {root: "root-sm"},
+          lg: {root: "root-lg"},
+        },
+      },
+      defaultVariants: {size: "sm"},
+    });
+
+    const circular: {self?: unknown; size: "sm" | "lg"} = {size: "sm"};
+
+    circular.self = circular;
+
+    const held = v(circular as {size: "sm"});
+
+    v({size: "lg"});
+
+    expect(held.root()).toHaveClass(["root-base", "root-sm"]);
+    expect(held.root()).not.toHaveClass(["root-lg"]);
+  });
+
+  test("extended slots components keep held results independent", () => {
+    const base = createTv(slotsConfig);
+    const extended = createTv({
+      extend: base,
+      variants: {
+        size: {
+          sm: {root: "root-sm-ext"},
+          lg: {root: "root-lg-ext"},
+        },
+      },
+    });
+
+    const held = extended({size: "sm"});
+
+    extended({size: "lg"});
+
+    expect(held.root()).toHaveClass(["root-base", "root-sm", "root-sm-ext"]);
+    expect(held.root()).not.toHaveClass(["root-lg", "root-lg-ext"]);
   });
 
   test("keeps compoundVariants independent across interleaved calls", () => {
