@@ -1,164 +1,70 @@
-import {afterEach, beforeEach, describe, expect, test} from "vitest";
+import {afterEach, describe, expect, test} from "vitest";
 
 import {createTV, defaultConfig, tv} from "../index";
+import {state} from "../internal/state.js";
+
+const originalTwMerge = defaultConfig.twMerge ?? true;
+const originalTwMergeConfig = defaultConfig.twMergeConfig ?? {};
+
+afterEach(() => {
+  defaultConfig.twMerge = originalTwMerge;
+  defaultConfig.twMergeConfig = originalTwMergeConfig;
+  state.reset();
+});
 
 describe("defaultConfig", () => {
-  // Store original values to restore after each test
-  const originalTwMerge = defaultConfig.twMerge ?? true;
-  const originalTwMergeConfig = {...defaultConfig.twMergeConfig};
-
-  beforeEach(() => {
-    // Reset to original values before each test
-    defaultConfig.twMerge = originalTwMerge;
-    defaultConfig.twMergeConfig = {...originalTwMergeConfig};
-  });
-
-  afterEach(() => {
-    // Ensure cleanup after each test
-    defaultConfig.twMerge = originalTwMerge;
-    defaultConfig.twMergeConfig = {...originalTwMergeConfig};
-  });
-
-  test("is importable as a value (not just a type)", () => {
-    expect(defaultConfig).toBeDefined();
-    expect(typeof defaultConfig).toBe("object");
-    expect(defaultConfig).toHaveProperty("twMerge");
-    expect(defaultConfig).toHaveProperty("twMergeConfig");
-  });
-
-  test("has default values", () => {
+  test("exports merging enabled with an empty merge config", () => {
     expect(defaultConfig.twMerge).toBe(true);
     expect(defaultConfig.twMergeConfig).toEqual({});
   });
 
-  test("allows modification of twMergeConfig", () => {
-    const customConfig = {
-      extend: {
-        theme: {
-          spacing: ["medium", "large"],
-        },
-      },
-    };
-
-    defaultConfig.twMergeConfig = customConfig;
-
-    expect(defaultConfig.twMergeConfig).toEqual(customConfig);
-    expect(defaultConfig.twMergeConfig.extend?.theme?.spacing).toEqual(["medium", "large"]);
-  });
-
-  test("allows modification of twMerge property", () => {
+  test("disabling twMerge affects components created afterwards", () => {
     defaultConfig.twMerge = false;
-    expect(defaultConfig.twMerge).toBe(false);
+
+    const unmerged = tv({base: "px-2 px-4"});
+
+    expect(unmerged()).toBe("px-2 px-4");
 
     defaultConfig.twMerge = true;
-    expect(defaultConfig.twMerge).toBe(true);
+
+    const merged = tv({base: "px-2 px-4"});
+
+    expect(merged()).toBe("px-4");
   });
 
-  test("affects tv behavior when twMergeConfig is modified", () => {
-    // Set up a custom twMergeConfig
+  test("twMergeConfig edits change how conflicts resolve", () => {
+    defaultConfig.twMergeConfig = {classGroups: {custom: ["foo-a", "foo-b"]}};
+
+    const withGroup = tv({base: "foo-a foo-b"});
+
+    expect(withGroup()).toBe("foo-b");
+  });
+
+  test("without a custom group the same classes do not conflict", () => {
+    const plain = tv({base: "foo-a foo-b"});
+
+    expect(plain()).toBe("foo-a foo-b");
+  });
+
+  test("twMergeConfig edits apply across multiple components", () => {
     defaultConfig.twMergeConfig = {
-      extend: {
-        theme: {
-          spacing: ["medium", "large"],
-        },
+      classGroups: {
+        custom: ["foo-a", "foo-b"],
+        other: ["bar-a", "bar-b"],
       },
     };
 
-    const button = tv({
-      base: "px-medium py-large",
-    });
-
-    // The custom config should be used
-    expect(button()).toBeDefined();
+    expect(tv({base: "foo-a foo-b"})()).toBe("foo-b");
+    expect(tv({base: "bar-a bar-b"})()).toBe("bar-b");
   });
 
-  test("allows nested modifications of twMergeConfig", () => {
-    defaultConfig.twMergeConfig = {
-      extend: {
-        theme: {
-          spacing: ["small"],
-        },
-      },
-    };
-
-    // Modify nested properties
-    if (defaultConfig.twMergeConfig.extend?.theme) {
-      defaultConfig.twMergeConfig.extend.theme.spacing = ["small", "medium", "large"];
-    }
-
-    expect(defaultConfig.twMergeConfig.extend?.theme?.spacing).toEqual([
-      "small",
-      "medium",
-      "large",
-    ]);
-  });
-
-  test("supports createTV when defaultConfig is modified", () => {
+  test("createTV spreads its config over mutated defaults", () => {
     defaultConfig.twMerge = false;
 
-    const tv = createTV({});
-    const h1 = tv({
-      base: "text-3xl font-bold text-blue-400 text-xl text-blue-200",
-    });
+    const inheriting = createTV({});
+    const overriding = createTV({twMerge: true});
 
-    // Since defaultConfig.twMerge is false and no override is provided,
-    // classes should not be merged
-    expect(h1()).toContain("text-3xl");
-    expect(h1()).toContain("text-xl");
-  });
-
-  test("allows setting twMergeConfig with extend.classGroups", () => {
-    const configWithClassGroups = {
-      extend: {
-        classGroups: {
-          shadow: [
-            {
-              shadow: ["small", "medium", "large"],
-            },
-          ],
-        },
-      },
-    };
-
-    defaultConfig.twMergeConfig = configWithClassGroups;
-
-    expect(defaultConfig.twMergeConfig.extend?.classGroups).toBeDefined();
-    expect(defaultConfig.twMergeConfig.extend?.classGroups?.shadow).toEqual([
-      {shadow: ["small", "medium", "large"]},
-    ]);
-  });
-
-  test("persists modifications across multiple tv calls", () => {
-    defaultConfig.twMergeConfig = {
-      extend: {
-        theme: {
-          spacing: ["custom-spacing"],
-        },
-      },
-    };
-
-    const button1 = tv({base: "px-custom-spacing"});
-    const button2 = tv({base: "py-custom-spacing"});
-
-    // Both should use the modified config
-    expect(button1()).toBeDefined();
-    expect(button2()).toBeDefined();
-  });
-
-  test("allows complete replacement of twMergeConfig object", () => {
-    const newConfig = {
-      extend: {
-        theme: {
-          opacity: ["disabled"],
-          spacing: ["unit", "unit-2"],
-        },
-      },
-    };
-
-    defaultConfig.twMergeConfig = newConfig;
-
-    expect(defaultConfig.twMergeConfig).toEqual(newConfig);
-    expect(defaultConfig.twMergeConfig.extend?.theme?.opacity).toEqual(["disabled"]);
-    expect(defaultConfig.twMergeConfig.extend?.theme?.spacing).toEqual(["unit", "unit-2"]);
+    expect(inheriting({base: "px-2 px-4"})()).toBe("px-2 px-4");
+    expect(overriding({base: "px-2 px-4"})()).toBe("px-4");
   });
 });

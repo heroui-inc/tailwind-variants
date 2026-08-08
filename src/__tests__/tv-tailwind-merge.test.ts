@@ -1,6 +1,11 @@
-import {describe, expect, test} from "vitest";
+import {afterEach, describe, expect, test} from "vitest";
 
 import {tv} from "../index";
+import {state} from "../internal/state.js";
+
+afterEach(() => {
+  state.reset();
+});
 
 const COMMON_UNITS = ["small", "medium", "large"];
 

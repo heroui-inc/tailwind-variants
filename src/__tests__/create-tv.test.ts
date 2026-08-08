@@ -15,7 +15,6 @@ describe.each(variants)("createTV ($name)", ({createTV, mode}) => {
       base: "text-3xl font-bold text-blue-400 text-xl text-blue-200",
     });
 
-    // twMerge disabled: classes should not be merged or overridden
     expect(h1()).toHaveClass("text-3xl font-bold text-blue-400 text-xl text-blue-200");
   });
 
@@ -26,13 +25,26 @@ describe.each(variants)("createTV ($name)", ({createTV, mode}) => {
       {twMerge: true},
     );
 
-    // twMerge enabled on full mode merges conflicting classes
-    // lite mode does not support merging, returns original classes
+    // lite mode has no merger, so the twMerge override keeps the original classes
     const expected =
       mode === "lite"
         ? "text-3xl font-bold text-blue-400 text-xl text-blue-200"
         : "font-bold text-xl text-blue-200";
 
     expect(h1()).toHaveClass(expected);
+  });
+
+  test("per-call twMerge false disables merging from a merging instance", () => {
+    const tv = createTV({twMerge: true});
+    const h1 = tv({base: "px-2 px-4"}, {twMerge: false});
+
+    expect(h1()).toHaveClass("px-2 px-4");
+  });
+
+  test("keeps instance config keys not overridden per call", () => {
+    const tv = createTV({twMerge: false});
+    const h1 = tv({base: "px-2 px-4"}, {twMergeConfig: {}});
+
+    expect(h1()).toHaveClass("px-2 px-4");
   });
 });

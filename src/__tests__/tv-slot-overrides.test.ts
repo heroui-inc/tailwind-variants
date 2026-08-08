@@ -2,6 +2,91 @@ import {describe, expect, test} from "vitest";
 
 import {tv} from "../index";
 
+/** Fresh instance per test so cached results never couple the two tabs tests. */
+const createTabs = () =>
+  tv({
+    slots: {
+      base: "inline-flex",
+      tabList: ["flex"],
+      tab: ["z-0", "w-full", "px-3", "py-1", "flex", "group", "relative"],
+      tabContent: ["relative", "z-10", "text-inherit", "whitespace-nowrap"],
+      cursor: ["absolute", "z-0", "bg-white"],
+      panel: ["py-3", "px-1", "outline-none"],
+    },
+    variants: {
+      variant: {
+        solid: {},
+        light: {},
+        underlined: {},
+        bordered: {},
+      },
+      color: {
+        default: {},
+        primary: {},
+        secondary: {},
+        success: {},
+        warning: {},
+        danger: {},
+      },
+      size: {
+        sm: {
+          tabList: "rounded-md",
+          tab: "h-7 text-xs rounded-sm",
+          cursor: "rounded-sm",
+        },
+        md: {
+          tabList: "rounded-md",
+          tab: "h-8 text-sm rounded-sm",
+          cursor: "rounded-sm",
+        },
+        lg: {
+          tabList: "rounded-lg",
+          tab: "h-9 text-md rounded-md",
+          cursor: "rounded-md",
+        },
+      },
+      radius: {
+        none: {
+          tabList: "rounded-none",
+          tab: "rounded-none",
+          cursor: "rounded-none",
+        },
+        sm: {
+          tabList: "rounded-md",
+          tab: "rounded-sm",
+          cursor: "rounded-sm",
+        },
+        md: {
+          tabList: "rounded-md",
+          tab: "rounded-sm",
+          cursor: "rounded-sm",
+        },
+        lg: {
+          tabList: "rounded-lg",
+          tab: "rounded-md",
+          cursor: "rounded-md",
+        },
+        full: {
+          tabList: "rounded-full",
+          tab: "rounded-full",
+          cursor: "rounded-full",
+        },
+      },
+    },
+    defaultVariants: {
+      color: "default",
+      variant: "solid",
+      size: "md",
+    },
+    compoundSlots: [
+      {
+        variant: "underlined",
+        slots: ["tab", "tabList", "cursor"],
+        class: ["rounded-none"],
+      },
+    ],
+  });
+
 describe("tv (slot overrides)", () => {
   test("supports slots and compoundVariants", () => {
     const menu = tv({
@@ -269,90 +354,7 @@ describe("tv (slot overrides)", () => {
   });
 
   test("preserves default classes when compoundSlots variants do not match", () => {
-    const tabs = tv({
-      slots: {
-        base: "inline-flex",
-        tabList: ["flex"],
-        tab: ["z-0", "w-full", "px-3", "py-1", "flex", "group", "relative"],
-        tabContent: ["relative", "z-10", "text-inherit", "whitespace-nowrap"],
-        cursor: ["absolute", "z-0", "bg-white"],
-        panel: ["py-3", "px-1", "outline-none"],
-      },
-      variants: {
-        variant: {
-          solid: {},
-          light: {},
-          underlined: {},
-          bordered: {},
-        },
-        color: {
-          default: {},
-          primary: {},
-          secondary: {},
-          success: {},
-          warning: {},
-          danger: {},
-        },
-        size: {
-          sm: {
-            tabList: "rounded-md",
-            tab: "h-7 text-xs rounded-sm",
-            cursor: "rounded-sm",
-          },
-          md: {
-            tabList: "rounded-md",
-            tab: "h-8 text-sm rounded-sm",
-            cursor: "rounded-sm",
-          },
-          lg: {
-            tabList: "rounded-lg",
-            tab: "h-9 text-md rounded-md",
-            cursor: "rounded-md",
-          },
-        },
-        radius: {
-          none: {
-            tabList: "rounded-none",
-            tab: "rounded-none",
-            cursor: "rounded-none",
-          },
-          sm: {
-            tabList: "rounded-md",
-            tab: "rounded-sm",
-            cursor: "rounded-sm",
-          },
-          md: {
-            tabList: "rounded-md",
-            tab: "rounded-sm",
-            cursor: "rounded-sm",
-          },
-          lg: {
-            tabList: "rounded-lg",
-            tab: "rounded-md",
-            cursor: "rounded-md",
-          },
-          full: {
-            tabList: "rounded-full",
-            tab: "rounded-full",
-            cursor: "rounded-full",
-          },
-        },
-      },
-      defaultVariants: {
-        color: "default",
-        variant: "solid",
-        size: "md",
-      },
-      compoundSlots: [
-        {
-          variant: "underlined",
-          slots: ["tab", "tabList", "cursor"],
-          class: ["rounded-none"],
-        },
-      ],
-    });
-
-    const {tab, tabList, cursor} = tabs();
+    const {tab, tabList, cursor} = createTabs()();
 
     expect(tab()).toHaveClass([
       "z-0",
@@ -371,90 +373,7 @@ describe("tv (slot overrides)", () => {
   });
 
   test("overrides default classes when compoundSlots variants match", () => {
-    const tabs = tv({
-      slots: {
-        base: "inline-flex",
-        tabList: ["flex"],
-        tab: ["z-0", "w-full", "px-3", "py-1", "flex", "group", "relative"],
-        tabContent: ["relative", "z-10", "text-inherit", "whitespace-nowrap"],
-        cursor: ["absolute", "z-0", "bg-white"],
-        panel: ["py-3", "px-1", "outline-none"],
-      },
-      variants: {
-        variant: {
-          solid: {},
-          light: {},
-          underlined: {},
-          bordered: {},
-        },
-        color: {
-          default: {},
-          primary: {},
-          secondary: {},
-          success: {},
-          warning: {},
-          danger: {},
-        },
-        size: {
-          sm: {
-            tabList: "rounded-md",
-            tab: "h-7 text-xs rounded-sm",
-            cursor: "rounded-sm",
-          },
-          md: {
-            tabList: "rounded-md",
-            tab: "h-8 text-sm rounded-sm",
-            cursor: "rounded-sm",
-          },
-          lg: {
-            tabList: "rounded-lg",
-            tab: "h-9 text-md rounded-md",
-            cursor: "rounded-md",
-          },
-        },
-        radius: {
-          none: {
-            tabList: "rounded-none",
-            tab: "rounded-none",
-            cursor: "rounded-none",
-          },
-          sm: {
-            tabList: "rounded-md",
-            tab: "rounded-sm",
-            cursor: "rounded-sm",
-          },
-          md: {
-            tabList: "rounded-md",
-            tab: "rounded-sm",
-            cursor: "rounded-sm",
-          },
-          lg: {
-            tabList: "rounded-lg",
-            tab: "rounded-md",
-            cursor: "rounded-md",
-          },
-          full: {
-            tabList: "rounded-full",
-            tab: "rounded-full",
-            cursor: "rounded-full",
-          },
-        },
-      },
-      defaultVariants: {
-        color: "default",
-        variant: "solid",
-        size: "md",
-      },
-      compoundSlots: [
-        {
-          variant: "underlined",
-          slots: ["tab", "tabList", "cursor"],
-          class: ["rounded-none"],
-        },
-      ],
-    });
-
-    const {tab, tabList, cursor} = tabs({variant: "underlined"});
+    const {tab, tabList, cursor} = createTabs()({variant: "underlined"});
 
     expect(tab()).toHaveClass([
       "z-0",

@@ -7,18 +7,18 @@ import type {
   OmitUndefined,
   StringToBoolean,
   TVCompoundSlots,
+  TVCompoundVariant,
   TVCompoundVariants,
   TVDefaultVariants,
+  TVExtendInput,
+  TVFactory,
   TVProps,
   TVScreenPropsValue,
   TVVariantKeys,
   TVVariants,
   WithInitialScreen,
 } from "../../index.js";
-
-type Assert<T extends true> = T;
-type Equal<Left, Right> =
-  (<T>() => T extends Left ? 1 : 2) extends <T>() => T extends Right ? 1 : 2 ? true : false;
+import type {Assert, IsEqual as Equal} from "./test-utils.js";
 
 type Slots = {base: string; icon: string};
 type Variants = {
@@ -30,11 +30,11 @@ type Variants = {
 type ClassValueContract = Assert<"block" extends ClassValue ? true : false>;
 // Case: ClassProp accepts the class branch of its mutually exclusive union.
 type ClassPropContract = Assert<{class: string} extends ClassProp ? true : false>;
-// Case: OmitUndefined removes undefined from exported unions.
+// Case: OmitUndefined removes undefined from a union.
 type OmitUndefinedContract = Assert<Equal<OmitUndefined<string | undefined>, string>>;
 // Case: StringToBoolean converts boolean-like keys without changing other keys.
 type BooleanContract = Assert<Equal<StringToBoolean<"true" | "other">, boolean | "other">>;
-// Case: isTrueOrArray retains its existing readonly-array behavior.
+// Case: isTrueOrArray is false for readonly arrays.
 type TrueOrArrayContract = Assert<Equal<isTrueOrArray<readonly string[]>, false>>;
 // Case: WithInitialScreen prepends the initial responsive key.
 type InitialScreenContract = Assert<
@@ -62,14 +62,25 @@ type VariantKeysContract = Assert<
   Equal<TVVariantKeys<Variants, undefined>, Array<"size" | "disabled">>
 >;
 
-// Case: CnOptions and CnReturn accept the documented class input and output shapes.
+// Case: CnOptions and CnReturn match cn's input and output shapes.
 const cnOptions: CnOptions = ["block", ["px-2"], {hidden: false}, null, undefined];
 const cnReturn: CnReturn = "block";
 
-// Case: TVCompoundVariants accepts arrays, boolean undefined conditions, and class.
+// Case: TVCompoundVariant / TVCompoundVariants accept array conditions and undefined on boolean axes.
+const compoundVariant: TVCompoundVariant<Variants, undefined, undefined, undefined> = {
+  size: ["sm", "lg"],
+  disabled: [false, undefined],
+  class: "px-2",
+};
 const compoundVariants: TVCompoundVariants<Variants, undefined, undefined, undefined, undefined> = [
-  {size: ["sm", "lg"], disabled: [false, undefined], class: "px-2"},
+  compoundVariant,
 ];
+
+// Case: TVExtendInput / TVFactory remain part of the public type surface.
+type ExtendInputContract = Assert<
+  TVExtendInput extends {(...args: any[]): any} | readonly {(...args: any[]): any}[] ? true : false
+>;
+type FactoryContract = Assert<TVFactory extends {(...args: any[]): any} ? true : false>;
 
 // Case: TVCompoundSlots accepts declared slots, variants, and className.
 const compoundSlots: TVCompoundSlots<Variants, Slots, undefined> = [
@@ -84,11 +95,12 @@ const defaultVariants: TVDefaultVariants<Variants, undefined, undefined, undefin
 
 void cnOptions;
 void cnReturn;
+void compoundVariant;
 void compoundVariants;
 void compoundSlots;
 void defaultVariants;
 
-// Case: aggregate all exported type assertions so every contract is instantiated.
+// Case: using the contracts in a tuple forces the compiler to evaluate them.
 type PublicTypeContracts = [
   ClassValueContract,
   ClassPropContract,
@@ -100,9 +112,13 @@ type PublicTypeContracts = [
   ScreenContract,
   PropsContract,
   VariantKeysContract,
+  ExtendInputContract,
+  FactoryContract,
 ];
 
 const publicTypeContracts: PublicTypeContracts = [
+  true,
+  true,
   true,
   true,
   true,

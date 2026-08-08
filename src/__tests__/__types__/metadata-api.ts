@@ -1,7 +1,5 @@
 import {type TVReturnProps, type TVReturnType, type TVReturnTypeLike, tv} from "../../index.js";
-
-type Assert<T extends true> = T;
-type Extends<Left, Right> = Left extends Right ? true : false;
+import type {Assert, Extends} from "./test-utils.js";
 
 // Case: expose callable components through the minimal TVReturnTypeLike contract.
 const component = tv({
@@ -43,6 +41,5 @@ const returnMetadataContract: ReturnMetadataContract = true;
 
 void returnMetadataContract;
 
-// Case: reject plain functions that do not expose tv-compatible metadata.
 // @ts-expect-error extend only accepts a tv-compatible component
 tv({extend: () => "plain"});

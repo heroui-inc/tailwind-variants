@@ -1,6 +1,6 @@
 import {describe, expect, test} from "vitest";
 
-import {createTV, tv} from "../index";
+import {createTV, type TVFactory, tv} from "../index";
 import {createTV as createTVLite, tv as tvLite} from "../lite";
 
 const slotsConfig = {
@@ -52,16 +52,17 @@ const chipConfig = {
 const warningSoft = ["chip", "chip--warning", "chip--sm", "chip--soft"] as const;
 const successPrimary = ["chip", "chip--success", "chip--sm", "chip--primary"] as const;
 
-const runtimes = [
+// Overloaded `TV | TVLite` unions are not callable; widen to {@link TVFactory}.
+const runtimes: [string, TVFactory][] = [
   ["tv", tv],
   ["tv/lite", tvLite],
   ["createTV", createTV({})],
   ["createTV/lite", createTVLite()],
-] as const;
+];
 
 describe.each(runtimes)("%s slots independence (#304)", (_label, createTv) => {
-  // ryuji — https://github.com/heroui-inc/tailwind-variants/issues/304
-  test("ryuji: interleaved calls keep independent results and identity", () => {
+  // Original repro from https://github.com/heroui-inc/tailwind-variants/issues/304
+  test("interleaved calls keep independent results and identity", () => {
     const v = createTv(slotsConfig);
 
     const s1 = v({size: "sm"});
@@ -84,8 +85,8 @@ describe.each(runtimes)("%s slots independence (#304)", (_label, createTv) => {
     expect(viaDefault.root()).not.toHaveClass(["root-lg"]);
   });
 
-  // lightsound — issue comment (HeroUI Chip + useMemo + className every render)
-  test("lightsound: held slots survive sibling mounts when re-applying className", () => {
+  // Repro from an issue #304 comment: HeroUI Chip, useMemo, className on every render.
+  test("held slots survive sibling mounts when re-applying className", () => {
     const chip = createTv(chipConfig);
 
     const slotsA = chip({color: "warning", size: "sm", variant: "soft"});

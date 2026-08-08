@@ -215,7 +215,17 @@ describe("tv", () => {
             blue: "text-blue-500",
           },
         },
-        // @ts-expect-error
+        // @ts-expect-error runtime validation coverage
+        compoundVariants: {},
+      }),
+    ).toThrow();
+  });
+
+  test("throws when compoundVariants is not an array without variants or slots", () => {
+    expect(
+      tv({
+        base: "text-3xl font-bold",
+        // @ts-expect-error runtime validation coverage
         compoundVariants: {},
       }),
     ).toThrow();
