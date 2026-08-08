@@ -1,15 +1,13 @@
-name: commitlint
+name: Commitlint
 
-on: [pull_request]
+on:
+  pull_request:
+    branches: [main]
 
 jobs:
   commitlint:
-    strategy:
-      matrix:
-        os: [ubuntu-latest]
-    runs-on: ${{ matrix.os }}
-    environment: Preview
-
+    name: Commitlint
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout codebase
         uses: actions/checkout@v7
@@ -19,7 +17,7 @@ jobs:
       - name: Install dependencies
         uses: ./.github/actions/install
 
-      - name: Run commitlint
+      - name: Run Commitlint
         id: run_commitlint
         uses: wagoid/commitlint-github-action@v6
         with:
@@ -27,6 +25,6 @@ jobs:
         env:
           NODE_PATH: ${{ github.workspace }}/node_modules
 
-      - name: Show outputs
+      - name: Show Outputs
         if: ${{ always() }}
         run: echo ${{ toJSON(steps.run_commitlint.outputs.results) }}
