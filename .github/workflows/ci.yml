@@ -1,18 +1,13 @@
 name: CI
 
 on:
-  push:
-    branches: [main]
   pull_request:
     branches: [main]
 
 jobs:
-  pnpm:
+  lint:
+    name: Lint
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        script: [lint, test, build, typecheck]
     steps:
       - name: Checkout Codebase
         uses: actions/checkout@v7
@@ -20,5 +15,66 @@ jobs:
       - name: Install dependencies
         uses: ./.github/actions/install
 
-      - name: Run Script ${{ matrix.script }}
-        run: pnpm ${{ matrix.script }}
+      - name: Run Linter
+        run: pnpm lint
+
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Codebase
+        uses: actions/checkout@v7
+
+      - name: Install dependencies
+        uses: ./.github/actions/install
+
+      - name: Run Tests
+        run: pnpm test
+
+  typecheck:
+    name: Typecheck
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Codebase
+        uses: actions/checkout@v7
+
+      - name: Install dependencies
+        uses: ./.github/actions/install
+
+      - name: Run Typecheck
+        run: pnpm typecheck
+
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Codebase
+        uses: actions/checkout@v7
+
+      - name: Install dependencies
+        uses: ./.github/actions/install
+
+      - name: Run Build
+        run: pnpm build
+
+  continuous-release:
+    name: Continuous Release
+    if: github.event_name == 'pull_request' && github.repository == 'heroui-inc/tailwind-variants'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - name: Checkout Codebase
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Install dependencies
+        uses: ./.github/actions/install
+
+      - name: Run Build
+        run: pnpm build
+
+      - name: Publish Preview
+        run: pnpm exec pkg-pr-new publish --pnpm
