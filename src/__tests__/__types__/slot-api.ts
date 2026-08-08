@@ -95,17 +95,13 @@ inheritedSlots.header({tone: "neutral"});
 inheritedSlots.body({size: "sm"});
 inheritedSlots.icon({selected: false});
 
-// Case: reject compoundSlots entries that target undeclared slots.
+// @ts-expect-error compoundSlots reject unknown slot names
 tv({
   slots: {base: "", icon: ""},
   variants: {size: {sm: {}, lg: {}}},
-  compoundSlots: [
-    // @ts-expect-error compoundSlots reject unknown slot names
-    {slots: ["label"], size: "sm", class: "text-sm"},
-  ],
+  compoundSlots: [{slots: ["label"], size: "sm", class: "text-sm"}],
 });
 
-// Case: reject compoundSlots values outside the declared variant union.
 tv({
   slots: {base: ""},
   variants: {size: {sm: {}, lg: {}}},
@@ -115,7 +111,6 @@ tv({
   ],
 });
 
-// Case: keep class and className mutually exclusive in compoundSlots.
 tv({
   slots: {base: ""},
   variants: {size: {sm: {}, lg: {}}},

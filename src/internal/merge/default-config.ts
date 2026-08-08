@@ -62,13 +62,10 @@ export const getDefaultConfig = () => {
   const themeEase = fromTheme("ease");
   const themeAnimate = fromTheme("animate");
 
-  /**
-   * Helpers to avoid repeating the same scales
-   *
-   * We use functions that create a new array every time they're called instead of static arrays.
-   * This ensures that users who modify any scale by mutating the array (e.g. with `array.push(element)`) don't accidentally mutate arrays in other parts of the config.
+  /*
+   * Shared scales. Each is a function returning a fresh array so mutating one
+   * scale (e.g. `array.push(...)`) cannot leak into other parts of the config.
    */
-  /***/
 
   const scaleBreak = () =>
     ["auto", "avoid", "all", "avoid-page", "page", "left", "right", "column"] as const;

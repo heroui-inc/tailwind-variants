@@ -19,7 +19,6 @@ describe("tv.extend (slots)", () => {
       base: "base--menu",
     });
 
-    // with default values
     const {base, title, item, list, wrapper} = menu();
 
     expect(base()).toHaveClass(["base--menuBase", "base--menu"]);
@@ -202,7 +201,6 @@ describe("tv.extend (slots)", () => {
       },
     });
 
-    // with default values
     let res = menu();
 
     expect(res.base()).toHaveClass(["base--menuBase", "base--menu"]);
@@ -243,7 +241,6 @@ describe("tv.extend (slots)", () => {
       },
     });
 
-    // with default values
     const {base, title, item, list, wrapper, extra} = menu();
 
     expect(base()).toHaveClass(["base--menuBase", "base--menu"]);
@@ -289,7 +286,6 @@ describe("tv.extend (slots)", () => {
       },
     });
 
-    // with default values
     const {base, title, item, list, wrapper} = menu();
 
     expect(base()).toHaveClass(["base--menuBase", "base--menu"]);
@@ -338,7 +334,6 @@ describe("tv.extend (slots)", () => {
       },
     });
 
-    // with default values
     const {base, title, item, list, wrapper} = menu();
 
     expect(base()).toHaveClass(["base--menuBase", "base--menu"]);
@@ -414,7 +409,6 @@ describe("tv.extend (slots)", () => {
       },
     });
 
-    // with default values
     const {base, title, item, list, wrapper} = menu({
       color: "red",
     });
@@ -512,7 +506,6 @@ describe("tv.extend (slots)", () => {
       ],
     });
 
-    // with default values
     const {base, title, item, list, wrapper} = menu({
       color: "red",
     });

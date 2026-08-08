@@ -19,7 +19,6 @@ describe("tv (compound slots)", () => {
         },
       ],
     });
-    // with default values
     const {base, item, prev, next, cursor} = pagination();
 
     expect(base()).toHaveClass(["flex", "flex-wrap", "relative", "gap-1", "max-w-fit"]);
@@ -72,7 +71,6 @@ describe("tv (compound slots)", () => {
         size: "xs",
       },
     });
-    // with default values
     const {base, item, prev, next, cursor} = pagination();
 
     expect(base()).toHaveClass(["flex", "flex-wrap", "relative", "gap-1", "max-w-fit"]);
@@ -115,7 +113,6 @@ describe("tv (compound slots)", () => {
         size: "sm",
       },
     });
-    // with default values
     const {base, item, prev, next, cursor} = pagination({
       size: "xs",
     });
@@ -257,7 +254,6 @@ describe("tv (compound slots)", () => {
         isBig: false,
       },
     });
-    // with default values
     const {base, item, prev, next, cursor} = pagination();
 
     expect(base()).toHaveClass(["flex", "flex-wrap", "relative", "gap-1", "max-w-fit"]);
@@ -311,7 +307,6 @@ describe("tv (compound slots)", () => {
         isBig: false,
       },
     });
-    // with default values
     const {base, item, prev, next, cursor} = pagination({
       size: "xs",
       color: "primary",

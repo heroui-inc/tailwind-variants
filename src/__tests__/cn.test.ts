@@ -338,7 +338,6 @@ describe.each(cxVariants)("cx ($name export)", ({cx}) => {
   });
 
   test("does not merge conflicting classes (simple concatenation)", () => {
-    // cx should just concatenate, not merge
     expect(cx("px-2", "px-4", "py-2")).toBe("px-2 px-4 py-2");
   });
 

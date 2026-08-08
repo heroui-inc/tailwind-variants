@@ -17,7 +17,7 @@ const CHAR_OPEN_PAREN = 40; // "("
 const CHAR_CLOSE_PAREN = 41; // ")"
 const CHAR_IMPORTANT = 33; // "!"
 
-// Pre-allocated result object shape for consistency
+// One result shape keeps the parser monomorphic.
 const createResultObject = (
   modifiers: string[],
   hasImportantModifier: boolean,

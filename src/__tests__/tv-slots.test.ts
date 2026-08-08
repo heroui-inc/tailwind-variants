@@ -45,7 +45,6 @@ describe("tv (slots)", () => {
       },
     });
 
-    // with default values
     const {base, title, item, list, wrapper} = menu();
 
     expect(base()).toHaveClass([
@@ -79,6 +78,37 @@ describe("tv (slots)", () => {
     expect(title()).toBe(expectedResult);
     expect(item()).toBe(expectedResult);
     expect(list()).toBe(expectedResult);
+  });
+
+  test("lets slots.base replace root base instead of appending", () => {
+    const card = tv({
+      base: "root-layer rounded-xl",
+      slots: {
+        base: "slot-layer border",
+        title: "font-medium",
+      },
+    });
+
+    const {base, title} = card();
+
+    expect(base()).toHaveClass(["slot-layer", "border"]);
+    expect(base()?.includes("root-layer")).toBe(false);
+    expect(base()?.includes("rounded-xl")).toBe(false);
+    expect(title()).toHaveClass(["font-medium"]);
+  });
+
+  test("keeps root base on the base slot when slots.base is omitted", () => {
+    const card = tv({
+      base: "root-layer rounded-xl",
+      slots: {
+        title: "font-medium",
+      },
+    });
+
+    const {base, title} = card();
+
+    expect(base()).toHaveClass(["root-layer", "rounded-xl"]);
+    expect(title()).toHaveClass(["font-medium"]);
   });
 
   test("always returns the implicit base slot", () => {
@@ -161,10 +191,8 @@ describe("tv (slots)", () => {
       },
     });
 
-    // with default values
     const {base, title, item, list, wrapper} = menu();
 
-    // base
     expect(base({class: "text-lg"})).toHaveClass([
       "font-bold",
       "underline",
@@ -177,13 +205,10 @@ describe("tv (slots)", () => {
       "bg-blue-500",
       "text-lg",
     ]);
-    // title
     expect(title({class: "text-2xl"})).toHaveClass(["text-2xl"]);
     expect(title({className: "text-2xl"})).toHaveClass(["text-2xl"]);
-    // item
     expect(item({class: "text-sm"})).toHaveClass(["text-sm", "opacity-100"]);
     expect(list({className: "bg-blue-50"})).toHaveClass(["list-none", "bg-blue-50"]);
-    // list
     expect(wrapper({class: "flex-row"})).toHaveClass(["flex", "flex-row"]);
     expect(wrapper({className: "flex-row"})).toHaveClass(["flex", "flex-row"]);
   });
@@ -231,7 +256,6 @@ describe("tv (slots)", () => {
       },
     });
 
-    // with custom props
     const {base, title, item, list, wrapper} = menu({
       color: "secondary",
       size: "md",
@@ -293,29 +317,23 @@ describe("tv (slots)", () => {
       },
     });
 
-    // with default values
     const {base, title, item, list, wrapper} = menu({
       color: "secondary",
       size: "md",
     });
 
-    // base
     expect(base({class: "text-xl"})).toHaveClass(["text-xl", "font-bold", "underline"]);
     expect(base({className: "text-xl"})).toHaveClass(["text-xl", "font-bold", "underline"]);
-    // title
     expect(title({class: "text-2xl"})).toHaveClass(["text-2xl", "text-white"]);
     expect(title({className: "text-2xl"})).toHaveClass(["text-2xl", "text-white"]);
-    //item
     expect(item({class: "bg-purple-50"})).toHaveClass(["text-xl", "bg-purple-50", "opacity-100"]);
     expect(item({className: "bg-purple-50"})).toHaveClass([
       "text-xl",
       "bg-purple-50",
       "opacity-100",
     ]);
-    // list
     expect(list({class: "bg-purple-100"})).toHaveClass(["list-none", "bg-purple-100"]);
     expect(list({className: "bg-purple-100"})).toHaveClass(["list-none", "bg-purple-100"]);
-    // wrapper
     expect(wrapper({class: "bg-purple-900 flex-row"})).toHaveClass([
       "flex",
       "bg-purple-900",

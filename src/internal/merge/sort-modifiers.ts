@@ -1,9 +1,8 @@
 import {AnyConfig} from "./types.js";
 
 /**
- * Sorts modifiers according to following schema:
- * - Predefined modifiers are sorted alphabetically
- * - When an arbitrary variant appears, it must be preserved which modifiers are before and after it
+ * Sorts predefined modifiers alphabetically. Arbitrary and order-sensitive
+ * modifiers stay in place, so only the runs between them are sorted.
  */
 export const createSortModifiers = (config: AnyConfig) => {
   const orderSensitiveModifiers = new Set(config.orderSensitiveModifiers);

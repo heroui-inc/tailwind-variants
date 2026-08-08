@@ -230,7 +230,7 @@ export const createConfigUtils = (config: AnyConfig) => {
       keepFlags[index] = 1;
     }
 
-    // Already normalized and nothing dropped → return input as-is.
+    // Already normalized and nothing dropped, so return the input as-is.
     if (
       !didDrop &&
       !splitSawNonSpaceWhitespace &&

@@ -60,7 +60,6 @@ createLiteTV({twMerge: false});
 // @ts-expect-error lite tv has no per-component config argument
 liteTV({base: "block"}, {twMerge: false});
 
-// Case: reject invalid scalar values in TVConfig.
 // @ts-expect-error twMerge must be boolean
 const invalidConfig: TVConfig = {twMerge: "yes"};
 

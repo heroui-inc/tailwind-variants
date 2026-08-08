@@ -23,7 +23,8 @@ const concatArrays = <T, U>(array1: readonly T[], array2: readonly U[]): readonl
 export interface ClassPartObject {
   nextPart: Map<string, ClassPartObject>;
   validators: ClassValidatorObject[] | null;
-  classGroupId: AnyClassGroupIds | undefined; // Always define optional props for consistent shape
+  // `undefined` rather than optional so every object keeps the same shape.
+  classGroupId: AnyClassGroupIds | undefined;
 }
 
 interface ClassValidatorObject {
@@ -31,7 +32,6 @@ interface ClassValidatorObject {
   validator: ClassValidator;
 }
 
-// Factory function ensures consistent object shapes
 const createClassValidatorObject = (
   classGroupId: AnyClassGroupIds,
   validator: ClassValidator,
@@ -40,7 +40,6 @@ const createClassValidatorObject = (
   validator,
 });
 
-// Factory ensures consistent ClassPartObject shape
 const createClassPartObject = (
   nextPart: Map<string, ClassPartObject> = new Map(),
   validators: ClassValidatorObject[] | null = null,
@@ -54,7 +53,7 @@ const createClassPartObject = (
 const CLASS_PART_SEPARATOR = "-";
 
 const EMPTY_CONFLICTS: readonly AnyClassGroupIds[] = [];
-// I use two dots here because one dot is used as prefix for class groups in plugins
+// Two dots because a single dot prefixes plugin class groups.
 const ARBITRARY_PROPERTY_PREFIX = "arbitrary..";
 
 export const createClassGroupUtils = (config: AnyConfig) => {
@@ -67,7 +66,7 @@ export const createClassGroupUtils = (config: AnyConfig) => {
     }
 
     const classParts = className.split(CLASS_PART_SEPARATOR);
-    // Classes like `-inset-1` produce an empty string as first classPart. We assume that classes for negative values are used correctly and skip it.
+    // Negative classes like `-inset-1` split with a leading empty part; skip it.
     const startIndex = classParts[0] === "" && classParts.length > 1 ? 1 : 0;
     return getGroupRecursive(classParts, startIndex, classMap);
   };
@@ -137,11 +136,7 @@ const getGroupRecursive = (
   return undefined;
 };
 
-/**
- * Get the class group ID for an arbitrary property.
- *
- * @param className - The class name to get the group ID for. Is expected to be string starting with `[` and ending with `]`.
- */
+/** Expects `className` wrapped in `[` and `]`. */
 const getGroupIdForArbitraryProperty = (className: string): AnyClassGroupIds | undefined => {
   const content = className.slice(1, -1);
   const colonIndex = content.indexOf(":");
@@ -152,15 +147,13 @@ const getGroupIdForArbitraryProperty = (className: string): AnyClassGroupIds | u
   return property ? ARBITRARY_PROPERTY_PREFIX + property : undefined;
 };
 
-/**
- * Exported for testing only
- */
+/** Exported for tests. */
 export const createClassMap = (config: Config<AnyClassGroupIds, AnyThemeGroupIds>) => {
   const {theme, classGroups} = config;
   return processClassGroups(classGroups, theme);
 };
 
-// Split into separate functions to maintain monomorphic call sites
+// Processing is split per definition type to keep call sites monomorphic.
 const processClassGroups = (
   classGroups: Record<AnyClassGroupIds, ClassGroup<AnyThemeGroupIds>>,
   theme: ThemeObject<AnyThemeGroupIds>,
@@ -188,7 +181,6 @@ const processClassesRecursively = (
   }
 };
 
-// Split into separate functions for each type to maintain monomorphic call sites
 const processClassDefinition = (
   classDefinition: ClassGroup<AnyThemeGroupIds>[number],
   classPartObject: ClassPartObject,

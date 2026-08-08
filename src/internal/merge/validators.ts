@@ -5,13 +5,12 @@ const tshirtUnitRegex = /^(\d+(\.\d+)?)?(xs|sm|md|lg|xl)$/;
 const lengthUnitRegex =
   /\d+(%|px|r?em|[sdl]?v([hwib]|min|max)|pt|pc|in|cm|mm|cap|ch|ex|r?lh|cq(w|h|i|b|min|max))|\b(calc|min|max|clamp)\(.+\)|^0$/;
 const colorFunctionRegex = /^(rgba?|hsla?|hwb|(ok)?(lab|lch)|color-mix)\(.+\)$/;
-// Shadow always begins with x and y offset separated by underscore optionally prepended by inset
+// Shadows start with x and y offsets separated by an underscore, optionally preceded by "inset".
 const shadowRegex = /^(inset_)?-?((\d+)?\.?(\d+)[a-z]+|0)_-?((\d+)?\.?(\d+)[a-z]+|0)/;
 const imageRegex =
   /^(url|image|image-set|cross-fade|element|(repeating-)?(linear|radial|conic)-gradient)\(.+\)$/;
 
-// Hoist global builtins to module-scope bindings (oveo "hoist globals"): plain variable
-// loads instead of repeated global-object property lookups on the per-token validator path.
+// Module-scope aliases avoid repeated global lookups on the per-token validator path.
 const toNumber = Number;
 const numberIsNaN = Number.isNaN;
 const numberIsInteger = Number.isInteger;
@@ -29,9 +28,8 @@ export const isTshirtSize = (value: string) => tshirtUnitRegex.test(value);
 export const isAny = () => true;
 
 const isLengthOnly = (value: string) =>
-  // `colorFunctionRegex` check is necessary because color functions can have percentages in them which which would be incorrectly classified as lengths.
-  // For example, `hsl(0 0% 0%)` would be classified as a length without this check.
-  // I could also use lookbehind assertion in `lengthUnitRegex` but that isn't supported widely enough.
+  // Color functions can contain percentages (e.g. `hsl(0 0% 0%)`) and would
+  // otherwise be misclassified as lengths.
   lengthUnitRegex.test(value) && !colorFunctionRegex.test(value);
 
 const isNever = () => false;

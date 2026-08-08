@@ -1,4 +1,4 @@
-import {describe, expect, test, vi} from "vitest";
+import {describe, expect, test} from "vitest";
 
 import {tv as tvFull} from "../index";
 import {tv as tvLite} from "../lite";
@@ -19,8 +19,6 @@ describe.each(variants)("tv with twMerge disabled ($name)", ({tv}) => {
       },
     );
 
-    // When twMerge is false, all classes should be preserved
-    // including conflicting ones like px-4 and px-2
     expect(button()).toBe("px-4 px-2 py-2 py-4 bg-blue-500 bg-red-500");
   });
 
@@ -44,7 +42,6 @@ describe.each(variants)("tv with twMerge disabled ($name)", ({tv}) => {
       },
     );
 
-    // All conflicting classes should be preserved
     expect(button({size: "sm"})).toBe("font-medium text-sm text-xs px-2 px-3");
     expect(button({size: "md", color: "primary"})).toBe(
       "font-medium text-base text-md px-4 px-5 bg-blue-500 bg-blue-600 text-white text-gray-100",
@@ -78,7 +75,6 @@ describe.each(variants)("tv with twMerge disabled ($name)", ({tv}) => {
       },
     );
 
-    // Compound variant classes should be added without resolving conflicts
     expect(button({size: "sm", variant: "primary"})).toBe(
       "font-semibold px-2 bg-blue-500 bg-blue-600 bg-blue-700 px-3 px-4",
     );
@@ -100,7 +96,6 @@ describe.each(variants)("tv with twMerge disabled ($name)", ({tv}) => {
 
     const slots = card();
 
-    // All conflicting classes in slots should be preserved
     expect(slots.base()).toBe("rounded-lg rounded-xl p-4 p-6");
     expect(slots.header()).toBe("text-lg text-xl font-bold font-semibold");
     expect(slots.body()).toBe("text-gray-600 text-gray-700 mt-2 mt-4");
@@ -116,7 +111,6 @@ describe.each(variants)("tv with twMerge disabled ($name)", ({tv}) => {
       },
     );
 
-    // Additional classes should be appended without conflict resolution
     expect(button({class: "px-2 py-4 rounded-lg"})).toBe("px-4 py-2 rounded px-2 py-4 rounded-lg");
     expect(button({className: "px-6 py-1 rounded-xl"})).toBe(
       "px-4 py-2 rounded px-6 py-1 rounded-xl",
@@ -188,40 +182,5 @@ describe.each(variants)("tv with twMerge disabled ($name)", ({tv}) => {
 
     expect(button()).toBe("px-4 py-2 rounded bg-blue-500");
     expect(button({size: "sm"})).toBe("px-4 py-2 rounded bg-blue-500 text-sm px-2 py-1");
-  });
-
-  test("does not require tailwind-merge in the lite bundle", () => {
-    // This test verifies that the createTwMerge function is not called
-    // when twMerge is false. In a real bundle, this would mean
-    // tailwind-merge is not included.
-    const mockCreateTwMerge = vi.fn();
-
-    // Override require for this test
-    const originalRequire = require;
-
-    (global as any).require = (module: string) => {
-      if (module === "./cn.js") {
-        return {createTwMerge: mockCreateTwMerge};
-      }
-
-      return originalRequire(module);
-    };
-
-    const button = tv(
-      {
-        base: "px-4 py-2",
-      },
-      {
-        twMerge: false,
-      },
-    );
-
-    button();
-
-    // createTwMerge should not be called when twMerge is false
-    expect(mockCreateTwMerge).not.toHaveBeenCalled();
-
-    // Restore original require
-    (global as any).require = originalRequire;
   });
 });

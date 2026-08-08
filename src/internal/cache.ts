@@ -236,7 +236,6 @@ export const createBoundedCache = <T>(limit = VARIANT_CACHE_LIMIT): BoundedCache
   };
 };
 
-/** Two-generation bounded Map cache. */
 export const createResultCache = (limit = VARIANT_CACHE_LIMIT): ResultCache => {
   const cache = createBoundedCache<CacheValue>(limit);
 
@@ -309,7 +308,6 @@ const createNestedOverrideCache = (limit = OVERRIDE_CACHE_LIMIT): NestedOverride
   };
 };
 
-/** Lazy override merge cache. */
 export const createLazyOverrideMerge = (cn: CnAdapter, config: TVConfig): OverrideMerge => {
   let cache: NestedOverrideCache | null = null;
 
