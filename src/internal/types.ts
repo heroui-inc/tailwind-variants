@@ -25,7 +25,8 @@ export type RuntimeResult =
 export type RuntimeComponent = {
   (props?: AnyRecord): RuntimeResult;
   variantKeys: string[] | undefined;
-  extend: RuntimeComponent | null;
+  /** Original `extend` input (single parent, array, or null). */
+  extend: RuntimeComponent | RuntimeComponent[] | null;
   base: any;
   slots: AnyRecord;
   variants: AnyRecord;
@@ -34,11 +35,14 @@ export type RuntimeComponent = {
   compoundVariants: any[];
 };
 
+export type RuntimeExtend = RuntimeComponent | RuntimeComponent[] | null;
+
 export type RuntimeTV = (options: AnyRecord, configProp?: TVConfig) => RuntimeComponent;
 
 export type ResolvedOptions = {
   config: TVConfig;
-  extend: RuntimeComponent | null;
+  /** Original `extend` input (single parent, array, or null). */
+  extend: RuntimeExtend;
   base: any;
   variants: AnyRecord;
   defaultVariants: AnyRecord;

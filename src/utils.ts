@@ -10,7 +10,7 @@ export const removeExtraSpaces = (str: string): string => {
   return str.replace(SPACE_REGEX, " ").trim();
 };
 
-/** Dirty leading/trailing/doubled/non-space whitespace on the final joined string. */
+/** True when the joined string has leading, trailing, doubled, or non-space whitespace. */
 const stringNeedsNormalize = (str: string): boolean => {
   const len = str.length;
 
@@ -132,6 +132,17 @@ export const flatMergeArrays = <T>(...arrays: unknown[][]): T[] => {
   return filtered;
 };
 
+const isPlainObject = (value: unknown): value is Record<string, unknown> =>
+  typeof value === "object" && value !== null && !isArray(value);
+
+/**
+ * Deep-merges variant/slot maps. Call sites pass the child as `obj1` and the
+ * parent as `obj2`.
+ *
+ * When one side is a class string and the other a slot object, the string is
+ * folded into `{base: string}` so composing with slots does not produce
+ * `"[object Object]"`.
+ */
 export const mergeObjects = <T extends object, U extends object>(
   obj1: T,
   obj2: U,
@@ -148,8 +159,14 @@ export const mergeObjects = <T extends object, U extends object>(
 
       if (isArray(val1) || isArray(val2)) {
         result[key] = flatMergeArrays(val2, val1);
-      } else if (typeof val1 === "object" && typeof val2 === "object" && val1 && val2) {
+      } else if (isPlainObject(val1) && isPlainObject(val2)) {
         result[key] = mergeObjects(val1, val2);
+      } else if (isPlainObject(val1) && typeof val2 === "string") {
+        // Child is a slot object, parent is a string: fold the parent into base.
+        result[key] = mergeObjects(val1, {base: val2});
+      } else if (typeof val1 === "string" && isPlainObject(val2)) {
+        // Child is a string, parent is a slot object: fold the child into base.
+        result[key] = mergeObjects({base: val1}, val2);
       } else {
         result[key] = val2 + " " + val1;
       }

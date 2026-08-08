@@ -8,7 +8,114 @@ import type {
   CompiledCompoundVariant,
   CompiledVariant,
   ResolvedOptions,
+  RuntimeComponent,
+  RuntimeExtend,
 } from "./types.js";
+
+/** Flattened recipe fields used while folding parents / merging the child. */
+type RecipeFields = {
+  base: any;
+  variants: AnyRecord;
+  defaultVariants: AnyRecord;
+  slots: AnyRecord;
+  compoundVariants: any[];
+  compoundSlots: any[];
+};
+
+const emptyRecipe = (): RecipeFields => ({
+  base: undefined,
+  variants: {},
+  defaultVariants: {},
+  slots: {},
+  compoundVariants: [],
+  compoundSlots: [],
+});
+
+const recipeFromComponent = (component: RuntimeComponent): RecipeFields => ({
+  base: component.base,
+  variants: component.variants ?? {},
+  defaultVariants: component.defaultVariants ?? {},
+  slots: component.slots ?? {},
+  compoundVariants: component.compoundVariants ?? [],
+  compoundSlots: component.compoundSlots ?? [],
+});
+
+/**
+ * Merge two already-flattened recipes left-to-right.
+ * Later recipe wins class conflicts (same rules as single-parent extend).
+ */
+const mergeRecipe = (acc: RecipeFields, next: RecipeFields): RecipeFields => {
+  const base = acc.base != null || next.base != null ? cx(acc.base, next.base) : undefined;
+
+  const variants =
+    !next.variants || isEmptyObject(next.variants)
+      ? acc.variants
+      : isEmptyObject(acc.variants)
+        ? next.variants
+        : mergeObjects(next.variants, acc.variants);
+
+  const defaultVariants =
+    !next.defaultVariants || isEmptyObject(next.defaultVariants)
+      ? acc.defaultVariants
+      : {...acc.defaultVariants, ...next.defaultVariants};
+
+  const accSlotsEmpty = !acc.slots || isEmptyObject(acc.slots);
+  const nextSlotsEmpty = !next.slots || isEmptyObject(next.slots);
+
+  let slots: AnyRecord;
+
+  if (accSlotsEmpty && nextSlotsEmpty) {
+    slots = {};
+  } else if (accSlotsEmpty) {
+    // Later parent introduces slots; fold earlier base into the base slot.
+    slots = acc.base != null ? joinObjects({base: acc.base}, {...next.slots}) : {...next.slots};
+  } else if (nextSlotsEmpty) {
+    slots = next.base != null ? joinObjects({...acc.slots}, {base: next.base}) : {...acc.slots};
+  } else {
+    slots = joinObjects({...acc.slots}, next.slots);
+  }
+
+  const compoundVariants =
+    !next.compoundVariants || isEmptyObject(next.compoundVariants)
+      ? acc.compoundVariants
+      : !acc.compoundVariants || isEmptyObject(acc.compoundVariants)
+        ? next.compoundVariants
+        : flatMergeArrays(acc.compoundVariants, next.compoundVariants);
+
+  const compoundSlots =
+    !next.compoundSlots || isEmptyObject(next.compoundSlots)
+      ? acc.compoundSlots
+      : !acc.compoundSlots || isEmptyObject(acc.compoundSlots)
+        ? next.compoundSlots
+        : flatMergeArrays(acc.compoundSlots, next.compoundSlots);
+
+  return {
+    base,
+    variants,
+    defaultVariants,
+    slots,
+    compoundVariants,
+    compoundSlots,
+  };
+};
+
+const normalizeParents = (extend: RuntimeExtend): RuntimeComponent[] => {
+  if (extend == null) return [];
+  if (Array.isArray(extend)) return extend.filter(Boolean) as RuntimeComponent[];
+
+  return [extend];
+};
+
+/** Fold 2+ parents left-to-right. Single-parent callers skip this and use the parent as-is. */
+const foldParents = (parents: RuntimeComponent[]): RecipeFields => {
+  let acc = emptyRecipe();
+
+  for (let i = 0; i < parents.length; i++) {
+    acc = mergeRecipe(acc, recipeFromComponent(parents[i]!));
+  }
+
+  return acc;
+};
 
 const synchronizeTwMergeConfig = (config: TVConfig): void => {
   if (
@@ -97,13 +204,27 @@ const indexCompoundSlotsBySlot = (
 
 export const resolveOptions = (options: AnyRecord, configProp?: TVConfig): ResolvedOptions => {
   const {
-    extend = null,
+    extend: extendInput = null,
     slots: slotProps = {},
     variants: variantsProps = {},
     compoundVariants: compoundVariantsProps = [],
     compoundSlots: compoundSlotsProps = [],
     defaultVariants: defaultVariantsProps = {},
   } = options;
+
+  const originalExtend = extendInput as RuntimeExtend;
+  // Single parent: use the component directly (same path as pre-multi-extend, no fold).
+  // Multiple parents: fold left-to-right into one synthetic recipe for the child-merge path.
+  let extend: RuntimeComponent | RecipeFields | null = null;
+
+  if (Array.isArray(originalExtend)) {
+    const parents = normalizeParents(originalExtend);
+
+    if (parents.length === 1) extend = parents[0]!;
+    else if (parents.length > 1) extend = foldParents(parents);
+  } else if (originalExtend != null) {
+    extend = originalExtend;
+  }
 
   const config = {...defaultConfig, ...configProp};
   const hasSlots = options.slots !== undefined;
@@ -127,6 +248,7 @@ export const resolveOptions = (options: AnyRecord, configProp?: TVConfig): Resol
         ? options.base
         : cx(options.base)
     : undefined;
+  // Seed base from root/`extend`, then let `slots.base` replace it when provided.
   const componentSlots = hasSlots
     ? {
         base: componentBase,
@@ -163,7 +285,7 @@ export const resolveOptions = (options: AnyRecord, configProp?: TVConfig): Resol
 
   return {
     config,
-    extend,
+    extend: originalExtend,
     base,
     variants,
     defaultVariants,

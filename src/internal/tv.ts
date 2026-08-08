@@ -1,8 +1,18 @@
 import type {TVConfig} from "../config.js";
-import {mergeObjects} from "../utils.js";
 import {createClassResolver} from "./class-resolver.js";
 import {resolveOptions} from "./resolve-options.js";
 import type {CnAdapter, ResolvedOptions, RuntimeComponent, RuntimeTV} from "./types.js";
+
+/** Per-call config wins per key; `twMergeConfig` objects merge one level deep. */
+const mergeConfig = (base: TVConfig, override: TVConfig): TVConfig => {
+  const merged: TVConfig = {...base, ...override};
+
+  if (base.twMergeConfig && override.twMergeConfig) {
+    merged.twMergeConfig = {...base.twMergeConfig, ...override.twMergeConfig};
+  }
+
+  return merged;
+};
 
 const attachComponentMetadata = (component: RuntimeComponent, resolved: ResolvedOptions): void => {
   component.variantKeys = resolved.variantKeys;
@@ -27,7 +37,7 @@ export const getTailwindVariants = (cn: CnAdapter) => {
 
   const createTV = (configProp?: TVConfig): RuntimeTV => {
     return (options, config) =>
-      tv(options, config ? (mergeObjects(configProp as object, config) as TVConfig) : configProp);
+      tv(options, config && configProp ? mergeConfig(configProp, config) : (config ?? configProp));
   };
 
   return {

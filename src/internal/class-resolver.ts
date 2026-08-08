@@ -219,11 +219,12 @@ const getCompoundSlotClasses = (
 };
 
 const createPlainResolver = (resolved: ResolvedOptions, cn: CnAdapter): RuntimeComponent => {
-  const {base, config} = resolved;
+  const {base, config, deferredError} = resolved;
   let core: string | undefined | typeof CACHE_MISS = CACHE_MISS;
   const mergeOverride = createLazyOverrideMerge(cn, config);
 
   return ((props?: AnyRecord): RuntimeResult => {
+    if (deferredError) throw deferredError;
     if (core === CACHE_MISS) {
       core = cn(config, base);
     }

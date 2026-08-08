@@ -95,8 +95,19 @@ const syncTwMergeConfig = (config?: TWMConfig): void => {
 
 const joinArgs = (classnames: CnOptions): string => joinClassValue(classnames as JoinClassValue[]);
 
+/** True when the string holds one class token (no ASCII whitespace), so merging can be skipped. */
+const isSingleToken = (str: string): boolean => {
+  for (let index = 0; index < str.length; index++) {
+    const code = str.charCodeAt(index);
+
+    if (code === 32 || (code >= 9 && code <= 13)) return false;
+  }
+
+  return true;
+};
+
 // V8 re-hashes freshly joined strings; cache on stable arg string identities instead.
-// JSC/SpiderMonkey hash new strings cheaply — skip this layer there.
+// JSC/SpiderMonkey hash new strings cheaply, so this layer is skipped there.
 const IS_V8 = (() => {
   const error = new Error();
 
@@ -123,7 +134,7 @@ const clearArgCache = (): void => {
 
 const mergeStringDefault = (joined: string): CnReturn => {
   if (!joined) return undefined;
-  if (joined.indexOf(" ") === -1) return joined;
+  if (isSingleToken(joined)) return joined;
 
   return getDefaultMerger().mergeString(joined) || undefined;
 };
@@ -240,7 +251,7 @@ const mergeVariadicCached = (inputs: ArrayLike<unknown>): CnReturn => {
 };
 
 /**
- * Probe/store arg-cache via getter (cn multi-arg uses `arguments` index access — no copy on hit).
+ * Probe/store arg-cache via getter (cn multi-arg reads `arguments` by index, so a hit copies nothing).
  */
 const mergeVariadicFromGetter = (length: number, getItem: (index: number) => unknown): CnReturn => {
   let firstKey = "";
@@ -312,7 +323,7 @@ const executeMerge = (classnames: CnOptions, config?: TWMConfig): CnReturn => {
 
   if (!base || !(config?.twMerge ?? true)) return base || undefined;
 
-  if (base.indexOf(" ") === -1) return base;
+  if (isSingleToken(base)) return base;
 
   syncTwMergeConfig(config);
 
@@ -349,7 +360,7 @@ export const cn = function cn(): CnReturn {
   }
 
   if (IS_V8) {
-    // Capture length; read by index only — no Array allocation on arg-cache hit.
+    // Capture length; read by index only, so an arg-cache hit allocates no array.
     return mergeVariadicFromGetter(length, (index) => arguments[index]);
   }
 
