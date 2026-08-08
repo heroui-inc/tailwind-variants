@@ -65,6 +65,8 @@ type VariantKeysContract = Assert<
 // Case: CnOptions and CnReturn match cn's input and output shapes.
 const cnOptions: CnOptions = ["block", ["px-2"], {hidden: false}, null, undefined];
 const cnReturn: CnReturn = "block";
+// Case: cn always returns a string (never undefined), matching clsx/cva/tailwind-merge.
+type CnReturnContract = Assert<Equal<CnReturn, string>>;
 
 // Case: TVCompoundVariant / TVCompoundVariants accept array conditions and undefined on boolean axes.
 const compoundVariant: TVCompoundVariant<Variants, undefined, undefined, undefined> = {
@@ -112,11 +114,13 @@ type PublicTypeContracts = [
   ScreenContract,
   PropsContract,
   VariantKeysContract,
+  CnReturnContract,
   ExtendInputContract,
   FactoryContract,
 ];
 
 const publicTypeContracts: PublicTypeContracts = [
+  true,
   true,
   true,
   true,

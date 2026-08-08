@@ -15,8 +15,8 @@ describe("tv.extend (advanced composition)", () => {
 
     expect(resultWithoutMerge).toBe("w-fit h-fit w-full");
     expect(resultWithMerge).toBe("h-fit w-full");
-    expect(emptyResultWithoutMerge).toBe(undefined);
-    expect(emptyResultWithMerge).toBe(undefined);
+    expect(emptyResultWithoutMerge).toBe("");
+    expect(emptyResultWithMerge).toBe("");
   });
 
   test("inherits parent slots when the child only defines a base", () => {

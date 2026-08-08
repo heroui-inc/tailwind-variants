@@ -43,7 +43,7 @@ const stringNeedsNormalize = (str: string): boolean => {
 export const cx = <T extends CnOptions>(...classnames: T): CnReturn => {
   const result = joinClassValue(classnames as JoinClassValue[]);
 
-  if (!result) return undefined;
+  if (!result) return "";
 
   return stringNeedsNormalize(result) ? removeExtraSpaces(result) : result;
 };

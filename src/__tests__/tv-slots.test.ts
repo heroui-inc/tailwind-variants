@@ -72,7 +72,7 @@ describe("tv (slots)", () => {
 
     const {base, title, item, list} = menu();
 
-    const expectedResult = undefined;
+    const expectedResult = "";
 
     expect(base()).toBe(expectedResult);
     expect(title()).toBe(expectedResult);
@@ -124,7 +124,7 @@ describe("tv (slots)", () => {
     expect(root()).toHaveClass(["flex", "items-center", "gap-2"]);
     expect(label()).toBe("font-medium");
     expect(Object.keys(remainingSlots)).toEqual(["base"]);
-    expect(remainingSlots.base()).toBeUndefined();
+    expect(remainingSlots.base()).toBe("");
   });
 
   test("activates slot mode for an explicit empty slots object", () => {
@@ -138,7 +138,7 @@ describe("tv (slots)", () => {
     });
 
     expect(Object.keys(emptySlots())).toEqual(["base"]);
-    expect(emptySlots().base()).toBeUndefined();
+    expect(emptySlots().base()).toBe("");
     expect(emptySlotsWithBase().base()).toBe("flex items-center");
     expect(extendedEmptySlots().base()).toBe("flex items-center");
   });

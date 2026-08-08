@@ -8,21 +8,13 @@ import {cx} from "./utils.js";
 export type * from "./types.js";
 
 export const cn = <T extends CnOptions>(...classnames: T): ((config?: any) => CnReturn) => {
-  return (_config?: TVConfig) => {
-    const base = cx(classnames);
-
-    return base || undefined;
-  };
+  return (_config?: TVConfig) => cx(classnames);
 };
 
 /** @internal */
 export const cnAdapter = cn;
 
-const classAdapter: CnAdapter = (_config, ...classnames) => {
-  const result = cx(classnames);
-
-  return result || undefined;
-};
+const classAdapter: CnAdapter = (_config, ...classnames) => cx(classnames);
 
 const runtime = getTailwindVariants(classAdapter);
 

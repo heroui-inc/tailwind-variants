@@ -8,7 +8,7 @@ const OVERRIDE_CACHE_LIMIT = 128;
 export const CACHE_MISS = Symbol("tv-cache-miss");
 
 export type CacheMiss = typeof CACHE_MISS;
-export type CacheValue = string | undefined;
+export type CacheValue = string;
 export type CacheLookup = CacheValue | CacheMiss;
 
 export type ResultCache = {
@@ -261,7 +261,7 @@ const createNestedOverrideCache = (limit = OVERRIDE_CACHE_LIMIT): NestedOverride
       if (primaryInner) {
         const value = primaryInner.get(overrideKey);
 
-        if (value !== undefined || primaryInner.has(overrideKey)) return value;
+        if (value !== undefined) return value;
       }
 
       if (secondary) {
@@ -270,7 +270,7 @@ const createNestedOverrideCache = (limit = OVERRIDE_CACHE_LIMIT): NestedOverride
         if (secondaryInner) {
           const value = secondaryInner.get(overrideKey);
 
-          if (value !== undefined || secondaryInner.has(overrideKey)) {
+          if (value !== undefined) {
             let promoteInner = primary.get(coreKey);
 
             if (!promoteInner) {
@@ -326,18 +326,17 @@ export const createLazyOverrideMerge = (cn: CnAdapter, config: TVConfig): Overri
 
     cache ??= createNestedOverrideCache();
 
-    const coreKey = core ?? "";
     const overrideKey =
       (typeof classVal === "string" ? classVal : "") +
       "\0" +
       (typeof classNameVal === "string" ? classNameVal : "");
-    const cached = cache.get(coreKey, overrideKey);
+    const cached = cache.get(core, overrideKey);
 
     if (cached !== CACHE_MISS) return cached;
 
     const merged = cn(config, core, classVal, classNameVal);
 
-    cache.set(coreKey, overrideKey, merged);
+    cache.set(core, overrideKey, merged);
 
     return merged;
   };

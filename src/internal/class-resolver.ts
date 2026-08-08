@@ -220,7 +220,7 @@ const getCompoundSlotClasses = (
 
 const createPlainResolver = (resolved: ResolvedOptions, cn: CnAdapter): RuntimeComponent => {
   const {base, config, deferredError} = resolved;
-  let core: string | undefined | typeof CACHE_MISS = CACHE_MISS;
+  let core: string | typeof CACHE_MISS = CACHE_MISS;
   const mergeOverride = createLazyOverrideMerge(cn, config);
 
   return ((props?: AnyRecord): RuntimeResult => {
@@ -269,7 +269,7 @@ const createVariantResolver = (resolved: ResolvedOptions, cn: CnAdapter): Runtim
       compiledCompoundSlots = resolved.compiledCompoundSlots ?? EMPTY_ARRAY;
     }
 
-    let core: string | undefined;
+    let core: string;
 
     if (coldInvokesRemaining > 0) {
       coldInvokesRemaining--;
@@ -302,8 +302,8 @@ const createVariantResolver = (resolved: ResolvedOptions, cn: CnAdapter): Runtim
   }) as RuntimeComponent;
 };
 
-type SlotsResult = Record<string, (slotProps?: AnyRecord) => string | undefined>;
-type SlotComputer = (propsRef?: AnyRecord, slotProps?: AnyRecord) => string | undefined;
+type SlotsResult = Record<string, (slotProps?: AnyRecord) => string>;
+type SlotComputer = (propsRef?: AnyRecord, slotProps?: AnyRecord) => string;
 
 const createSlotsResolver = (resolved: ResolvedOptions, cn: CnAdapter): RuntimeComponent => {
   const {config, defaultVariants, deferredError, slots, variantKeys} = resolved;

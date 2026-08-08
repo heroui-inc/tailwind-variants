@@ -280,8 +280,8 @@ describe("cn / cnMerge with built-in merger", () => {
 
   test("cn handles single-token and empty-ish inputs", () => {
     expect(cn("px-2")).toBe("px-2");
-    expect(cn()).toBeUndefined();
-    expect(cn(false, null, undefined, "")).toBeUndefined();
+    expect(cn()).toBe("");
+    expect(cn(false, null, undefined, "")).toBe("");
     expect(cn("px-2", false, "px-4")).toBe("px-4");
   });
 });

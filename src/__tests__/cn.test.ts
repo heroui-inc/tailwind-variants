@@ -50,8 +50,8 @@ describe("cnLite", () => {
     expect(cnLite(123, "text-base", 0n, {border: true})()).toBe("123 text-base 0 border");
   });
 
-  test("returns undefined for no input", () => {
-    expect(cnLite()()).toBeUndefined();
+  test("returns an empty string for no input", () => {
+    expect(cnLite()()).toBe("");
   });
 
   test("returns '0' for zero and ignores other falsy values", () => {
@@ -115,10 +115,10 @@ describe("cn", () => {
     expect(result).toBe("px-2 py-2 text-sm");
   });
 
-  test("returns undefined when no classes provided", () => {
+  test("returns an empty string when no classes provided", () => {
     const result = cn();
 
-    expect(result).toBeUndefined();
+    expect(result).toBe("");
   });
 
   test("handles arrays with tailwind-merge", () => {
@@ -199,10 +199,10 @@ describe("cnMerge", () => {
     expect(result).toBe("px-2 py-2 text-sm");
   });
 
-  test("returns undefined when no classes provided", () => {
+  test("returns an empty string when no classes provided", () => {
     const result = cnMerge()({twMerge: true});
 
-    expect(result).toBeUndefined();
+    expect(result).toBe("");
   });
 
   test("handles arrays with tailwind-merge", () => {
@@ -304,8 +304,8 @@ describe.each(cxVariants)("cx ($name export)", ({cx}) => {
     expect(cx(123, "text-base", 0n, {border: true})).toBe("123 text-base 0 border");
   });
 
-  test("returns undefined for no input", () => {
-    expect(cx()).toBeUndefined();
+  test("returns an empty string for no input", () => {
+    expect(cx()).toBe("");
   });
 
   test("returns '0' for zero and ignores other falsy values", () => {

@@ -133,10 +133,10 @@ const clearArgCache = (): void => {
 };
 
 const mergeStringDefault = (joined: string): CnReturn => {
-  if (!joined) return undefined;
+  if (!joined) return "";
   if (isSingleToken(joined)) return joined;
 
-  return getDefaultMerger().mergeString(joined) || undefined;
+  return getDefaultMerger().mergeString(joined);
 };
 
 const storeArgCache = (firstKey: string, rest: string[], result: string): void => {
@@ -221,7 +221,7 @@ const mergeVariadicCached = (inputs: ArrayLike<unknown>): CnReturn => {
     return mergeStringDefault(joinArgs(inputs as CnOptions));
   }
 
-  if (truthyStringCount === 0) return undefined;
+  if (truthyStringCount === 0) return "";
   if (truthyStringCount === 1) return mergeStringDefault(firstKey);
 
   const cached = lookupArgCache(
@@ -231,7 +231,7 @@ const mergeVariadicCached = (inputs: ArrayLike<unknown>): CnReturn => {
     length,
     (index) => inputs[index],
   );
-  if (cached !== undefined) return cached || undefined;
+  if (cached !== undefined) return cached;
 
   let joined = firstKey;
   const rest: string[] = [];
@@ -244,10 +244,10 @@ const mergeVariadicCached = (inputs: ArrayLike<unknown>): CnReturn => {
     rest.push(item as string);
   }
 
-  const result = mergeStringDefault(joined) ?? "";
+  const result = mergeStringDefault(joined);
   storeArgCache(firstKey, rest, result);
 
-  return result || undefined;
+  return result;
 };
 
 /**
@@ -287,11 +287,11 @@ const mergeVariadicFromGetter = (length: number, getItem: (index: number) => unk
     return mergeStringDefault(joinArgs(inputs as CnOptions));
   }
 
-  if (truthyStringCount === 0) return undefined;
+  if (truthyStringCount === 0) return "";
   if (truthyStringCount === 1) return mergeStringDefault(firstKey);
 
   const cached = lookupArgCache(firstKey, firstKeyIndex, truthyStringCount, length, getItem);
-  if (cached !== undefined) return cached || undefined;
+  if (cached !== undefined) return cached;
 
   let joined = firstKey;
   const rest: string[] = [];
@@ -304,10 +304,10 @@ const mergeVariadicFromGetter = (length: number, getItem: (index: number) => unk
     rest.push(item as string);
   }
 
-  const result = mergeStringDefault(joined) ?? "";
+  const result = mergeStringDefault(joined);
   storeArgCache(firstKey, rest, result);
 
-  return result || undefined;
+  return result;
 };
 
 const originalStateReset = state.reset.bind(state);
@@ -321,7 +321,7 @@ state.reset = () => {
 const executeMerge = (classnames: CnOptions, config?: TWMConfig): CnReturn => {
   const base = joinArgs(classnames);
 
-  if (!base || !(config?.twMerge ?? true)) return base || undefined;
+  if (!base || !(config?.twMerge ?? true)) return base;
 
   if (isSingleToken(base)) return base;
 
@@ -330,7 +330,7 @@ const executeMerge = (classnames: CnOptions, config?: TWMConfig): CnReturn => {
   const hasCustomConfig = Boolean(config?.twMergeConfig && !isEmptyObject(config.twMergeConfig));
   const merge = hasCustomConfig ? ensureConfiguredMerger() : getDefaultMerger().mergeString;
 
-  return merge(base) || undefined;
+  return merge(base);
 };
 
 const isDefaultMergeConfig = (config?: TWMConfig): boolean => {
@@ -349,7 +349,7 @@ export const cnAdapter: CnAdapter = (config, ...classnames) => executeMerge(clas
 export const cn = function cn(): CnReturn {
   const length = arguments.length;
 
-  if (length === 0) return undefined;
+  if (length === 0) return "";
 
   const first = arguments[0];
 

@@ -150,7 +150,7 @@ interface CnClassDictionary {
 interface CnClassArray extends Array<CnClassValue> {}
 
 export type CnOptions = CnClassValue[];
-export type CnReturn = string | undefined;
+export type CnReturn = string;
 export type isTrueOrArray<T> = T extends true | unknown[] ? true : false;
 export type WithInitialScreen<T extends Array<string>> = ["initial", ...T];
 

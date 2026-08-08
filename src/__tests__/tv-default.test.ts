@@ -252,7 +252,7 @@ describe("tv", () => {
 
   test("returns an empty result without configuration", () => {
     const styles = tv({});
-    const expectedResult = undefined;
+    const expectedResult = "";
 
     expect(styles()).toBe(expectedResult);
   });

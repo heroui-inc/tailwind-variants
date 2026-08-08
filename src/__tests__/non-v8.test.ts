@@ -33,8 +33,8 @@ describe("non-V8 fallback parity", () => {
   test("cn handles falsy and empty inputs", () => {
     const {cn} = runtime;
 
-    expect(cn()).toBeUndefined();
-    expect(cn("", null, undefined, false)).toBeUndefined();
+    expect(cn()).toBe("");
+    expect(cn("", null, undefined, false)).toBe("");
   });
 
   test("cn merges single and multi-argument strings", () => {

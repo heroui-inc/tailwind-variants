@@ -212,7 +212,7 @@ describe("tv (slot overrides)", () => {
 
     expect(root({})).toBe("border-b");
     expect(root({orientation: undefined, variant: undefined})).toBe("border-b");
-    expect(root({orientation: null, variant: null} as any)).toBeUndefined();
+    expect(root({orientation: null, variant: null} as any)).toBe("");
   });
 
   test("preserves defaultVariants for compoundSlots when slot props contain undefined", () => {

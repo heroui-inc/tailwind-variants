@@ -14,12 +14,12 @@ import {cx} from "../utils.js";
 const joinAdapter: CnAdapter = (_config, ...classnames) => cx(...(classnames as string[]));
 
 describe("createBoundedCache", () => {
-  test("misses unknown keys and distinguishes stored undefined from a miss", () => {
+  test("misses unknown keys and distinguishes a stored empty string from a miss", () => {
     const cache = createResultCache();
 
-    cache.set("empty", undefined);
+    cache.set("empty", "");
 
-    expect(cache.get("empty")).toBeUndefined();
+    expect(cache.get("empty")).toBe("");
     expect(cache.get("unknown")).toBe(CACHE_MISS);
   });
 
@@ -71,7 +71,7 @@ describe("createLazyOverrideMerge", () => {
     expect(merge("px-2")).toBe("px-2");
     expect(merge("px-2", {})).toBe("px-2");
     expect(merge("px-2", {size: "sm"})).toBe("px-2");
-    expect(merge(undefined)).toBeUndefined();
+    expect(merge("")).toBe("");
   });
 
   test("returns the core untouched for empty-string class and className", () => {
@@ -87,7 +87,7 @@ describe("createLazyOverrideMerge", () => {
     expect(merge("px-2", {class: "extra"})).toBe("px-2 extra");
     expect(merge("px-2", {className: "other"})).toBe("px-2 other");
     expect(merge("px-2", {class: "a", className: "b"})).toBe("px-2 a b");
-    expect(merge(undefined, {class: "only"})).toBe("only");
+    expect(merge("", {class: "only"})).toBe("only");
   });
 
   test("merges non-string overrides without corrupting later cached lookups", () => {

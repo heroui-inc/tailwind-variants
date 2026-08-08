@@ -2,7 +2,7 @@ import type {TVConfig} from "../config.js";
 
 export type AnyRecord = Record<string, any>;
 
-export type CnAdapter = (config: TVConfig | undefined, ...classnames: any[]) => string | undefined;
+export type CnAdapter = (config: TVConfig | undefined, ...classnames: any[]) => string;
 
 export type CompiledVariant = {
   key: string;
@@ -17,10 +17,7 @@ export type CompiledCompoundVariant = {
 
 export type CompiledCompoundSlot = CompiledCompoundVariant;
 
-export type RuntimeResult =
-  | string
-  | undefined
-  | Record<string, (slotProps?: AnyRecord) => string | undefined>;
+export type RuntimeResult = string | Record<string, (slotProps?: AnyRecord) => string>;
 
 export type RuntimeComponent = {
   (props?: AnyRecord): RuntimeResult;
