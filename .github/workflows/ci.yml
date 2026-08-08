@@ -77,4 +77,4 @@ jobs:
         run: pnpm build
 
       - name: Publish Preview
-        run: pnpm exec pkg-pr-new publish --pnpm
+        run: pnpm exec pkg-pr-new publish --pnpm --packageManager=pnpm
