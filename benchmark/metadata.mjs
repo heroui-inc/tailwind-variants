@@ -77,6 +77,30 @@ export const scenarioMetadata = [
     implementations: ["tv"],
   },
   {
+    id: "composition/extend-multi",
+    category: "composition",
+    name: "Create multi-extend and call",
+    description:
+      "Lifecycle for three independent mixins. Current TV uses extend: [a,b,c]; released uses an equivalent chain.",
+    implementations: ["tv"],
+  },
+  {
+    id: "construction/extend-multi",
+    category: "construction",
+    name: "Create multi-extend component",
+    description:
+      "Definition-time cost of composing three mixins (array vs chain). Invocation is not timed.",
+    implementations: ["tv"],
+  },
+  {
+    id: "invocation/extend-multi",
+    category: "invocation",
+    name: "Call multi-extend variant matrix",
+    description:
+      "Pre-created multi-parent recipe; five-call batch. Hot path should match single-parent extend.",
+    implementations: ["tv"],
+  },
+  {
     id: "utilities/cn-merge",
     category: "utilities",
     name: "Merge pre-bound mixed class names",

@@ -142,3 +142,57 @@ export const mergeTokenInputs = [
   "px-4",
   "text-lg trailing",
 ];
+
+/** Independent style primitives for multi-parent `extend` benchmarks. */
+export const focusableConfig = {
+  base: "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500",
+  variants: {
+    focus: {
+      visible: "ring-2",
+      none: "ring-0",
+    },
+  },
+  defaultVariants: {focus: "visible"},
+};
+
+export const animatedConfig = {
+  base: "transition-all duration-150 ease-out",
+  variants: {
+    motion: {
+      normal: "duration-150",
+      slow: "duration-300",
+    },
+  },
+  defaultVariants: {motion: "normal"},
+};
+
+export const surfacedConfig = {
+  base: "bg-white border border-gray-200 shadow-sm",
+  variants: {
+    tone: {
+      neutral: "bg-white text-gray-900",
+      muted: "bg-gray-50 text-gray-700",
+    },
+  },
+  defaultVariants: {tone: "neutral"},
+};
+
+export const multiExtendChildConfig = {
+  base: "inline-flex items-center rounded-md px-3 py-2 font-medium",
+  variants: {
+    size: {
+      sm: "text-sm h-8",
+      md: "text-base h-10",
+      lg: "text-lg h-12",
+    },
+  },
+  defaultVariants: {size: "md"},
+};
+
+export const multiExtendProps = [
+  {},
+  {focus: "none", motion: "slow"},
+  {tone: "muted", size: "sm"},
+  {focus: "visible", motion: "normal", tone: "neutral", size: "lg"},
+  {focus: "none", tone: "muted", size: "md"},
+];

@@ -4,13 +4,18 @@ import {extendTailwindMerge} from "tailwind-merge";
 
 import {scenarioMetadataById} from "./metadata.mjs";
 import {
+  animatedConfig,
   buttonConfig,
   buttonProps,
   classInputs,
   customButtonConfig,
   customMergeConfig,
+  focusableConfig,
+  multiExtendChildConfig,
+  multiExtendProps,
   slotsConfig,
   slotsProps,
+  surfacedConfig,
 } from "./workloads.mjs";
 
 const metadata = (id) => {
@@ -42,6 +47,59 @@ const callSlotsBatch = (component) => {
     consume(slots.icon());
     consume(slots.label());
   }
+};
+
+const callMultiExtendBatch = (adapter, component) => {
+  for (let i = 0; i < multiExtendProps.length; i++) {
+    consume(adapter.invoke(component, multiExtendProps[i]));
+  }
+};
+
+/**
+ * Current TV supports `extend: [a, b, c]`. Released TV does not, so it gets an
+ * equivalent inheritance chain. Both produce the same flattened recipe and output.
+ */
+const createMultiExtended = (adapter, options) => {
+  const focusable = adapter.create(focusableConfig, options);
+  const animated = adapter.create(animatedConfig, options);
+  const surfaced = adapter.create(surfacedConfig, options);
+
+  if (adapter.id === "released") {
+    const focusAnimated = adapter.create(
+      {
+        extend: focusable,
+        base: animatedConfig.base,
+        variants: animatedConfig.variants,
+        defaultVariants: animatedConfig.defaultVariants,
+      },
+      options,
+    );
+    const focusAnimatedSurfaced = adapter.create(
+      {
+        extend: focusAnimated,
+        base: surfacedConfig.base,
+        variants: surfacedConfig.variants,
+        defaultVariants: surfacedConfig.defaultVariants,
+      },
+      options,
+    );
+
+    return adapter.create(
+      {
+        extend: focusAnimatedSurfaced,
+        ...multiExtendChildConfig,
+      },
+      options,
+    );
+  }
+
+  return adapter.create(
+    {
+      extend: [focusable, animated, surfaced],
+      ...multiExtendChildConfig,
+    },
+    options,
+  );
 };
 
 export const scenarios = [
@@ -154,6 +212,30 @@ export const scenarios = [
     },
   },
   {
+    ...metadata("composition/extend-multi"),
+    createTask(adapter) {
+      return () => {
+        const component = createMultiExtended(adapter, {twMerge: false});
+
+        consume(adapter.invoke(component, {focus: "none", tone: "muted", size: "sm"}));
+      };
+    },
+  },
+  {
+    ...metadata("construction/extend-multi"),
+    createTask(adapter) {
+      return () => consume(createMultiExtended(adapter, {twMerge: false}));
+    },
+  },
+  {
+    ...metadata("invocation/extend-multi"),
+    createTask(adapter) {
+      const component = createMultiExtended(adapter, {twMerge: false});
+
+      return () => callMultiExtendBatch(adapter, component);
+    },
+  },
+  {
     ...metadata("utilities/cn-merge"),
     createTask(adapter) {
       const run = adapter.bindMerge(classInputs, {twMerge: true});
@@ -221,6 +303,12 @@ const extendOutputFor = (adapter) => {
   return adapter.invoke(child, {intent: "secondary", density: "compact"});
 };
 
+const multiExtendOutputsFor = (adapter) => {
+  const component = createMultiExtended(adapter, {twMerge: false});
+
+  return multiExtendProps.map((props) => adapter.invoke(component, props));
+};
+
 export const assertEquivalentOutputs = (adapters) => {
   const tv = adapters.find((adapter) => adapter.id === "tv");
   const released = adapters.find((adapter) => adapter.id === "released");
@@ -248,6 +336,11 @@ export const assertEquivalentOutputs = (adapters) => {
     "TV no-merge slots outputs differ.",
   );
   assert.equal(extendOutputFor(tv), extendOutputFor(released), "TV extend outputs differ.");
+  assert.deepEqual(
+    multiExtendOutputsFor(tv),
+    multiExtendOutputsFor(released),
+    "TV multi-extend (array) and released chain outputs differ.",
+  );
   assert.equal(
     tv.bindMerge(classInputs, {twMerge: true})(),
     released.bindMerge(classInputs, {twMerge: true})(),

@@ -3,7 +3,8 @@
 This suite measures the built package, not source files. It separates one-time component
 construction from repeated invocation and from complete create-and-call lifecycle workloads.
 The structure follows the useful parts of CVA's benchmark system while adding TV-specific
-coverage for slots, `extend`, custom Tailwind Merge configuration, and `cnMerge`.
+coverage for slots, `extend` (single and multi-parent), custom Tailwind Merge configuration,
+and `cnMerge`.
 
 ## Commands
 
@@ -62,6 +63,27 @@ set `NO_COLOR=1` to disable ANSI colors.
   be treated as noise and confirmed with repeated runs on the same machine.
 - Custom Tailwind Merge configuration runs in a separate final phase because TV's merger cache
   is process-global.
+
+## Multi-parent `extend`
+
+Multi-extend folds parents at **definition time** only. The per-call / invocation path is the
+same flattened recipe as a single-parent or chained `extend`.
+
+| Scenario | What it measures |
+| --- | --- |
+| `composition/extend-multi` | Create three mixins + compose + one call |
+| `construction/extend-multi` | Definition-time compose only (array vs chain) |
+| `invocation/extend-multi` | Pre-created recipe, five-call batch (hot path) |
+
+Current TV uses `extend: [a, b, c]`. Released TV (no array API) uses an equivalent inheritance
+chain so outputs stay comparable. Expect:
+
+- **invocation/*** (including `extend-multi`): parity with released (noise). Parent folding runs
+  only inside `tv({...})`, not on each component call.
+- **composition/extend** (single parent): should stay within noise; single-parent still uses the
+  parent recipe directly (no fold loop).
+- **construction/extend-multi** / **composition/extend-multi**: array compose vs a forced chain;
+  usually within noise, sometimes slightly faster (one fold pass vs intermediate recipes).
 
 ## Pull request automation
 
