@@ -1,14 +1,16 @@
 import type {TVConfig, TWMConfig, TWMergeConfig} from "./config.js";
+import type {TV} from "./types.js";
+
+import {diagnostics} from "./internal/debug/decorate.js";
 import {defaultConfig as runtimeDefaultConfig} from "./internal/default-config.js";
 import {getTailwindVariants} from "./internal/tv.js";
 import {cn, cnAdapter, cnMerge} from "./internal/tw-merge.js";
-import type {TV} from "./types.js";
 import {cx as runtimeCx} from "./utils.js";
 
 export type * from "./types.js";
 export type {TVConfig, TWMConfig, TWMergeConfig};
 
-const runtime = getTailwindVariants(cnAdapter);
+const runtime = getTailwindVariants(cnAdapter, diagnostics);
 
 /**
  * Creates a variant-aware component function with Tailwind CSS classes.

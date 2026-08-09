@@ -154,9 +154,91 @@ export type CnReturn = string;
 export type isTrueOrArray<T> = T extends true | unknown[] ? true : false;
 export type WithInitialScreen<T extends Array<string>> = ["initial", ...T];
 
-type TVSlotsWithBase<S extends TVSlots, B extends ClassValue> =
-  | keyof S
-  | (B extends undefined ? never : TVBaseName);
+/**
+ * Slot names addressable by name: every declared slot plus the implicit `base`
+ * slot. A recipe always exposes `base` at runtime, whether or not a root `base`
+ * class was given (asserted by "always returns the implicit base slot" in
+ * `__tests__/tv-slots.test.ts`), so `base` is unconditional here.
+ *
+ * Deliberately a bare union, not a conditional on `B`: a conditional stays
+ * deferred while `S` is generic, which moves overload diagnostics off the
+ * offending property and onto the whole `tv()` call. Whether an object class
+ * value is admissible at all is decided by {@link TVSlotClassKeys}.
+ */
+type TVSlotsWithBase<S extends TVSlots, _B extends ClassValue> = keyof S | TVBaseName;
+
+/**
+ * Slot names a slot-shaped class value may target, resolved across own (`S`)
+ * and parent (`ES`) slots. `never` for a recipe without slots: there an object
+ * class value is joined clsx-style (its *keys* become class names), so it is a
+ * bug rather than a slot map and every key is rejected.
+ */
+type TVSlotClassKeys<S extends TVSlots, ES extends TVSlots> = [TVMergedSlots<S, ES>] extends [
+  undefined,
+]
+  ? never
+  : keyof TVMergedSlots<S, ES> | TVBaseName;
+
+/**
+ * Soft Exact for one class value: a slot map may only name known slots, while
+ * every other class form (string, array, falsy) passes through untouched.
+ * Unknown keys resolve to `never`, so they error on the offending property
+ * rather than on the whole object, even when the value is held in a variable.
+ */
+type ExactSlotClass<Slots extends PropertyKey, Actual> = Actual extends readonly unknown[]
+  ? Actual & ClassValue
+  : Actual extends object
+    ? Actual & Partial<Record<Slots, ClassValue>> & Record<Exclude<keyof Actual, Slots>, never>
+    : Actual & ClassValue;
+
+/**
+ * Suggestion-only contextual shape for a slot-shaped class value: the type that
+ * makes an IDE offer slot names inside a `variants` option value.
+ *
+ * Needed only in the `variants` position. {@link ExactVariantSlots} is mapped
+ * over the *inferred* `V`, so while an option value is still being typed there
+ * is nothing concrete for the language service to offer and the position falls
+ * back to global scope. This type names the resolved slots directly, so
+ * completions appear. `compoundVariants` needs no counterpart: its `class` /
+ * `className` are already described concretely by {@link TVCompoundVariant},
+ * which {@link ExactCompoundArray} intersects in as its `Shape`.
+ *
+ * Deliberately permissive: it must never be the type that rejects anything.
+ * The `| ClassValue` arm keeps strings, arrays and falsy values assignable, and
+ * the slot keys come from {@link TVSlotClassKeys} (already resolved) rather than
+ * from a conditional on `S`. A conditional such as {@link VariantClassValue}
+ * stays deferred when `S` is an unresolved type parameter, which would make
+ * every value unassignable inside a generic wrapper around `tv()`
+ * (regression-tested by `genericSlotWrapper` in
+ * `__tests__/__types__/excess-keys.ts`). Rejection stays the exactness types' job.
+ */
+type SuggestSlotClass<Slots extends PropertyKey> = Partial<Record<Slots, ClassValue>> | ClassValue;
+
+/**
+ * Soft Exact applied to a `variants` map: validates the slot names used by
+ * every slot-shaped option value. `V` itself must stay an unconstrained
+ * inference site (see {@link TVVariantsConstraint}), so slot validation is
+ * intersected into the `variants` position instead of narrowing the constraint.
+ */
+type ExactVariantSlots<Slots extends PropertyKey, Actual> = {
+  [Axis in keyof Actual]: {
+    [Option in keyof Actual[Axis]]: ExactSlotClass<Slots, Actual[Axis][Option]>;
+  };
+};
+
+/**
+ * Soft Exact applied to the `class` / `className` of one compoundVariants entry.
+ *
+ * The `?` is required, not cosmetic. Mixing `class` and `className` across
+ * entries widens the array's element type to a union, and `keyof` a union keeps
+ * only the keys common to every member — which is *both* `class` and
+ * `className`, since {@link ClassProp} gives each entry the other one as
+ * `never`. Without `?` this mapped type would then demand both on every entry
+ * and reject an ordinary mixed array.
+ */
+type ExactSlotClassProp<Slots extends PropertyKey, Actual> = {
+  [K in Extract<keyof Actual, "class" | "className">]?: ExactSlotClass<Slots, Actual[K]>;
+};
 
 type SlotsClassValue<S extends TVSlots, B extends ClassValue> = {
   [K in TVSlotsWithBase<S, B>]?: ClassValue;
@@ -216,34 +298,70 @@ type TVResolvedVariants<V extends TVVariantsShape, EV extends TVVariantsShape> =
       : OmitIndexSignature<Merged>
     : never;
 
-/** One compoundVariants entry (resolved parent+child axes). */
+/**
+ * One compoundVariants entry (resolved parent+child axes).
+ *
+ * The class value spans own *and* inherited slots: a compound entry may target
+ * any slot the recipe exposes, exactly like a variant option value. `ES`
+ * defaults to `undefined` so the historical four-argument form still resolves
+ * to own slots only.
+ *
+ * Keep the slot set here in sync with the {@link TVSlotClassKeys} passed to
+ * {@link ExactSlotClassProp} at the `compoundVariants` option: this type decides
+ * what the IDE *suggests*, that one decides what is *rejected*. When they drift,
+ * valid slots stop being suggested (inherited slots did, before `ES` was
+ * threaded through).
+ */
 export type TVCompoundVariant<
   V extends TVVariantsShape,
   S extends TVSlots,
   B extends ClassValue,
   EV extends TVVariantsShape,
-> = {
+  ES extends TVSlots = undefined,
+> = TVCompoundVariantAxes<V, EV> & ClassProp<SlotsClassValue<TVMergedSlots<S, ES>, B> | ClassValue>;
+
+/**
+ * Axis conditions of one compoundVariants entry, without the class props.
+ *
+ * Split out so {@link ExactCompoundArray} can validate an entry against
+ * `TVCompoundVariantAxes & ClassProp<unknown>`. Pairing the axes with a class
+ * value of `unknown` keeps `class` / `className` as *known* keys — excess-key
+ * checks and their mutual exclusivity both still work — while contributing
+ * nothing to their value type.
+ *
+ * That matters for IDE completions. `ExactShape` intersects the entry being
+ * typed with this shape, and an intersection surfaces the members of every
+ * constituent. A class value of `SlotsClassValue | ClassValue` therefore dragged
+ * the whole `String` prototype (`at`, `charAt`, `length`, …) into the suggestion
+ * list at `class: {`, ranked above the slot names. `unknown` contributes no
+ * members, leaving {@link ExactSlotClassProp} as the single source of both the
+ * value's validation and its slot-name suggestions.
+ */
+type TVCompoundVariantAxes<V extends TVVariantsShape, EV extends TVVariantsShape> = {
   [K in keyof TVResolvedVariants<V, EV> & string]?:
     | VariantValueWithBooleanUndefined<TVResolvedVariants<V, EV>, K>
     | Array<VariantValueWithBooleanUndefined<TVResolvedVariants<V, EV>, K>>;
-} & ClassProp<SlotsClassValue<S, B> | ClassValue>;
+};
 
 export type TVCompoundVariants<
   V extends TVVariantsShape,
   S extends TVSlots,
   B extends ClassValue,
   EV extends TVVariantsShape,
-  _ES extends TVSlots = undefined,
-> = Array<TVCompoundVariant<V, S, B, EV>>;
+  ES extends TVSlots = undefined,
+> = Array<TVCompoundVariant<V, S, B, EV, ES>>;
 
 /**
- * Per-element Soft Exact: {@link ExactShape} applied to each entry. Rejects
- * renamed or typo axes even when the array is held in a variable. Used for
- * `compoundVariants`; reuse for future array options (e.g. exact
- * `compoundSlots`) instead of adding a parallel implementation.
+ * Per-element Soft Exact for `compoundVariants`: {@link ExactShape} rejects
+ * renamed or typo axes, {@link ExactSlotClassProp} rejects unknown slot names
+ * inside that entry's `class` / `className`. Both survive the array being held
+ * in a variable. Reuse for future array options instead of adding a parallel
+ * implementation.
  */
-type ExactArray<Shape, Actual extends readonly object[]> = {
-  [I in keyof Actual]: Actual[I] extends object ? ExactShape<Shape, Actual[I]> : Actual[I];
+type ExactCompoundArray<Shape, Slots extends PropertyKey, Actual extends readonly object[]> = {
+  [I in keyof Actual]: Actual[I] extends object
+    ? ExactShape<Shape, Actual[I]> & ExactSlotClassProp<Slots, Actual[I]>
+    : Actual[I];
 };
 
 /**
@@ -387,6 +505,8 @@ type HasSlots<S extends TVSlots, ES extends TVSlots> = S extends undefined
     : true
   : true;
 
+type TVSlotCall<Props> = (slotProps?: Props) => string;
+
 export interface TVReturnType<
   V extends TVVariantsShape,
   S extends TVSlots,
@@ -400,15 +520,11 @@ export interface TVReturnType<
   ): HasSlots<S, ES> extends true
     ? Simplify<
         {
-          [K in keyof (ES extends undefined ? {} : ES)]: (
-            slotProps?: TVProps<V, S, EV, ES>,
-          ) => string;
+          [K in keyof (ES extends undefined ? {} : ES)]: TVSlotCall<TVProps<V, S, EV, ES>>;
         } & {
-          [K in keyof (S extends undefined ? {} : S)]: (
-            slotProps?: TVProps<V, S, EV, ES>,
-          ) => string;
+          [K in keyof (S extends undefined ? {} : S)]: TVSlotCall<TVProps<V, S, EV, ES>>;
         } & {
-          [K in TVBaseName]: (slotProps?: TVProps<V, S, EV, ES>) => string;
+          [K in TVBaseName]: TVSlotCall<TVProps<V, S, EV, ES>>;
         }
       >
     : string;
@@ -443,16 +559,30 @@ type TVOptionsFields<
   slots?: S;
   /**
    * Named variant axes and their options.
+   * Soft Exact: `V` stays inferrable from the value, while slot-shaped option
+   * values may only name declared slots (own or inherited) plus `base`.
+   * The {@link SuggestSlotClass} arm adds nothing to validation; it exists so the
+   * IDE suggests those slot names while the option value is being typed.
    * @see https://www.tailwind-variants.org/docs/variants#adding-variants
    */
-  variants?: V;
+  variants?: V &
+    Record<string, Record<string, SuggestSlotClass<TVSlotClassKeys<S, ES>>>> &
+    ExactVariantSlots<TVSlotClassKeys<S, ES>, V>;
   /**
    * Classes applied when several variants match at once.
-   * Validated against resolved parent+child axes; excess keys are rejected,
-   * even when the array is held in a variable.
+   * Validated against resolved parent+child axes; excess axes and unknown slot
+   * names in `class` / `className` are rejected, even when the array is held in
+   * a variable.
+   * The {@link SuggestSlotClass} arm mirrors `variants`: validation-neutral, it
+   * only makes the IDE suggest slot names inside `class` / `className`.
    * @see https://www.tailwind-variants.org/docs/variants#compound-variants
    */
-  compoundVariants?: CV & ExactArray<TVCompoundVariant<V, S, B, EV>, CV>;
+  compoundVariants?: CV &
+    ExactCompoundArray<
+      TVCompoundVariantAxes<V, EV> & ClassProp<unknown>,
+      TVSlotClassKeys<S, ES>,
+      CV
+    >;
   /**
    * Default value for each variant axis.
    * Soft Exact: `DV` stays inferrable from the value; renamed or typo axes are rejected.

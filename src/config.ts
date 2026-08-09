@@ -26,4 +26,24 @@ export type TWMConfig = {
   twMergeConfig?: TWMergeConfig;
 };
 
-export type TVConfig = TWMConfig;
+/**
+ * Config for a recipe or a `createTV` factory.
+ *
+ * The debug flag lives behind `process.env.NODE_ENV !== "production"` branches,
+ * so a bundled production build strips the console reporter and the logging
+ * wrapper entirely.
+ */
+export type TVConfig = TWMConfig & {
+  /**
+   * Log how each invocation resolved its classes to the browser console:
+   * effective props, `base`, `variants`, `compounds`, classes `tailwind-merge`
+   * discarded, and the final `result`.
+   *
+   * Logging is development-only and browser-only — SSR and production builds
+   * stay silent. When disabled, recipes are returned untouched.
+   *
+   * @default false
+   * @see https://www.tailwind-variants.org/docs/debugging
+   */
+  debug?: boolean;
+};

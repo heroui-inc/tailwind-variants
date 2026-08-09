@@ -1,9 +1,11 @@
 import type {TVConfig} from "../config.js";
-import {createClassResolver} from "./class-resolver.js";
-import {resolveOptions} from "./resolve-options.js";
+import type {Diagnostics} from "./debug/decorate.js";
 import type {CnAdapter, ResolvedOptions, RuntimeComponent, RuntimeTV} from "./types.js";
 
-/** Per-call config wins per key; `twMergeConfig` objects merge one level deep. */
+import {createClassResolver} from "./class-resolver.js";
+import {resolveOptions} from "./resolve-options.js";
+
+/** Per-call config wins per key; `twMergeConfig` merges one level deep. */
 const mergeConfig = (base: TVConfig, override: TVConfig): TVConfig => {
   const merged: TVConfig = {...base, ...override};
 
@@ -25,12 +27,14 @@ const attachComponentMetadata = (component: RuntimeComponent, resolved: Resolved
   component.compoundVariants = resolved.compoundVariants;
 };
 
-export const getTailwindVariants = (cn: CnAdapter) => {
+export const getTailwindVariants = (cn: CnAdapter, diagnostics?: Diagnostics) => {
   const tv: RuntimeTV = (options, configProp) => {
     const resolved = resolveOptions(options, configProp);
     const component = createClassResolver(resolved, cn);
 
     attachComponentMetadata(component, resolved);
+
+    if (diagnostics) return diagnostics(component, resolved, attachComponentMetadata);
 
     return component;
   };
