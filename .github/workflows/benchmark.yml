@@ -14,6 +14,7 @@ on:
 
 permissions:
   contents: read
+  pull-requests: write
 
 concurrency:
   group: benchmark-${{ github.event.pull_request.number }}
@@ -31,5 +32,48 @@ jobs:
       - name: Install dependencies
         uses: ./.github/actions/install
 
+      - name: Post running status
+        if: ${{ github.event.pull_request.head.repo.full_name == github.repository }}
+        env:
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          GITHUB_SHA: ${{ github.event.pull_request.head.sha }}
+          GITHUB_REF_NAME: ${{ github.head_ref }}
+          GITHUB_RUN_ID: ${{ github.run_id }}
+        run: node benchmark/ci-comment.mjs status running
+
       - name: Run Benchmark
         run: pnpm benchmark
+        env:
+          BENCHMARK_RESULTS_PATH: benchmark-results.json
+
+      - name: Post Results Comment
+        if: ${{ success() && github.event.pull_request.head.repo.full_name == github.repository }}
+        env:
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          GITHUB_SHA: ${{ github.event.pull_request.head.sha }}
+          GITHUB_REF_NAME: ${{ github.head_ref }}
+          GITHUB_RUN_ID: ${{ github.run_id }}
+          BENCHMARK_RESULTS_PATH: benchmark-results.json
+        run: node benchmark/ci-comment.mjs status results
+
+      - name: Post Failure Comment
+        if: ${{ failure() && github.event.pull_request.head.repo.full_name == github.repository }}
+        env:
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          GITHUB_SHA: ${{ github.event.pull_request.head.sha }}
+          GITHUB_REF_NAME: ${{ github.head_ref }}
+          GITHUB_RUN_ID: ${{ github.run_id }}
+        run: node benchmark/ci-comment.mjs status failed
+
+      - name: Post Cancelled Comment
+        if: ${{ cancelled() && github.event.pull_request.head.repo.full_name == github.repository }}
+        env:
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          GITHUB_SHA: ${{ github.event.pull_request.head.sha }}
+          GITHUB_REF_NAME: ${{ github.head_ref }}
+          GITHUB_RUN_ID: ${{ github.run_id }}
+        run: node benchmark/ci-comment.mjs status cancelled

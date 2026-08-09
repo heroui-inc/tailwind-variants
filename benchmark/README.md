@@ -14,7 +14,14 @@ pnpm benchmark
 
 # Fast smoke run (not suitable for performance claims)
 pnpm benchmark --quick
+
+# Write machine-readable results for cross-run comparison
+BENCHMARK_RESULTS_PATH=benchmark-results.json pnpm benchmark
 ```
+
+`--quick` uses 100 ms measure / 50 ms warmup, drops the faster/slower verdicts from the delta
+columns, and flags the run as `[UNRELIABLE]` in the output. Quick runs are for iteration and CI
+smoke checks only, never for claims.
 
 Each run queries npm for the latest published `tailwind-variants`,
 `class-variance-authority`, and `cnfast`, caches those exact packages in the system temporary
@@ -88,5 +95,35 @@ chain so outputs stay comparable. Expect:
 ## Pull request automation
 
 Pull requests that change runtime sources, benchmark code, build configuration, or dependency
-manifests run the full suite. The result table is visible in the workflow log and is also appended
-to the GitHub Actions job summary.
+manifests run the full suite. The result table is visible in the workflow log, is appended to the
+GitHub Actions job summary, and is posted to the pull request as a **single comment**.
+
+### PR comment report
+
+Every benchmark trigger updates the same comment in place — identified by an HTML marker — so the
+comment thread never gets polluted with a new comment per push:
+
+| Status | When | Body |
+| --- | --- | --- |
+| 🔄 **Benchmark running…** | posted before the benchmark starts | commit, branch, workflow link |
+| ✅ **Completed** | benchmark succeeded | full cross-run comparison + versions |
+| ⚠️ **Completed — regressions detected** | succeeded but ≥1 regression vs baseline | same report, warning header |
+| ❌ **Benchmark failed** | benchmark step failed | failure notice + workflow link |
+| ⏹️ **Benchmark cancelled** | superseded by a newer run | cancellation notice |
+
+The report compares the current run against the **previous run on the same PR**. The raw results of
+the latest successful run are embedded in an HTML comment at the end of the report comment, so no
+extra branch or storage is needed — the next run parses that payload and marks each scenario as:
+
+- 🟢 **improved** — more than +5% vs baseline
+- 🔴 **regressed** — more than −5% vs baseline
+- 🟡 **within noise** — inside ±5%
+
+The first run on a PR has no baseline yet, so it just records the numbers and becomes the baseline
+for the next run. Statuses that need the pull request API (`running`, `results`, `failed`,
+`cancelled`) only post comments for same-repository PRs; fork PRs keep the benchmark but skip the
+comment because the default token cannot write to them.
+
+The raw results the report consumes are written by the benchmark itself: set
+`BENCHMARK_RESULTS_PATH` (CI) or pass `--json-out <path>` to emit
+`{timestamp, commit, options, noiseThreshold, versions, variants[], utilities[]}`.
