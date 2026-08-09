@@ -28,6 +28,17 @@ const hasClassOverride = (props?: AnyRecord): boolean =>
   (props?.class != null && props.class !== "") ||
   (props?.className != null && props.className !== "");
 
+// `JSON.stringify` turns NaN/Infinity into `null`, which would make two
+// different variant values share one cache key and serve the wrong classes.
+// Rejecting them bails to the uncached path instead of colliding.
+const NON_FINITE = Symbol("tv-non-finite");
+
+const stringifyFiniteOrThrow = (_key: string, value: unknown): unknown => {
+  if (typeof value === "number" && !Number.isFinite(value)) throw NON_FINITE;
+
+  return value;
+};
+
 const serializeFingerprintValue = (value: unknown): string | null => {
   if (value === undefined) return "";
   if (value === null) return "null";
@@ -51,7 +62,7 @@ const serializeFingerprintValue = (value: unknown): string | null => {
 
   if (mappedType === "object") {
     try {
-      return JSON.stringify(mapped);
+      return JSON.stringify(mapped, stringifyFiniteOrThrow);
     } catch {
       return null;
     }
@@ -60,24 +71,24 @@ const serializeFingerprintValue = (value: unknown): string | null => {
   return null;
 };
 
-const appendSignatureValue = (out: string, value: unknown): string => {
+const appendSignatureValue = (out: string, value: unknown): string | null => {
   if (value === undefined) return out;
   if (value === null) return out + "null";
 
   const type = typeof value;
 
   if (type === "string" || type === "number" || type === "boolean" || type === "bigint") {
+    // `String(NaN)` is "NaN" — distinct from "null", so top-level primitives
+    // never collide. Only the object/array branches need the finite check.
     return out + String(value);
   }
 
-  if (Array.isArray(value)) {
-    return out + value.join("\0");
-  }
-
   try {
-    return out + JSON.stringify(value);
+    // Arrays serialize through the same replacer so nested values keep their
+    // full shape (a `join` would reduce objects to "[object Object]").
+    return out + JSON.stringify(value, stringifyFiniteOrThrow);
   } catch {
-    return out + "?";
+    return null;
   }
 };
 
@@ -153,11 +164,17 @@ export const buildPropsFingerprint = (
   return fingerprint;
 };
 
-/** Invalidates cache when compound metadata mutates. */
+/**
+ * Invalidates cache when compound metadata mutates.
+ *
+ * Returns `null` when a value cannot be serialized losslessly (non-finite
+ * numbers, circular objects), so callers skip the cache instead of keying two
+ * different configs alike.
+ */
 export const buildCompoundsSignature = (
   compoundVariants: CompiledCompoundVariant[],
   compoundSlots: CompiledCompoundSlot[],
-): string => {
+): string | null => {
   let signature = "";
 
   for (let i = 0; i < compoundVariants.length; i++) {
@@ -165,17 +182,24 @@ export const buildCompoundsSignature = (
 
     for (let j = 0; j < conditionKeys.length; j++) {
       const key = conditionKeys[j];
+      const appended = appendSignatureValue(signature + key + "=", source[key]);
 
-      signature += key + "=";
-      signature = appendSignatureValue(signature, source[key]);
-      signature += ",";
+      if (appended === null) return null;
+
+      signature = appended + ",";
     }
 
     signature += "c=";
-    signature = appendSignatureValue(signature, source.class);
-    signature += "|cn=";
-    signature = appendSignatureValue(signature, source.className);
-    signature += ";";
+    const withClass = appendSignatureValue(signature, source.class);
+
+    if (withClass === null) return null;
+
+    signature = withClass + "|cn=";
+    const withClassName = appendSignatureValue(signature, source.className);
+
+    if (withClassName === null) return null;
+
+    signature = withClassName + ";";
   }
 
   for (let i = 0; i < compoundSlots.length; i++) {
@@ -183,10 +207,11 @@ export const buildCompoundsSignature = (
 
     for (let j = 0; j < conditionKeys.length; j++) {
       const key = conditionKeys[j];
+      const appended = appendSignatureValue(signature + key + "=", source[key]);
 
-      signature += key + "=";
-      signature = appendSignatureValue(signature, source[key]);
-      signature += ",";
+      if (appended === null) return null;
+
+      signature = appended + ",";
     }
 
     if (Array.isArray(source.slots)) {
@@ -194,10 +219,16 @@ export const buildCompoundsSignature = (
     }
 
     signature += "c=";
-    signature = appendSignatureValue(signature, source.class);
-    signature += "|cn=";
-    signature = appendSignatureValue(signature, source.className);
-    signature += ";";
+    const withClass = appendSignatureValue(signature, source.class);
+
+    if (withClass === null) return null;
+
+    signature = withClass + "|cn=";
+    const withClassName = appendSignatureValue(signature, source.className);
+
+    if (withClassName === null) return null;
+
+    signature = withClassName + ";";
   }
 
   return signature;

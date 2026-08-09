@@ -301,13 +301,20 @@ const createVariantResolver = (resolved: ResolvedOptions, cn: CnAdapter): Runtim
             ? buildCompoundsSignature(compiledCompoundVariants!, compiledCompoundSlots)
             : "";
         const cacheKey = propsFingerprint + "#" + compoundsSig;
-        const cached = cache.get(cacheKey);
 
-        if (cached !== CACHE_MISS) {
-          core = cached;
-        } else {
+        // A null compounds signature (unserializable compound values) skips the
+        // cache so two different configs never share a key.
+        if (compoundsSig === null) {
           core = computeCore(props);
-          cache.set(cacheKey, core);
+        } else {
+          const cached = cache.get(cacheKey);
+
+          if (cached !== CACHE_MISS) {
+            core = cached;
+          } else {
+            core = computeCore(props);
+            cache.set(cacheKey, core);
+          }
         }
       } else {
         core = computeCore(props);
@@ -444,6 +451,11 @@ const createSlotsResolver = (resolved: ResolvedOptions, cn: CnAdapter): RuntimeC
     const compoundsSig = hasCompounds
       ? buildCompoundsSignature(compoundVariants!, compoundSlots!)
       : "";
+
+    if (compoundsSig === null) {
+      return createSlotsResult(props);
+    }
+
     const cacheKey = propsFingerprint + "#" + compoundsSig;
 
     parentCache ??= createBoundedCache<SlotsResult>();

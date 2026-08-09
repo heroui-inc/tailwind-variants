@@ -3,6 +3,7 @@ import type {CnAdapter} from "../internal/types.js";
 import {describe, expect, test} from "vitest";
 
 import {
+  buildCompoundsSignature,
   buildPropsFingerprint,
   CACHE_MISS,
   createBoundedCache,
@@ -178,6 +179,62 @@ describe("buildPropsFingerprint", () => {
     const asString = buildPropsFingerprint(["disabled"], {}, {disabled: "false"});
 
     expect(asBoolean).toBe(asString);
+  });
+});
+
+describe("non-finite number serialization", () => {
+  const variantKeys = ["size"];
+
+  test("bails out for NaN inside object props instead of colliding with null", () => {
+    const nan = buildPropsFingerprint(variantKeys, {}, {size: {level: NaN}});
+    const nullValue = buildPropsFingerprint(variantKeys, {}, {size: {level: null}});
+
+    expect(nan).toBeNull();
+    expect(nullValue).not.toBeNull();
+  });
+
+  test("bails out for Infinity inside nested array props", () => {
+    expect(buildPropsFingerprint(variantKeys, {}, {size: [Infinity]})).toBeNull();
+    expect(buildPropsFingerprint(variantKeys, {}, {size: [null]})).not.toBeNull();
+  });
+
+  test("keeps serializing finite nested values", () => {
+    expect(buildPropsFingerprint(variantKeys, {}, {size: {level: 1}})).not.toBeNull();
+  });
+
+  test("distinguishes array props carrying different objects", () => {
+    const a = buildPropsFingerprint(variantKeys, {}, {size: [{x: 1}]});
+    const b = buildPropsFingerprint(variantKeys, {}, {size: [{y: 2}]});
+
+    expect(a).not.toBeNull();
+    expect(b).not.toBeNull();
+    expect(a).not.toBe(b);
+  });
+
+  test("compounds signature bails out for non-finite condition values", () => {
+    const nan = [{conditionKeys: ["size"], source: {size: {level: NaN}}}];
+    const finite = [{conditionKeys: ["size"], source: {size: {level: 2}}}];
+
+    expect(buildCompoundsSignature(nan, [])).toBeNull();
+    expect(buildCompoundsSignature(finite, [])).not.toBeNull();
+  });
+
+  test("compounds signature bails out for non-finite class values", () => {
+    const nanClass = [{conditionKeys: [], source: {class: {width: NaN}}}];
+    const nullClass = [{conditionKeys: [], source: {class: {width: null}}}];
+
+    expect(buildCompoundsSignature(nanClass, [])).toBeNull();
+    expect(buildCompoundsSignature(nullClass, [])).not.toBeNull();
+  });
+
+  test("compounds signature bails out for circular objects", () => {
+    const circular: Record<string, unknown> = {};
+
+    circular.self = circular;
+
+    const source = [{conditionKeys: [], source: {class: circular}}];
+
+    expect(buildCompoundsSignature(source, [])).toBeNull();
   });
 });
 
