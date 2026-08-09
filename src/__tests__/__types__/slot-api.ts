@@ -1,4 +1,6 @@
-import {tv, type VariantProps} from "../../index.js";
+import type {VariantProps} from "../../index.js";
+
+import {tv} from "../../index.js";
 
 // Case: infer slot functions, slot props, compounds, and boolean conditions.
 const card = tv({

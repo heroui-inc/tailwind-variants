@@ -5,7 +5,7 @@
  * @see https://github.com/dcastil/tailwind-merge/blob/main/LICENSE.md
  */
 
-import {AnyConfig, ConfigExtension} from "./types.js";
+import type {AnyConfig, ConfigExtension} from "./types.js";
 
 type PropertyObject = Partial<Record<string, readonly unknown[]>>;
 

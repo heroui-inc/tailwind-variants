@@ -1,7 +1,8 @@
+import type {AnyClassGroupIds, AnyConfig} from "./types.js";
+
 import {createClassGroupUtils} from "./class-group-utils.js";
 import {IMPORTANT_MODIFIER, parseClassName} from "./parse-class-name.js";
 import {createSortModifiers} from "./sort-modifiers.js";
-import {AnyClassGroupIds, AnyConfig} from "./types.js";
 
 export type ConfigUtils = ReturnType<typeof createConfigUtils>;
 

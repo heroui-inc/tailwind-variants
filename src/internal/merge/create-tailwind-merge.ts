@@ -5,9 +5,12 @@
  * @see https://github.com/dcastil/tailwind-merge/blob/main/LICENSE.md
  */
 
-import {type JoinClassValue, joinClassValue} from "../join-class-value.js";
-import {createConfigUtils} from "./config-utils.js";
+import type {JoinClassValue} from "../join-class-value.js";
 import type {AnyConfig, ClassNameValue} from "./types.js";
+
+import {joinClassValue} from "../join-class-value.js";
+
+import {createConfigUtils} from "./config-utils.js";
 
 type ConfigUtils = ReturnType<typeof createConfigUtils>;
 

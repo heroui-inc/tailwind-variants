@@ -1,6 +1,8 @@
+import type {TVFactory} from "../index";
+
 import {describe, expect, test} from "vitest";
 
-import {createTV, type TVFactory, tv} from "../index";
+import {createTV, tv} from "../index";
 import {createTV as createTVLite, tv as tvLite} from "../lite";
 
 const slotsConfig = {

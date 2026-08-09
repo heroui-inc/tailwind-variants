@@ -1,17 +1,9 @@
-import {
-  cn,
-  cnMerge,
-  createTV,
-  cx,
-  defaultConfig,
-  type TVConfig,
-  type TWMConfig,
-  type TWMergeConfig,
-  tv,
-} from "../../index.js";
+import type {TVConfig, TWMConfig, TWMergeConfig} from "../../index.js";
+import type {IsEqual} from "./test-utils.js";
+
+import {cn, cnMerge, createTV, cx, defaultConfig, tv} from "../../index.js";
 import {createTV as createLiteTV, cn as liteCn, cx as liteCx, tv as liteTV} from "../../lite.js";
 import {cx as utilityCx} from "../../utils.js";
-import type {IsEqual} from "./test-utils.js";
 
 // Case: accept public Tailwind Merge configuration shapes in TVConfig and TWMConfig.
 const twMergeConfig: TWMergeConfig = {

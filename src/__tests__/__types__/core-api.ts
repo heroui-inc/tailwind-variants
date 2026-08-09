@@ -1,15 +1,15 @@
-import {
-  createTV,
-  type TV,
-  type TVCompoundSlots,
-  type TVLite,
-  type TVReturnProps,
-  type TVReturnType,
-  tv,
-  type VariantProps,
+import type {
+  TV,
+  TVCompoundSlots,
+  TVLite,
+  TVReturnProps,
+  TVReturnType,
+  VariantProps,
 } from "../../index.js";
-import {createTV as createLiteTV, tv as liteTV} from "../../lite.js";
 import type {Assert, Extends, IsEqual} from "./test-utils.js";
+
+import {createTV, tv} from "../../index.js";
+import {createTV as createLiteTV, tv as liteTV} from "../../lite.js";
 
 // Case: infer callable props, return type, and VariantProps from basic variants.
 const button = tv({

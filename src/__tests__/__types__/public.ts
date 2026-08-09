@@ -2,8 +2,11 @@
  * Public TypeScript usage from https://www.tailwind-variants.org/docs/typescript
  * These cases mirror the documented examples so docs and library stay aligned.
  */
-import {tv, type VariantProps} from "../../index.js";
+
+import type {VariantProps} from "../../index.js";
 import type {Assert, IsEqual as Equals, Extends} from "./test-utils.js";
+
+import {tv} from "../../index.js";
 
 // ---------------------------------------------------------------------------
 // VariantProps (docs): extract props a recipe accepts

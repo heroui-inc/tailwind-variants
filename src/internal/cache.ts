@@ -1,6 +1,7 @@
 import type {TVConfig} from "../config.js";
-import {falsyToString} from "../utils.js";
 import type {AnyRecord, CnAdapter, CompiledCompoundSlot, CompiledCompoundVariant} from "./types.js";
+
+import {falsyToString} from "../utils.js";
 
 const VARIANT_CACHE_LIMIT = 256;
 const OVERRIDE_CACHE_LIMIT = 128;

@@ -5,10 +5,12 @@
  * @see https://github.com/dcastil/tailwind-merge/blob/main/LICENSE.md
  */
 
-import {createTailwindMerge, type TailwindMerge} from "./create-tailwind-merge.js";
+import type {TailwindMerge} from "./create-tailwind-merge.js";
+import type {AnyConfig, ConfigExtension} from "./types.js";
+
+import {createTailwindMerge} from "./create-tailwind-merge.js";
 import {getDefaultConfig} from "./default-config.js";
 import {mergeConfigs} from "./merge-configs.js";
-import type {AnyConfig, ConfigExtension} from "./types.js";
 
 export type Merger = TailwindMerge;
 
@@ -28,6 +30,7 @@ export const createMerger = (config?: CreateMergerConfig): Merger => {
   return createTailwindMerge(createConfig);
 };
 
+export type {AnyConfig, ClassNameValue, ConfigExtension} from "./types.js";
+
 export {getDefaultConfig} from "./default-config.js";
 export {mergeConfigs} from "./merge-configs.js";
-export type {AnyConfig, ClassNameValue, ConfigExtension} from "./types.js";

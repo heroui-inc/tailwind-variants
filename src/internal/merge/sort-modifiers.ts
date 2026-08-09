@@ -1,4 +1,4 @@
-import {AnyConfig} from "./types.js";
+import type {AnyConfig} from "./types.js";
 
 /**
  * Sorts predefined modifiers alphabetically. Arbitrary and order-sensitive

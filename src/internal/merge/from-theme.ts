@@ -1,4 +1,4 @@
-import {DefaultThemeGroupIds, NoInfer, ThemeGetter, ThemeObject} from "./types.js";
+import type {DefaultThemeGroupIds, NoInfer, ThemeGetter, ThemeObject} from "./types.js";
 
 const fallbackThemeArr: ThemeObject<DefaultThemeGroupIds>[DefaultThemeGroupIds] = [];
 

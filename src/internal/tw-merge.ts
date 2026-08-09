@@ -9,13 +9,17 @@
 
 import type {TWMConfig, TWMergeConfig} from "../config.js";
 import type {CnOptions, CnReturn} from "../types.js";
-import {isEmptyObject, isEqual} from "../utils.js";
-import {type JoinClassValue, joinClassValue} from "./join-class-value.js";
-import {createMerger, type Merger} from "./merge/index.js";
+import type {JoinClassValue} from "./join-class-value.js";
+import type {Merger} from "./merge/index.js";
 import type {ConfigExtension} from "./merge/types.js";
 import type {TwMergeFn} from "./state.js";
-import {state} from "./state.js";
 import type {CnAdapter} from "./types.js";
+
+import {isEmptyObject, isEqual} from "../utils.js";
+
+import {joinClassValue} from "./join-class-value.js";
+import {createMerger} from "./merge/index.js";
+import {state} from "./state.js";
 
 /** Normalize TV config shapes into `{ extend, override }`. */
 const toMergerConfig = (config: TWMergeConfig): ConfigExtension | undefined => {

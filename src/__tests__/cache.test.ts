@@ -1,3 +1,5 @@
+import type {CnAdapter} from "../internal/types.js";
+
 import {describe, expect, test} from "vitest";
 
 import {
@@ -8,7 +10,6 @@ import {
   createResultCache,
 } from "../internal/cache.js";
 import {createMerger} from "../internal/merge/index.js";
-import type {CnAdapter} from "../internal/types.js";
 import {cx} from "../utils.js";
 
 const joinAdapter: CnAdapter = (_config, ...classnames) => cx(...(classnames as string[]));

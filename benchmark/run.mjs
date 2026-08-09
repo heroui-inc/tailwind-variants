@@ -1,6 +1,3 @@
-import {appendFileSync} from "node:fs";
-import path from "node:path";
-
 import {Bench} from "tinybench";
 
 import {createAdapter, createUtilityAdapter, loadImplementations} from "./harness.mjs";
@@ -10,6 +7,8 @@ import {
   hasRetainedUtilityResult,
   utilityScenarios,
 } from "./utility-scenarios.mjs";
+import {appendFileSync} from "node:fs";
+import path from "node:path";
 
 const noiseThreshold = 5;
 const compactNumber = new Intl.NumberFormat("en-US", {

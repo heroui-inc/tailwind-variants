@@ -1,5 +1,3 @@
-import assert from "node:assert/strict";
-
 import {extendTailwindMerge} from "tailwind-merge";
 
 import {scenarioMetadataById} from "./metadata.mjs";
@@ -17,6 +15,7 @@ import {
   slotsProps,
   surfacedConfig,
 } from "./workloads.mjs";
+import assert from "node:assert/strict";
 
 const metadata = (id) => {
   const value = scenarioMetadataById.get(id);

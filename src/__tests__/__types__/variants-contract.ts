@@ -12,15 +12,11 @@
  * autocompletion through the inlined LiteralUnion fallback; strict axes
  * stay strict.
  */
-import {
-  type ClassProp,
-  type ClassValue,
-  type TVProps,
-  type TVVariants,
-  tv,
-  type VariantProps,
-} from "../../index.js";
+
+import type {ClassProp, ClassValue, TVProps, TVVariants, VariantProps} from "../../index.js";
 import type {Assert, IsEqual} from "./test-utils.js";
+
+import {tv} from "../../index.js";
 
 // ---------------------------------------------------------------------------
 // TVVariants shape freeze
@@ -32,11 +28,12 @@ type TVVariantsFrozenShape = Assert<
 >;
 
 // Slot-aware values stay slot map | ClassValue; no index-signature union at
-// the axis level.
+// the axis level. The slot map covers the implicit `base` slot as well, which
+// a slot recipe always exposes at runtime.
 type TVVariantsFrozenSlotShape = Assert<
   IsEqual<
     TVVariants<{icon: string}>,
-    Record<string, Record<string, {icon?: ClassValue} | ClassValue>>
+    Record<string, Record<string, {icon?: ClassValue; base?: ClassValue} | ClassValue>>
   >
 >;
 

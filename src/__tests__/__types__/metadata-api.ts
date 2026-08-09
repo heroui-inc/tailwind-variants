@@ -1,5 +1,7 @@
-import {type TVReturnProps, type TVReturnType, type TVReturnTypeLike, tv} from "../../index.js";
+import type {TVReturnProps, TVReturnType, TVReturnTypeLike} from "../../index.js";
 import type {Assert, Extends} from "./test-utils.js";
+
+import {tv} from "../../index.js";
 
 // Case: expose callable components through the minimal TVReturnTypeLike contract.
 const component = tv({

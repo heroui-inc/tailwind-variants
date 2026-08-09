@@ -5,8 +5,9 @@
  * @see https://github.com/dcastil/tailwind-merge/blob/main/LICENSE.md
  */
 
+import type {Config, DefaultClassGroupIds, DefaultThemeGroupIds} from "./types.js";
+
 import {fromTheme} from "./from-theme.js";
-import {Config, DefaultClassGroupIds, DefaultThemeGroupIds} from "./types.js";
 import {
   isAny,
   isAnyNonArbitrary,

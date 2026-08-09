@@ -1,10 +1,9 @@
-import {readFileSync} from "node:fs";
-import path from "node:path";
-import {pathToFileURL} from "node:url";
-
 import {twMerge} from "tailwind-merge";
 
 import {installLatestCnfast, installLatestCVA, installReleasedTV} from "./released.mjs";
+import {readFileSync} from "node:fs";
+import path from "node:path";
+import {pathToFileURL} from "node:url";
 
 const repoRoot = path.resolve(import.meta.dirname, "..");
 

@@ -1,4 +1,5 @@
 import type {UserConfig} from "@commitlint/types";
+
 import {RuleConfigSeverity} from "@commitlint/types";
 
 const config: UserConfig = {

@@ -1,5 +1,7 @@
-import {type JoinClassValue, joinClassValue} from "./internal/join-class-value.js";
+import type {JoinClassValue} from "./internal/join-class-value.js";
 import type {CnOptions, CnReturn} from "./types.js";
+
+import {joinClassValue} from "./internal/join-class-value.js";
 
 const SPACE_REGEX = /\s+/g;
 const isArray = Array.isArray;

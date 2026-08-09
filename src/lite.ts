@@ -1,8 +1,9 @@
 import type {TVConfig} from "./config.js";
-import {defaultConfig as runtimeDefaultConfig} from "./internal/default-config.js";
-import {getTailwindVariants} from "./internal/tv.js";
 import type {CnAdapter} from "./internal/types.js";
 import type {CnOptions, CnReturn, TVLite} from "./types.js";
+
+import {defaultConfig as runtimeDefaultConfig} from "./internal/default-config.js";
+import {getTailwindVariants} from "./internal/tv.js";
 import {cx} from "./utils.js";
 
 export type * from "./types.js";

@@ -1,6 +1,6 @@
 {
   "extends": "../tsconfig.json",
-  "include": ["../src/__tests__/__types__/**/*.ts"],
+  "include": ["../src/__tests__/__types__/**/*.ts", "./type-tests-env.d.ts"],
   "exclude": [],
   "compilerOptions": {
     "types": [],

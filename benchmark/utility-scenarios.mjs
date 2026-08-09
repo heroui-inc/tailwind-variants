@@ -1,7 +1,6 @@
-import assert from "node:assert/strict";
-
 import {utilityScenarioMetadataById} from "./utility-metadata.mjs";
 import {classInputs, mergeClassInputs, mergeTokenInputs, tokenInputs} from "./workloads.mjs";
+import assert from "node:assert/strict";
 
 const metadata = (id) => {
   const value = utilityScenarioMetadataById.get(id);

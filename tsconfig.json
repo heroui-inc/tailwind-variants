@@ -1,7 +1,7 @@
 {
   "$schema": "https://json.schemastore.org/tsconfig",
   "include": ["src/**/*.ts", ".config/**/*.ts"],
-  "exclude": ["node_modules", "dist", ".config/tsup.config.ts"],
+  "exclude": ["node_modules", "dist", ".config/tsup.config.ts", ".config/type-tests-env.d.ts"],
   "compilerOptions": {
     "types": ["node"],
     "target": "esnext",

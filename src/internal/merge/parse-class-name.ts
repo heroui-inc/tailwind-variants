@@ -5,7 +5,7 @@
  * @see https://github.com/dcastil/tailwind-merge/blob/main/LICENSE.md
  */
 
-import {ParsedClassName} from "./types.js";
+import type {ParsedClassName} from "./types.js";
 
 export const IMPORTANT_MODIFIER = "!";
 

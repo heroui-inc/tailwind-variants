@@ -1,7 +1,4 @@
 import type {TVConfig} from "../config.js";
-import {cx, flatMergeArrays, isEmptyObject, isEqual, joinObjects, mergeObjects} from "../utils.js";
-import {defaultConfig} from "./default-config.js";
-import {state} from "./state.js";
 import type {
   AnyRecord,
   CompiledCompoundSlot,
@@ -11,6 +8,11 @@ import type {
   RuntimeComponent,
   RuntimeExtend,
 } from "./types.js";
+
+import {cx, flatMergeArrays, isEmptyObject, isEqual, joinObjects, mergeObjects} from "../utils.js";
+
+import {defaultConfig} from "./default-config.js";
+import {state} from "./state.js";
 
 /** Flattened recipe fields used while folding parents / merging the child. */
 type RecipeFields = {
