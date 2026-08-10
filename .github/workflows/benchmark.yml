@@ -25,6 +25,10 @@ jobs:
     name: Benchmark
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    env:
+      # gh CLI does not pick up the auto-injected GITHUB_TOKEN in Actions; it
+      # requires an explicit GH_TOKEN (GitHub docs: "you must set GH_TOKEN").
+      GH_TOKEN: ${{ github.token }}
     steps:
       - name: Checkout codebase
         uses: actions/checkout@v7

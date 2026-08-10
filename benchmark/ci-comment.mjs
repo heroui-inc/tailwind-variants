@@ -14,7 +14,8 @@
  *   node benchmark/ci-comment.mjs status failed     # ❌ failure notice
  *   node benchmark/ci-comment.mjs status cancelled  # ⏹️ cancelled notice
  *
- * Requires an authenticated `gh` (GITHUB_TOKEN in CI) and these env vars:
+ * Requires an authenticated `gh` (set `GH_TOKEN` in the workflow — gh does not
+ * pick up GITHUB_TOKEN in Actions) and these env vars:
  *   GITHUB_REPOSITORY, PR_NUMBER, GITHUB_SHA, GITHUB_REF_NAME, GITHUB_RUN_ID
  *   BENCHMARK_RESULTS_PATH (only for `status results`)
  */

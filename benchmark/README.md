@@ -124,6 +124,10 @@ for the next run. Statuses that need the pull request API (`running`, `results`,
 `cancelled`) only post comments for same-repository PRs; fork PRs keep the benchmark but skip the
 comment because the default token cannot write to them.
 
+The workflow sets `GH_TOKEN: ${{ github.token }}` at the job level. This is required: the `gh`
+CLI does not use the auto-injected `GITHUB_TOKEN` in Actions, so without `GH_TOKEN` every comment
+step fails (the error is logged as `benchmark comment skipped: ...`).
+
 The raw results the report consumes are written by the benchmark itself: set
 `BENCHMARK_RESULTS_PATH` (CI) or pass `--json-out <path>` to emit
 `{timestamp, commit, options, noiseThreshold, versions, variants[], utilities[]}`.
