@@ -10,7 +10,7 @@ import {
   hasRetainedUtilityResult,
   utilityScenarios,
 } from "./utility-scenarios.mjs";
-import {appendFileSync, writeFileSync} from "node:fs";
+import {writeFileSync} from "node:fs";
 import path from "node:path";
 
 const noiseThreshold = 5;
@@ -201,26 +201,6 @@ const deltaStyles = [
   colorDelta,
 ];
 
-const renderSummaryTable = (rows) =>
-  `\`\`\`
-${renderBoxTable(rows)}
-\`\`\``;
-
-const renderSummaryFooter = (options) =>
-  `<sub>${options.time}ms measure · ${options.warmupTime}ms warmup · higher ops/s is better · ±${noiseThreshold}% is noise${options.quick ? " · ⚠️ quick mode" : ""}</sub>`;
-
-const markdownSummaryLine = (options, summary) =>
-  `${options.quick ? "**⚠️ Quick mode — results are not suitable for performance claims.** " : ""}**tv vs released:** 🟢 ${summary.improved} improved · 🔴 ${summary.regressed} regressed · 🟡 ${summary.noise} within ±${noiseThreshold}% noise`;
-
-const appendStepSummary = (title, summaryLine, rows, options) => {
-  if (!process.env.GITHUB_STEP_SUMMARY) return;
-
-  appendFileSync(
-    process.env.GITHUB_STEP_SUMMARY,
-    `## ${title}\n\n${summaryLine}\n\n${renderSummaryTable(rows)}\n\n${renderSummaryFooter(options)}\n`,
-  );
-};
-
 const runScenarioGroup = async (selectedScenarios, adapters, options) => {
   const bench = new Bench({
     iterations: 64,
@@ -313,13 +293,6 @@ const runVariantsSuite = async (implementations, options) => {
       `${options.time}ms measure · ${options.warmupTime}ms warmup`,
   );
 
-  appendStepSummary(
-    "Runtime benchmarks · variants",
-    markdownSummaryLine(options, summary),
-    rows,
-    options,
-  );
-
   return results;
 };
 
@@ -368,13 +341,6 @@ const runUtilitiesSuite = async (implementations, options) => {
       `${color(`tv released v${released.version}`, colors.blue)} · ` +
       `${color(`cnfast v${cnfast.version}`, colors.magenta)} · ` +
       `${options.time}ms measure · ${options.warmupTime}ms warmup`,
-  );
-
-  appendStepSummary(
-    "Runtime benchmarks · utilities (cx/cn vs cnfast)",
-    markdownSummaryLine(options, summary),
-    rows,
-    options,
   );
 
   return results;

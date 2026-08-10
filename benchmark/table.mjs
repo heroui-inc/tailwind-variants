@@ -23,9 +23,7 @@ const BORDER = {
 
 /**
  * Renders a box-drawing table via the `table` package — the same look
- * `pnpm benchmark` prints to the terminal. Used for terminal output (with ANSI
- * styles) and for markdown code fences on the PR comment / Actions job summary
- * (plain, no styles).
+ * `pnpm benchmark` prints to the terminal.
  *
  * @param {Array<Record<string, string>>} rows  row objects keyed by header.
  * @param {{
