@@ -95,6 +95,7 @@
     "conventional-changelog-angular": "9.2.1",
     "esbuild": "0.28.1",
     "pkg-pr-new": "0.0.87",
+    "table": "6.9.0",
     "tailwind-merge": "3.6.0",
     "tinybench": "6.1.2",
     "tsup": "8.5.1",
@@ -117,5 +118,5 @@
     "pnpm": ">=7.x",
     "node": ">=16.9.x"
   },
-  "packageManager": "pnpm@11.20.0"
+  "packageManager": "pnpm@11.21.0"
 }

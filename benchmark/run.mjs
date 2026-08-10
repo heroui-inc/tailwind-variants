@@ -3,6 +3,7 @@ import {Bench} from "tinybench";
 import {createAdapter, createUtilityAdapter, loadImplementations} from "./harness.mjs";
 import {scenarioMetadataById} from "./metadata.mjs";
 import {assertEquivalentOutputs, hasRetainedResult, scenarios} from "./scenarios.mjs";
+import {renderBoxTable} from "./table.mjs";
 import {utilityScenarioMetadataById} from "./utility-metadata.mjs";
 import {
   assertEquivalentUtilityOutputs,
@@ -32,7 +33,6 @@ const colors = {
   yellow: 33,
 };
 const color = (value, code) => (useColor ? `\u001B[${code}m${value}\u001B[0m` : String(value));
-const stripColor = (value) => String(value).replace(/\u001B\[[0-9;]*m/g, "");
 
 const quickModeNote = (options) =>
   options.quick
@@ -191,68 +191,34 @@ const colorDelta = (value) => {
   return color(value, colors.dim);
 };
 
-const renderTerminalTable = (rows, valueStyles) => {
-  const headers = Object.keys(rows[0]);
-  const widths = headers.map((header) =>
-    Math.max(header.length, ...rows.map((row) => stripColor(row[header]).length)),
+const deltaStyles = [
+  (value) => color(value, colors.dim),
+  undefined,
+  (value) => color(value, colors.cyan),
+  (value) => color(value, colors.blue),
+  colorDelta,
+  (value) => color(value, colors.magenta),
+  colorDelta,
+];
+
+const renderSummaryTable = (rows) =>
+  `\`\`\`
+${renderBoxTable(rows)}
+\`\`\``;
+
+const renderSummaryFooter = (options) =>
+  `<sub>${options.time}ms measure · ${options.warmupTime}ms warmup · higher ops/s is better · ±${noiseThreshold}% is noise${options.quick ? " · ⚠️ quick mode" : ""}</sub>`;
+
+const markdownSummaryLine = (options, summary) =>
+  `${options.quick ? "**⚠️ Quick mode — results are not suitable for performance claims.** " : ""}**tv vs released:** 🟢 ${summary.improved} improved · 🔴 ${summary.regressed} regressed · 🟡 ${summary.noise} within ±${noiseThreshold}% noise`;
+
+const appendStepSummary = (title, summaryLine, rows, options) => {
+  if (!process.env.GITHUB_STEP_SUMMARY) return;
+
+  appendFileSync(
+    process.env.GITHUB_STEP_SUMMARY,
+    `## ${title}\n\n${summaryLine}\n\n${renderSummaryTable(rows)}\n\n${renderSummaryFooter(options)}\n`,
   );
-  const border = (left, separator, right) =>
-    `${left}${widths.map((width) => "─".repeat(width + 2)).join(separator)}${right}`;
-  const line = (values, styles = []) =>
-    `│ ${values
-      .map((value, index) => {
-        const padded = String(value).padEnd(widths[index]);
-        const style = styles[index];
-
-        return style ? style(padded) : padded;
-      })
-      .join(" │ ")} │`;
-
-  console.log(border("┌", "┬", "┐"));
-  console.log(
-    line(
-      headers,
-      headers.map(() => (value) => color(value, colors.bold)),
-    ),
-  );
-  console.log(border("├", "┼", "┤"));
-  for (const row of rows) {
-    console.log(
-      line(
-        headers.map((header) => row[header]),
-        valueStyles,
-      ),
-    );
-  }
-  console.log(border("└", "┴", "┘"));
-};
-
-const markdownDelta = (value) => {
-  if (value.includes("faster")) return `🟢 ${value}`;
-  if (value.includes("slower")) return `🔴 ${value}`;
-  if (value.includes("noise")) return `🟡 ${value}`;
-
-  return value;
-};
-
-const renderMarkdownTable = ({title, summaryLine, headerLine, alignmentLine, rows, options}) => {
-  const lines = ["## " + title, "", summaryLine, "", headerLine, alignmentLine];
-
-  for (const row of rows) {
-    const values = Object.values(row).map((value, index) =>
-      index >= 2 ? markdownDelta(value) : value,
-    );
-
-    lines.push(`| ${values.join(" | ")} |`);
-  }
-
-  lines.push(
-    "",
-    `<sub>${options.time}ms measure · ${options.warmupTime}ms warmup · higher ops/s is better · ±${noiseThreshold}% is noise${options.quick ? " · ⚠️ quick mode" : ""}</sub>`,
-    "",
-  );
-
-  return lines.join("\n");
 };
 
 const runScenarioGroup = async (selectedScenarios, adapters, options) => {
@@ -339,15 +305,7 @@ const runVariantsSuite = async (implementations, options) => {
       `${color(`${summary.regressed} regressed`, colors.red)} · ` +
       `${color(`${summary.noise} within noise`, colors.yellow)}\n`,
   );
-  renderTerminalTable(rows, [
-    (value) => color(value, colors.dim),
-    undefined,
-    (value) => color(value, colors.cyan),
-    (value) => color(value, colors.blue),
-    colorDelta,
-    (value) => color(value, colors.magenta),
-    colorDelta,
-  ]);
+  console.log(renderBoxTable(rows, {styles: deltaStyles, boldHeaders: true, color}));
   console.log(
     `${color("tv current", colors.cyan)} · ` +
       `${color(`tv released v${released.version}`, colors.blue)} · ` +
@@ -355,23 +313,12 @@ const runVariantsSuite = async (implementations, options) => {
       `${options.time}ms measure · ${options.warmupTime}ms warmup`,
   );
 
-  if (process.env.GITHUB_STEP_SUMMARY) {
-    appendFileSync(
-      process.env.GITHUB_STEP_SUMMARY,
-      renderMarkdownTable({
-        title: "Runtime benchmarks · variants",
-        summaryLine: `${
-          options.quick
-            ? "**⚠️ Quick mode — results are not suitable for performance claims.** "
-            : ""
-        }**tv vs released:** 🟢 ${summary.improved} improved · 🔴 ${summary.regressed} regressed · 🟡 ${summary.noise} within ±${noiseThreshold}% noise`,
-        headerLine: `| Category | Scenario | tv ops/s | released ${released.version} ops/s | tv vs released | cva ${cva.version} ops/s | tv vs cva |`,
-        alignmentLine: "| --- | --- | ---: | ---: | ---: | ---: | ---: |",
-        rows,
-        options,
-      }),
-    );
-  }
+  appendStepSummary(
+    "Runtime benchmarks · variants",
+    markdownSummaryLine(options, summary),
+    rows,
+    options,
+  );
 
   return results;
 };
@@ -415,15 +362,7 @@ const runUtilitiesSuite = async (implementations, options) => {
       `${color(`${summary.regressed} regressed`, colors.red)} · ` +
       `${color(`${summary.noise} within noise`, colors.yellow)}\n`,
   );
-  renderTerminalTable(rows, [
-    (value) => color(value, colors.dim),
-    undefined,
-    (value) => color(value, colors.cyan),
-    (value) => color(value, colors.blue),
-    colorDelta,
-    (value) => color(value, colors.magenta),
-    colorDelta,
-  ]);
+  console.log(renderBoxTable(rows, {styles: deltaStyles, boldHeaders: true, color}));
   console.log(
     `${color("tv current", colors.cyan)} · ` +
       `${color(`tv released v${released.version}`, colors.blue)} · ` +
@@ -431,23 +370,12 @@ const runUtilitiesSuite = async (implementations, options) => {
       `${options.time}ms measure · ${options.warmupTime}ms warmup`,
   );
 
-  if (process.env.GITHUB_STEP_SUMMARY) {
-    appendFileSync(
-      process.env.GITHUB_STEP_SUMMARY,
-      renderMarkdownTable({
-        title: "Runtime benchmarks · utilities (cx/cn vs cnfast)",
-        summaryLine: `${
-          options.quick
-            ? "**⚠️ Quick mode — results are not suitable for performance claims.** "
-            : ""
-        }**tv vs released:** 🟢 ${summary.improved} improved · 🔴 ${summary.regressed} regressed · 🟡 ${summary.noise} within ±${noiseThreshold}% noise`,
-        headerLine: `| Category | Scenario | tv ops/s | released ${released.version} ops/s | tv vs released | cnfast ${cnfast.version} ops/s | tv vs cnfast |`,
-        alignmentLine: "| --- | --- | ---: | ---: | ---: | ---: | ---: |",
-        rows,
-        options,
-      }),
-    );
-  }
+  appendStepSummary(
+    "Runtime benchmarks · utilities (cx/cn vs cnfast)",
+    markdownSummaryLine(options, summary),
+    rows,
+    options,
+  );
 
   return results;
 };

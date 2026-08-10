@@ -21,6 +21,7 @@
  */
 
 import {scenarioMetadataById} from "./metadata.mjs";
+import {renderBoxTable} from "./table.mjs";
 import {utilityScenarioMetadataById} from "./utility-metadata.mjs";
 import {execFileSync} from "node:child_process";
 import {existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync} from "node:fs";
@@ -34,8 +35,6 @@ const NOISE_THRESHOLD = 5;
 
 const repo = process.env.GITHUB_REPOSITORY;
 const pr = process.env.PR_NUMBER;
-const sha = process.env.GITHUB_SHA ?? "unknown";
-const branch = process.env.GITHUB_REF_NAME ?? "unknown";
 const runId = process.env.GITHUB_RUN_ID ?? "";
 const runUrl = runId ? `https://github.com/${repo}/actions/runs/${runId}` : "#";
 
@@ -160,29 +159,20 @@ const deltaStatus = (delta) => {
 export const deltaCell = (delta) => {
   if (delta === null) return "—";
 
-  const status = deltaStatus(delta);
-  const emoji = status === "improved" ? "🟢" : status === "regressed" ? "🔴" : "🟡";
   const sign = delta >= 0 ? "+" : "";
 
-  return `${sign}${delta.toFixed(1)}% ${emoji}`;
+  return `${sign}${delta.toFixed(1)}% ${deltaStatus(delta)}`;
 };
 
-export const renderTable = (rows) => {
-  const lines = [
-    "| Scenario | tv ops/s | baseline ops/s | Δ vs baseline |",
-    "| --- | ---: | ---: | ---: |",
-  ];
-
-  for (const row of rows) {
-    const name = row.meta?.name ?? row.current.scenarioId;
-    const currentOps = formatOps(row.current.hz, row.current.rme);
-    const baselineOps = row.baseline ? formatOps(row.baseline.hz, row.baseline.rme) : "—";
-
-    lines.push(`| ${name} | ${currentOps} | ${baselineOps} | ${deltaCell(row.delta)} |`);
-  }
-
-  return lines.join("\n");
-};
+const renderTable = (rows) =>
+  renderBoxTable(
+    rows.map((row) => ({
+      Scenario: row.meta?.name ?? row.current.scenarioId,
+      "tv ops/s": formatOps(row.current.hz, row.current.rme),
+      "baseline ops/s": row.baseline ? formatOps(row.baseline.hz, row.baseline.rme) : "—",
+      "Δ vs baseline": deltaCell(row.delta),
+    })),
+  );
 
 export const summarize = (rows) => {
   const summary = {compared: 0, improved: 0, regressed: 0, noise: 0, firstRun: 0};
@@ -199,29 +189,24 @@ export const summarize = (rows) => {
   return summary;
 };
 
-const headerTable = (statusEmoji, statusLabel, baselineCommit) => `| | |
-|---|---|
-| **Status** | ${statusEmoji} ${statusLabel} |
-| **Commit** | \`${sha}\` |
-| **Branch** | \`${branch}\` |
-| **Baseline** | ${baselineCommit} |`;
+const statusLine = (statusEmoji, statusLabel) => `${statusEmoji} **${statusLabel}**`;
 
 const buildRunningBody = () => `${MARKER}
 
 ## ⚡ Benchmark report
 
-${headerTable("🔄", "Benchmark running…", "—")}
+${statusLine("🔄", "Benchmark running…")}
 
 The benchmark started and is measuring right now. This comment is updated in place
 when the run finishes — no new comments are posted.
 
-<sub>[Workflow run](${runUrl})</sub>`;
+[Workflow run](${runUrl})`;
 
 const buildFailedBody = () => `${MARKER}
 
 ## ⚡ Benchmark report
 
-${headerTable("❌", "Benchmark failed", "—")}
+${statusLine("❌", "Benchmark failed")}
 
 The benchmark did not complete. Check the [workflow run](${runUrl}) log for the error.`;
 
@@ -229,20 +214,13 @@ const buildCancelledBody = () => `${MARKER}
 
 ## ⚡ Benchmark report
 
-${headerTable("⏹️", "Benchmark cancelled", "—")}
+${statusLine("⏹️", "Benchmark cancelled")}
 
 The benchmark was superseded by a newer run and cancelled.
 
-<sub>[Workflow run](${runUrl})</sub>`;
+[Workflow run](${runUrl})`;
 
-export const buildResultsBody = ({
-  variants,
-  utilities,
-  versions,
-  options,
-  baseline,
-  embeddedBaseline,
-}) => {
+export const buildResultsBody = ({variants, utilities, options, baseline, embeddedBaseline}) => {
   const variantRows = compareRows(variants, baseline?.variants ?? [], scenarioMetadataById);
   const utilityRows = compareRows(
     utilities,
@@ -252,66 +230,34 @@ export const buildResultsBody = ({
   const variantSummary = summarize(variantRows);
   const utilitySummary = summarize(utilityRows);
 
-  const combined = {
-    improved: variantSummary.improved + utilitySummary.improved,
-    regressed: variantSummary.regressed + utilitySummary.regressed,
-    noise: variantSummary.noise + utilitySummary.noise,
-    compared: variantSummary.compared + utilitySummary.compared,
-    firstRun: variantSummary.firstRun + utilitySummary.firstRun,
-  };
-
-  const hasRegressions = combined.regressed > 0;
-  const statusEmoji = hasRegressions ? "⚠️" : "✅";
-  const statusLabel = hasRegressions ? "Completed — regressions detected" : "Completed";
-  const baselineCommit = baseline
-    ? `\`${baseline.commit ?? "previous run"}\``
-    : "— (first run on this PR)";
-  const baselineHint = baseline
-    ? ""
-    : "\n\n> This is the first benchmark on this PR — the numbers recorded now become the baseline for the next run.";
-
-  const summaryLine =
-    combined.compared > 0
-      ? `🟢 **${combined.improved}** improved · 🔴 **${combined.regressed}** regressed · 🟡 **${combined.noise}** within noise · across **${combined.compared}** scenarios`
-      : "No previous run on this PR yet — this run becomes the baseline.";
+  const regressed = variantSummary.regressed + utilitySummary.regressed;
+  const statusEmoji = regressed > 0 ? "⚠️" : "✅";
+  const statusLabel = regressed > 0 ? "Completed — regressions detected" : "Completed";
 
   const quickNote = options?.quick
-    ? "\n> ⚠️ **Quick mode — results are not suitable for performance claims.**\n"
+    ? "> ⚠️ **Quick mode — results are not suitable for performance claims.**\n"
     : "";
 
   return `${MARKER}
 
 ## ⚡ Benchmark report
 
-${headerTable(statusEmoji, statusLabel, baselineCommit)}
+${statusLine(statusEmoji, statusLabel)}
 
-${quickNote}### Summary
+${quickNote}### Variants
 
-${summaryLine}
-
-${baselineHint}
-### Variants
-
+\`\`\`
 ${renderTable(variantRows)}
+\`\`\`
 
-<details>
-<summary>Utilities (cx / cn / cnMerge)</summary>
+### Utilities (cx / cn / cnMerge)
 
+\`\`\`
 ${renderTable(utilityRows)}
+\`\`\`
 
-</details>
-
-### Versions
-
-| Implementation | Version |
-| --- | --- |
-| tv (current) | \`${versions?.tv ?? "unknown"}\` |
-| tv (released) | \`${versions?.released ?? "unknown"}\` |
-| cva | \`${versions?.cva ?? "unknown"}\` |
-| cnfast | \`${versions?.cnfast ?? "unknown"}\` |
-
-<sub>${options?.time ?? 1000}ms measure · ${options?.warmupTime ?? 200}ms warmup · higher ops/s is better · ±${NOISE_THRESHOLD}% is noise · [workflow run](${runUrl})</sub>
-${serializeBaseline(embeddedBaseline ?? {variants, utilities, versions, options})}
+${options?.time ?? 1000}ms measure · ${options?.warmupTime ?? 200}ms warmup · higher ops/s is better · ±${NOISE_THRESHOLD}% is noise · [Workflow run](${runUrl})
+${serializeBaseline(embeddedBaseline ?? {variants, utilities, options})}
 `;
 };
 

@@ -106,12 +106,14 @@ comment thread never gets polluted with a new comment per push:
 | Status | When | Body |
 | --- | --- | --- |
 | 🔄 **Benchmark running…** | posted before the benchmark starts | commit, branch, workflow link |
-| ✅ **Completed** | benchmark succeeded | full cross-run comparison + versions |
+| ✅ **Completed** | benchmark succeeded | full cross-run comparison |
 | ⚠️ **Completed — regressions detected** | succeeded but ≥1 regression vs baseline | same report, warning header |
 | ❌ **Benchmark failed** | benchmark step failed | failure notice + workflow link |
 | ⏹️ **Benchmark cancelled** | superseded by a newer run | cancellation notice |
 
-The report compares the current run against the **previous run on the same PR**. The raw results of
+The comment shows the same terminal-style box tables as `pnpm benchmark` (embedded in fenced code
+blocks), one per suite, plus a status/commit/branch/baseline header and a summary line. The report
+compares the current run against the **previous run on the same PR**. The raw results of
 the latest successful run are embedded in an HTML comment at the end of the report comment, so no
 extra branch or storage is needed — the next run parses that payload and marks each scenario as:
 
