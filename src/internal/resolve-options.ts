@@ -49,20 +49,18 @@ const recipeFromComponent = (component: RuntimeComponent): RecipeFields => ({
 const mergeRecipe = (acc: RecipeFields, next: RecipeFields): RecipeFields => {
   const base = acc.base != null || next.base != null ? cx(acc.base, next.base) : undefined;
 
-  const variants =
-    !next.variants || isEmptyObject(next.variants)
-      ? acc.variants
-      : isEmptyObject(acc.variants)
-        ? next.variants
-        : mergeObjects(next.variants, acc.variants);
+  const variants = isEmptyObject(next.variants)
+    ? acc.variants
+    : isEmptyObject(acc.variants)
+      ? next.variants
+      : mergeObjects(next.variants, acc.variants);
 
-  const defaultVariants =
-    !next.defaultVariants || isEmptyObject(next.defaultVariants)
-      ? acc.defaultVariants
-      : {...acc.defaultVariants, ...next.defaultVariants};
+  const defaultVariants = isEmptyObject(next.defaultVariants)
+    ? acc.defaultVariants
+    : {...acc.defaultVariants, ...next.defaultVariants};
 
-  const accSlotsEmpty = !acc.slots || isEmptyObject(acc.slots);
-  const nextSlotsEmpty = !next.slots || isEmptyObject(next.slots);
+  const accSlotsEmpty = isEmptyObject(acc.slots);
+  const nextSlotsEmpty = isEmptyObject(next.slots);
 
   let slots: AnyRecord;
 
@@ -77,19 +75,17 @@ const mergeRecipe = (acc: RecipeFields, next: RecipeFields): RecipeFields => {
     slots = joinObjects({...acc.slots}, next.slots);
   }
 
-  const compoundVariants =
-    !next.compoundVariants || isEmptyObject(next.compoundVariants)
-      ? acc.compoundVariants
-      : !acc.compoundVariants || isEmptyObject(acc.compoundVariants)
-        ? next.compoundVariants
-        : flatMergeArrays(acc.compoundVariants, next.compoundVariants);
+  const compoundVariants = isEmptyObject(next.compoundVariants)
+    ? acc.compoundVariants
+    : isEmptyObject(acc.compoundVariants)
+      ? next.compoundVariants
+      : flatMergeArrays(acc.compoundVariants, next.compoundVariants);
 
-  const compoundSlots =
-    !next.compoundSlots || isEmptyObject(next.compoundSlots)
-      ? acc.compoundSlots
-      : !acc.compoundSlots || isEmptyObject(acc.compoundSlots)
-        ? next.compoundSlots
-        : flatMergeArrays(acc.compoundSlots, next.compoundSlots);
+  const compoundSlots = isEmptyObject(next.compoundSlots)
+    ? acc.compoundSlots
+    : isEmptyObject(acc.compoundSlots)
+      ? next.compoundSlots
+      : flatMergeArrays(acc.compoundSlots, next.compoundSlots);
 
   return {
     base,
@@ -99,13 +95,6 @@ const mergeRecipe = (acc: RecipeFields, next: RecipeFields): RecipeFields => {
     compoundVariants,
     compoundSlots,
   };
-};
-
-const normalizeParents = (extend: RuntimeExtend): RuntimeComponent[] => {
-  if (extend == null) return [];
-  if (Array.isArray(extend)) return extend.filter(Boolean) as RuntimeComponent[];
-
-  return [extend];
 };
 
 /** Fold 2+ parents left-to-right. Single-parent callers skip this and use the parent as-is. */
@@ -226,7 +215,7 @@ export const resolveOptions = (options: AnyRecord, configProp?: TVConfig): Resol
   let extend: RuntimeComponent | RecipeFields | null = null;
 
   if (Array.isArray(originalExtend)) {
-    const parents = normalizeParents(originalExtend);
+    const parents = originalExtend.filter(Boolean) as RuntimeComponent[];
 
     if (parents.length === 1) extend = parents[0]!;
     else if (parents.length > 1) extend = foldParents(parents);
@@ -317,8 +306,7 @@ export const compileResolvedOptions = (resolved: ResolvedOptions): ResolvedOptio
   resolved.compiledCompoundVariants = compileCompoundVariants(resolved.compoundVariants);
   resolved.compiledCompoundSlots = compileCompoundSlots(resolved.compoundSlots);
   resolved.compiledCompoundSlotsBySlot = indexCompoundSlotsBySlot(resolved.compiledCompoundSlots);
-  resolved.slotKeys =
-    resolved.slots && typeof resolved.slots === "object" ? Object.keys(resolved.slots) : [];
+  resolved.slotKeys = Object.keys(resolved.slots);
 
   return resolved;
 };

@@ -1,4 +1,3 @@
-import type {ResultCache} from "./cache.js";
 import type {
   AnyRecord,
   CnAdapter,
@@ -18,7 +17,6 @@ import {
   CACHE_MISS,
   createBoundedCache,
   createLazyOverrideMerge,
-  createResultCache,
 } from "./cache.js";
 import {compileResolvedOptions} from "./resolve-options.js";
 
@@ -73,7 +71,7 @@ const matchesCompoundValue = (expected: any, actual: any): boolean => {
   return false;
 };
 
-export const getVariantValue = (
+const getVariantValue = (
   variant: CompiledVariant,
   defaultVariants: AnyRecord,
   props?: AnyRecord,
@@ -251,7 +249,7 @@ const createVariantResolver = (resolved: ResolvedOptions, cn: CnAdapter): Runtim
   let compiledCompoundVariants = resolved.compiledCompoundVariants;
   let compiledVariants = resolved.compiledVariants;
   let compiledCompoundSlots: CompiledCompoundSlot[] = EMPTY_ARRAY;
-  let cache: ResultCache | null = null;
+  let cache: ReturnType<typeof createBoundedCache<string>> | null = null;
   let lastCompoundsSig: string | null = null;
   const mergeOverride = createLazyOverrideMerge(cn, config);
   // First invoke skips cache.
@@ -312,7 +310,7 @@ const createVariantResolver = (resolved: ResolvedOptions, cn: CnAdapter): Runtim
         } else {
           if (compoundsSig !== lastCompoundsSig) {
             lastCompoundsSig = compoundsSig;
-            cache = createResultCache();
+            cache = createBoundedCache<string>();
           }
 
           const cached = cache!.get(propsFingerprint);

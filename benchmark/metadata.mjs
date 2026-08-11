@@ -1,4 +1,4 @@
-export const scenarioMetadata = [
+const scenarioMetadata = [
   {
     id: "construction/no-slots",
     category: "construction",

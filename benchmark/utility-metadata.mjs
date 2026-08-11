@@ -1,4 +1,4 @@
-export const utilityScenarioMetadata = [
+const utilityScenarioMetadata = [
   {
     id: "utilities/join-mixed",
     category: "join",

@@ -81,7 +81,7 @@ Options:
                     from BENCHMARK_RESULTS_PATH in CI).
   --help            Show this help.`;
 
-export const parseRunArgs = (argv) => {
+const parseRunArgs = (argv) => {
   const options = {
     quick: false,
     time: 1000,
@@ -504,7 +504,7 @@ const writeResultsJson = (
   console.log(`${color("Benchmark results written to", colors.dim)} ${filePath}`);
 };
 
-export const runBenchmarks = async (rawOptions = {}) => {
+const runBenchmarks = async (rawOptions = {}) => {
   const options = {
     quick: false,
     time: 1000,

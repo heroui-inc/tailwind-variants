@@ -9,20 +9,13 @@ const OVERRIDE_CACHE_LIMIT = 128;
 export const CACHE_MISS = Symbol("tv-cache-miss");
 
 export type CacheMiss = typeof CACHE_MISS;
-export type CacheValue = string;
-export type CacheLookup = CacheValue | CacheMiss;
-
-export type ResultCache = {
-  get(key: string): CacheLookup;
-  set(key: string, value: CacheValue): void;
-};
 
 type NestedOverrideCache = {
-  get(coreKey: string, overrideKey: string): CacheLookup;
-  set(coreKey: string, overrideKey: string, value: CacheValue): void;
+  get(coreKey: string, overrideKey: string): string | CacheMiss;
+  set(coreKey: string, overrideKey: string, value: string): void;
 };
 
-export type OverrideMerge = (core: CacheValue, props?: AnyRecord) => CacheValue;
+export type OverrideMerge = (core: string, props?: AnyRecord) => string;
 
 const hasClassOverride = (props?: AnyRecord): boolean =>
   (props?.class != null && props.class !== "") ||
@@ -319,26 +312,13 @@ export const createBoundedCache = <T>(limit = VARIANT_CACHE_LIMIT): BoundedCache
   };
 };
 
-export const createResultCache = (limit = VARIANT_CACHE_LIMIT): ResultCache => {
-  const cache = createBoundedCache<CacheValue>(limit);
-
-  return {
-    get(key: string): CacheLookup {
-      return cache.get(key);
-    },
-    set(key: string, value: CacheValue) {
-      cache.set(key, value);
-    },
-  };
-};
-
 const createNestedOverrideCache = (limit = OVERRIDE_CACHE_LIMIT): NestedOverrideCache => {
-  let primary: Map<string, Map<string, CacheValue>> = new Map();
-  let secondary: Map<string, Map<string, CacheValue>> | null = null;
+  let primary: Map<string, Map<string, string>> = new Map();
+  let secondary: Map<string, Map<string, string>> | null = null;
   let size = 0;
 
   return {
-    get(coreKey: string, overrideKey: string): CacheLookup {
+    get(coreKey: string, overrideKey: string): string | CacheMiss {
       const primaryInner = primary.get(coreKey);
 
       if (primaryInner) {
@@ -371,7 +351,7 @@ const createNestedOverrideCache = (limit = OVERRIDE_CACHE_LIMIT): NestedOverride
 
       return CACHE_MISS;
     },
-    set(coreKey: string, overrideKey: string, value: CacheValue) {
+    set(coreKey: string, overrideKey: string, value: string) {
       if (size >= limit) {
         secondary = primary;
         primary = new Map();

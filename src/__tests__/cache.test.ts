@@ -8,7 +8,6 @@ import {
   CACHE_MISS,
   createBoundedCache,
   createLazyOverrideMerge,
-  createResultCache,
 } from "../internal/cache.js";
 import {createMerger} from "../internal/merge/index.js";
 import {cx} from "../utils.js";
@@ -17,7 +16,7 @@ const joinAdapter: CnAdapter = (_config, ...classnames) => cx(...(classnames as 
 
 describe("createBoundedCache", () => {
   test("misses unknown keys and distinguishes a stored empty string from a miss", () => {
-    const cache = createResultCache();
+    const cache = createBoundedCache<string>();
 
     cache.set("empty", "");
 
