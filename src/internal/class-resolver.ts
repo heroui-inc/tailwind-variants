@@ -113,6 +113,8 @@ export const matchesConditions = (
 export const pushCompoundClassForSlot = (result: any[], slotKey: string, classValue: any): void => {
   if (typeof classValue === "string") {
     if (slotKey === "base") result.push(classValue);
+  } else if (Array.isArray(classValue)) {
+    if (slotKey === "base") result.push(...classValue);
   } else if (classValue && typeof classValue === "object" && classValue[slotKey]) {
     result.push(classValue[slotKey]);
   }
