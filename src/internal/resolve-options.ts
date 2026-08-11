@@ -205,15 +205,21 @@ const indexCompoundSlotsBySlot = (
 };
 
 export const resolveOptions = (options: AnyRecord, configProp?: TVConfig): ResolvedOptions => {
+  // Read each config property exactly once; every extra `options.x` access is
+  // a separate inline-cache site that degrades once many config shapes have
+  // flowed through here.
   const {
     extend: extendInput = null,
-    slots: slotProps = {},
+    base: baseProp,
+    slots: rawSlots,
     variants: variantsProps = {},
     compoundVariants: compoundVariantsProps = [],
     compoundSlots: compoundSlotsProps = [],
     defaultVariants: defaultVariantsProps = {},
   } = options;
 
+  const hasSlots = rawSlots !== undefined;
+  const slotProps = hasSlots ? rawSlots : {};
   const originalExtend = extendInput as RuntimeExtend;
   // Single parent: use the component directly (same path as pre-multi-extend, no fold).
   // Multiple parents: fold left-to-right into one synthetic recipe for the child-merge path.
@@ -229,8 +235,7 @@ export const resolveOptions = (options: AnyRecord, configProp?: TVConfig): Resol
   }
 
   const config = {...defaultConfig, ...configProp};
-  const hasSlots = options.slots !== undefined;
-  const base = extend?.base ? cx(extend.base, options?.base) : options?.base;
+  const base = extend?.base ? cx(extend.base, baseProp) : baseProp;
   const variants =
     extend?.variants && !isEmptyObject(extend.variants)
       ? mergeObjects(variantsProps, extend.variants)
@@ -245,10 +250,10 @@ export const resolveOptions = (options: AnyRecord, configProp?: TVConfig): Resol
   const isExtendedSlotsEmpty = !extend?.slots || isEmptyObject(extend.slots);
   const componentBase = hasSlots
     ? isExtendedSlotsEmpty && extend?.base
-      ? cx(options?.base, extend.base)
-      : typeof options?.base === "string" || options?.base == null
-        ? options.base
-        : cx(options.base)
+      ? cx(baseProp, extend.base)
+      : typeof baseProp === "string" || baseProp == null
+        ? baseProp
+        : cx(baseProp)
     : undefined;
   // Seed base from root/`extend`, then let `slots.base` replace it when provided.
   const componentSlots = hasSlots
@@ -261,7 +266,7 @@ export const resolveOptions = (options: AnyRecord, configProp?: TVConfig): Resol
     ? componentSlots
     : joinObjects(
         {...extend?.slots},
-        isEmptyObject(componentSlots) ? {base: options?.base} : componentSlots,
+        isEmptyObject(componentSlots) ? {base: baseProp} : componentSlots,
       );
   const compoundVariants =
     !extend?.compoundVariants || isEmptyObject(extend.compoundVariants)
