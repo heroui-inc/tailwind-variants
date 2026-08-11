@@ -68,9 +68,9 @@ tv({
 // Case: Soft Exact still rejects when defaultVariants is held in a variable.
 const badDefaults = {size: "sm" as const, color: "primary" as const};
 
-// @ts-expect-error defaultVariants reject unknown axes via variables
 tv({
   variants: {size: {sm: "", lg: ""}},
+  // @ts-expect-error defaultVariants reject unknown axes via variables
   defaultVariants: badDefaults,
 });
 

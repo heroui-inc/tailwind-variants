@@ -530,3 +530,23 @@ createLiteTV({twMerge: false});
 
 // @ts-expect-error TVLite has no per-component config argument
 liteTV({base: "block"}, {twMerge: false});
+
+// Case: single-signature TV contextually types wrapper parameters; no
+// annotations or assertions needed, and the return type stays checked.
+const _myTV: TV = (options, config) => {
+  return tv(options, {
+    ...config,
+    twMerge: config?.twMerge ?? false,
+    twMergeConfig: {
+      ...config?.twMergeConfig,
+      classGroups: {
+        ...config?.twMergeConfig?.classGroups,
+      },
+      theme: {
+        ...config?.twMergeConfig?.theme,
+      },
+    },
+  });
+};
+
+void _myTV;

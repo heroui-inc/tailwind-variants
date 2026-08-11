@@ -97,10 +97,10 @@ inheritedSlots.header({tone: "neutral"});
 inheritedSlots.body({size: "sm"});
 inheritedSlots.icon({selected: false});
 
-// @ts-expect-error compoundSlots reject unknown slot names
 tv({
   slots: {base: "", icon: ""},
   variants: {size: {sm: {}, lg: {}}},
+  // @ts-expect-error compoundSlots reject unknown slot names
   compoundSlots: [{slots: ["label"], size: "sm", class: "text-sm"}],
 });
 

@@ -367,23 +367,48 @@ type ExactCompoundArray<Shape, Slots extends PropertyKey, Actual extends readonl
 /**
  * Variants of one parent recipe. Shared by the single-parent `EV` default and
  * the multi-parent fold.
+ *
+ * The leading `[P] extends [undefined]` guard is mode-stable: with
+ * `strictNullChecks: false`, `undefined extends <object type>` is true, so the
+ * unguarded conditional would take the inference branch with no candidate and
+ * widen the result to its constraint. Same guard on {@link ParentSlots},
+ * {@link SlotsOfExtend}, and {@link VariantsOfExtend}.
  */
-type ParentVariants<P> =
-  P extends TVReturnTypeLike<infer PV extends TVVariantsShape, any> ? PV : undefined;
+type ParentVariants<P> = [P] extends [undefined]
+  ? undefined
+  : P extends TVReturnTypeLike<infer PV extends TVVariantsShape, any>
+    ? PV
+    : undefined;
 
 /**
  * Slots of one parent recipe, normalized to `TVSlots`. Shared by single-parent
  * (`ES` default, {@link SlotsOfExtend}) and multi-parent folds.
  */
-type ParentSlots<P> = P extends TVReturnTypeLike<any, infer PS extends TVSlots> ? PS : undefined;
+type ParentSlots<P> = [P] extends [undefined]
+  ? undefined
+  : P extends TVReturnTypeLike<any, infer PS extends TVSlots>
+    ? PS
+    : undefined;
 
 /**
  * Parent `slots` from any `extend` input (single recipe or parent list)
  * without reverse-inferring `ES` into a wide `TVSlots`.
  */
-type SlotsOfExtend<E> = E extends readonly TVReturnTypeLike<any, any>[]
-  ? MergedSlotsFromParents<E>
-  : ParentSlots<E>;
+type SlotsOfExtend<E> = [E] extends [undefined]
+  ? undefined
+  : E extends readonly TVReturnTypeLike<any, any>[]
+    ? MergedSlotsFromParents<E>
+    : ParentSlots<E>;
+
+/**
+ * Parent `variants` from any `extend` input (single recipe or parent list).
+ * Multi-parent lists fold left-to-right like the runtime.
+ */
+type VariantsOfExtend<E> = [E] extends [undefined]
+  ? undefined
+  : E extends readonly TVReturnTypeLike<any, any>[]
+    ? MergedVariantsFromParents<E>
+    : ParentVariants<E>;
 
 type TVCompoundSlotVariantKeys<V extends TVVariantsShape, EV extends TVVariantsShape> = Exclude<
   keyof TVResolvedVariants<V, EV> & string,
@@ -532,13 +557,6 @@ export interface TVReturnType<
 /** Non-empty parent list for multi-extend. */
 export type TVExtendList = readonly [TVReturnTypeLike<any, any>, ...TVReturnTypeLike<any, any>[]];
 
-/**
- * Keep the multi-parent overload out of resolution when `extend` is a single
- * recipe. Without this, failed single-parent calls also report a spurious
- * "not assignable to TVExtendList" from the last overload.
- */
-type OnlyIfArrayExtend<O> = O extends {extend: readonly any[]} ? O : never;
-
 type TVOptionsFields<
   V extends TVVariantsShape,
   DV,
@@ -592,23 +610,28 @@ type TVOptionsFields<
 };
 
 /**
- * `tv` factory signature.
- * Overload 1 (first): single parent or no extend; preserves legacy inference.
- * Overload 2: multi-parent `extend: [a, b, ...]` (tuple-preserving).
+ * `tv` factory signature. A single call signature: `E` covers no extend
+ * (`undefined`), a single parent, or a non-empty parent list, and
+ * {@link VariantsOfExtend} / {@link SlotsOfExtend} derive `EV` / `ES` for
+ * whichever shape was passed. One signature (rather than overloads) keeps
+ * contextual typing for wrappers (`const tv: TV = (options, config) => ...`)
+ * and produces one coherent error per failed call. Parent lists still infer
+ * as tuples: the `TVExtendList` arm of `E`'s constraint provides the tuple
+ * inference context for array literals.
  *
  * `V` defaults to `{}` so omitting `variants` does not instantiate the
  * `Record` constraint as `V`, which would widen `VariantProps` to `string`.
  * `V` must not extend `TVVariants<..., EV, ES>`: that ties `V` to `E`
  * circularly and collapses parent axes when validating `compoundVariants`.
  *
- * `compoundSlots` reads parent slots from `E` / `ExtendList` directly (not the `ES`
- * type param) so slot names are not reverse-inferred into a wide `TVSlots`.
+ * `compoundSlots` reads parent slots from `E` directly (not the `ES` type
+ * param) so slot names are not reverse-inferred into a wide `TVSlots`.
  *
  * NoInfer audit: `compoundSlots` is a validation-only position. Every type
  * parameter it mentions (`V`, `S`, `B`, `EV`, and the parent-derived types) is
  * wrapped in `NoInfer` so it can never become an inference site that broadens
  * parent axes or slots. `extend`, `variants`, `slots`, and `base` remain the
- * only inference sites for `E`/`ExtendList`, `V`, `S`, and `B` respectively.
+ * only inference sites for `E`, `V`, `S`, and `B` respectively.
  */
 export interface TV {
   <
@@ -619,15 +642,17 @@ export interface TV {
     S extends TVSlots = undefined,
     // Defaults to `undefined` when `extend` is omitted. Do not default to
     // TVReturnTypeLike<V, S>: that duplicated variants in EV and cluttered hover tooltips.
-    E extends TVReturnTypeLike<any, any> | undefined = undefined,
-    EV extends TVVariantsShape = ParentVariants<E>,
-    ES extends TVSlots = ParentSlots<E>,
+    E extends TVReturnTypeLike<any, any> | TVExtendList | undefined = undefined,
+    EV extends TVVariantsShape = VariantsOfExtend<E>,
+    ES extends TVSlots = SlotsOfExtend<E>,
   >(
     options: TVOptionsFields<V, DV, CV, B, S, EV, ES> & {
       /**
-       * Extend merges one parent recipe into this definition.
-       * Accepts a single {@link TVReturnTypeLike} (see also {@link TVExtendInput}).
+       * Extend merges parent recipes into this definition; child options win.
+       * Accepts a single {@link TVReturnTypeLike} or a non-empty list, merged
+       * left-to-right (`[]` is rejected at the type level).
        * @example tv({ extend: baseButton, base: "gap-2" })
+       * @example tv({ extend: [focusable, animated], base: "inline-flex" })
        * @see https://www.tailwind-variants.org/docs/composing-components
        */
       extend?: E;
@@ -643,40 +668,9 @@ export interface TV {
     },
     config?: TVConfig,
   ): TVReturnType<V, S, B, EV, ES, E>;
-
-  <
-    V extends TVVariantsConstraint = {},
-    DV = {},
-    CV extends readonly object[] = [],
-    B extends ClassValue = undefined,
-    S extends TVSlots = undefined,
-    ExtendList extends TVExtendList = TVExtendList,
-    EV extends TVVariantsShape = MergedVariantsFromParents<ExtendList>,
-    ES extends TVSlots = MergedSlotsFromParents<ExtendList>,
-  >(
-    options: OnlyIfArrayExtend<
-      Omit<TVOptionsFields<V, DV, CV, B, S, EV, ES>, "defaultVariants"> & {
-        /**
-         * Extend merges parent recipes left-to-right; child options win last.
-         * Non-empty tuple only (`[]` is rejected at the type level).
-         * @example tv({ extend: [focusable, animated], base: "inline-flex" })
-         * @see https://www.tailwind-variants.org/docs/composing-components
-         */
-        extend: ExtendList;
-        defaultVariants?: ExactShape<TVDefaultVariants<V, S, EV, ES>, DV>;
-        compoundSlots?: TVCompoundSlots<
-          NoInfer<V>,
-          TVMergedSlots<NoInfer<S>, NoInfer<MergedSlotsFromParents<ExtendList>>>,
-          NoInfer<B>,
-          NoInfer<MergedVariantsFromParents<ExtendList>>
-        >;
-      }
-    >,
-    config?: TVConfig,
-  ): TVReturnType<V, S, B, EV, ES, ExtendList>;
 }
 
-/** Lite `tv` factory (no per-call config). Same extend overloads as {@link TV}. */
+/** Lite `tv` factory (no per-call config). Same signature as {@link TV}. */
 export interface TVLite {
   <
     V extends TVVariantsConstraint = {},
@@ -684,15 +678,17 @@ export interface TVLite {
     CV extends readonly object[] = [],
     B extends ClassValue = undefined,
     S extends TVSlots = undefined,
-    E extends TVReturnTypeLike<any, any> | undefined = undefined,
-    EV extends TVVariantsShape = ParentVariants<E>,
-    ES extends TVSlots = ParentSlots<E>,
+    E extends TVReturnTypeLike<any, any> | TVExtendList | undefined = undefined,
+    EV extends TVVariantsShape = VariantsOfExtend<E>,
+    ES extends TVSlots = SlotsOfExtend<E>,
   >(
     options: TVOptionsFields<V, DV, CV, B, S, EV, ES> & {
       /**
-       * Extend merges one parent recipe into this definition.
-       * Accepts a single {@link TVReturnTypeLike} (see also {@link TVExtendInput}).
+       * Extend merges parent recipes into this definition; child options win.
+       * Accepts a single {@link TVReturnTypeLike} or a non-empty list, merged
+       * left-to-right (`[]` is rejected at the type level).
        * @example tv({ extend: baseButton, base: "gap-2" })
+       * @example tv({ extend: [focusable, animated], base: "inline-flex" })
        * @see https://www.tailwind-variants.org/docs/composing-components
        */
       extend?: E;
@@ -704,36 +700,6 @@ export interface TVLite {
       >;
     },
   ): TVReturnType<V, S, B, EV, ES, E>;
-
-  <
-    V extends TVVariantsConstraint = {},
-    DV = {},
-    CV extends readonly object[] = [],
-    B extends ClassValue = undefined,
-    S extends TVSlots = undefined,
-    ExtendList extends TVExtendList = TVExtendList,
-    EV extends TVVariantsShape = MergedVariantsFromParents<ExtendList>,
-    ES extends TVSlots = MergedSlotsFromParents<ExtendList>,
-  >(
-    options: OnlyIfArrayExtend<
-      Omit<TVOptionsFields<V, DV, CV, B, S, EV, ES>, "defaultVariants"> & {
-        /**
-         * Extend merges parent recipes left-to-right; child options win last.
-         * Non-empty tuple only (`[]` is rejected at the type level).
-         * @example tv({ extend: [focusable, animated], base: "inline-flex" })
-         * @see https://www.tailwind-variants.org/docs/composing-components
-         */
-        extend: ExtendList;
-        defaultVariants?: ExactShape<TVDefaultVariants<V, S, EV, ES>, DV>;
-        compoundSlots?: TVCompoundSlots<
-          NoInfer<V>,
-          TVMergedSlots<NoInfer<S>, NoInfer<MergedSlotsFromParents<ExtendList>>>,
-          NoInfer<B>,
-          NoInfer<MergedVariantsFromParents<ExtendList>>
-        >;
-      }
-    >,
-  ): TVReturnType<V, S, B, EV, ES, ExtendList>;
 }
 
 /**
