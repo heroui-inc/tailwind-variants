@@ -101,10 +101,12 @@ const joinArgs = (classnames: CnOptions): string => joinClassValue(classnames as
 
 /** True when the string holds one class token (no ASCII whitespace), so merging can be skipped. */
 const isSingleToken = (str: string): boolean => {
+  if (str.indexOf(" ") !== -1) return false;
+
   for (let index = 0; index < str.length; index++) {
     const code = str.charCodeAt(index);
 
-    if (code === 32 || (code >= 9 && code <= 13)) return false;
+    if (code >= 9 && code <= 13) return false;
   }
 
   return true;

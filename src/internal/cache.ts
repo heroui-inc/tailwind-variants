@@ -83,9 +83,52 @@ const appendSignatureValue = (out: string, value: unknown): string | null => {
     return out + String(value);
   }
 
+  if (Array.isArray(value)) {
+    // Primitive arrays serialize through `join` — the v3.3.1 fast path. Arrays
+    // containing objects keep their full shape via the replacer, and arrays
+    // with non-finite numbers bail to the uncached path to avoid key collisions.
+    for (let i = 0; i < value.length; i++) {
+      const item = value[i];
+
+      if (item !== null && typeof item === "object") {
+        try {
+          return out + JSON.stringify(value, stringifyFiniteOrThrow);
+        } catch {
+          return null;
+        }
+      }
+      if (typeof item === "number" && !Number.isFinite(item)) return null;
+    }
+
+    return out + value.join("\0");
+  }
+
+  if (value !== null && type === "object") {
+    // Flat objects of primitives (the common compound-class shape) stringify
+    // without the replacer; nested structures or non-finite values fall back to
+    // the replacer or the uncached path.
+    let allPrimitive = true;
+
+    for (const key in value as AnyRecord) {
+      const item = (value as AnyRecord)[key];
+
+      if (typeof item === "number" && !Number.isFinite(item)) return null;
+      if (item !== null && typeof item === "object") {
+        allPrimitive = false;
+        break;
+      }
+    }
+
+    if (allPrimitive) {
+      try {
+        return out + JSON.stringify(value);
+      } catch {
+        return null;
+      }
+    }
+  }
+
   try {
-    // Arrays serialize through the same replacer so nested values keep their
-    // full shape (a `join` would reduce objects to "[object Object]").
     return out + JSON.stringify(value, stringifyFiniteOrThrow);
   } catch {
     return null;
