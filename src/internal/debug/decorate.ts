@@ -27,10 +27,14 @@ const developmentDiagnostics: Diagnostics = (component, resolved, attachMetadata
 
 const productionDiagnostics: Diagnostics = (component) => component;
 
-// The `typeof process` guard keeps the ternary safe in runtimes without a
-// global `process` (bare browser ESM). Bundlers still fold the branch because
-// `process.env.NODE_ENV` is a magic replacement that ignores the guard.
-export const diagnostics: Diagnostics =
-  typeof process !== "undefined" && process.env.NODE_ENV !== "production"
-    ? developmentDiagnostics
-    : productionDiagnostics;
+const isDevelopment = (): boolean => {
+  try {
+    return process.env.NODE_ENV !== "production";
+  } catch {
+    return false;
+  }
+};
+
+export const diagnostics: Diagnostics = isDevelopment()
+  ? developmentDiagnostics
+  : productionDiagnostics;
