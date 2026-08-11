@@ -1,4 +1,4 @@
-import {Bench} from "tinybench";
+import {Bench, calibrateTimerOverhead, hrtimeNowTimestampProvider} from "tinybench";
 
 import {createAdapter, createUtilityAdapter, loadImplementations} from "./harness.mjs";
 import {scenarioMetadataById} from "./metadata.mjs";
@@ -42,10 +42,13 @@ const quickModeNote = (options) =>
 const RUN_USAGE = `Usage: node benchmark/run.mjs [options]
 
 Options:
-  --quick           Fast smoke run (100ms measure, 50ms warmup). Results are
-                    flagged [UNRELIABLE] and are not suitable for claims.
+  --quick           Fast smoke run (100ms measure, 50ms warmup, 1 round).
+                    Results are flagged [UNRELIABLE] and are not suitable for
+                    claims.
   --time <ms>       Measurement time per task (default: 1000).
   --warmup <ms>     Warmup time per task (default: 200).
+  --rounds <n>      Measurement rounds per task (default: 3); the median round
+                    is reported, so one noisy window cannot dominate.
   --json-out <path> Write machine-readable results to a JSON file (also read
                     from BENCHMARK_RESULTS_PATH in CI).
   --help            Show this help.`;
@@ -55,6 +58,7 @@ export const parseRunArgs = (argv) => {
     quick: false,
     time: 1000,
     warmupTime: 200,
+    rounds: 3,
   };
 
   for (let i = 0; i < argv.length; i++) {
@@ -63,11 +67,14 @@ export const parseRunArgs = (argv) => {
     if (argument === "--quick") {
       options.time = 100;
       options.warmupTime = 50;
+      options.rounds = 1;
       options.quick = true;
     } else if (argument === "--time") {
       options.time = Number(argv[++i]);
     } else if (argument === "--warmup") {
       options.warmupTime = Number(argv[++i]);
+    } else if (argument === "--rounds") {
+      options.rounds = Number(argv[++i]);
     } else if (argument === "--json-out") {
       options.jsonOut = argv[++i];
     } else if (argument === "--help" || argument === "-h") {
@@ -86,10 +93,14 @@ export const parseRunArgs = (argv) => {
     throw new RangeError(`--warmup must be a non-negative number, received ${options.warmupTime}.`);
   }
 
+  if (!Number.isInteger(options.rounds) || options.rounds <= 0) {
+    throw new RangeError(`--rounds must be a positive integer, received ${options.rounds}.`);
+  }
+
   return options;
 };
 
-const toResult = (task, implementationId) => {
+const toResult = (task, implementationId, timerOverheadMs) => {
   const result = task.result;
 
   if (result.state !== "completed") {
@@ -98,10 +109,27 @@ const toResult = (task, implementationId) => {
     throw new Error(`Benchmark task ${task.name} ${result.state}${detail}`);
   }
 
+  let hz = result.throughput.mean;
+  let rme = result.throughput.rme;
+
+  // Subtract the calibrated timer overhead from the mean latency at the
+  // aggregate level. This removes the hrtime cost from every measurement the
+  // same way tinybench's `subtractTimerOverhead` option does, but without
+  // clamping individual samples to zero — which would inflate throughput by
+  // orders of magnitude for tasks whose latency is close to the overhead.
+  const meanLatencyMs = result.latency.mean;
+
+  if (timerOverheadMs > 0 && meanLatencyMs > SUBTRACT_SAFE_RATIO * timerOverheadMs) {
+    const adjustedLatencyMs = Math.max(0, meanLatencyMs - timerOverheadMs);
+
+    hz = 1e3 / adjustedLatencyMs;
+    rme = rme * (meanLatencyMs / adjustedLatencyMs);
+  }
+
   return {
     implementation: implementationId,
-    hz: result.throughput.mean,
-    rme: result.throughput.rme,
+    hz,
+    rme,
   };
 };
 
@@ -201,14 +229,18 @@ const deltaStyles = [
   colorDelta,
 ];
 
+// tinybench's `subtractTimerOverhead` subtracts the calibrated overhead from
+// every sample and clamps negatives to zero. For tasks whose latency is the
+// same order of magnitude as the overhead (slots / no-slots construction,
+// cx/twJoin), most samples clamp to zero and the mean-of-rates throughput
+// explodes to physically impossible values (e.g. cva at 158B ops/s). We
+// therefore measure raw and subtract the overhead analytically from the mean
+// latency (see toResult), only when the task is comfortably above the
+// overhead.
+const SUBTRACT_SAFE_RATIO = 2;
+
 const runScenarioGroup = async (selectedScenarios, adapters, options) => {
-  const bench = new Bench({
-    iterations: 64,
-    retainSamples: false,
-    throws: true,
-    time: options.time,
-    warmupTime: options.warmupTime,
-  });
+  const taskFns = new Map();
   const taskMetadata = new Map();
 
   for (const scenario of selectedScenarios) {
@@ -218,20 +250,59 @@ const runScenarioGroup = async (selectedScenarios, adapters, options) => {
       const taskName = `${scenario.id}::${adapter.id}`;
 
       taskMetadata.set(taskName, {scenarioId: scenario.id, implementationId: adapter.id});
-      bench.add(taskName, scenario.createTask(adapter));
+      taskFns.set(taskName, scenario.createTask(adapter));
     }
   }
 
-  await bench.run();
+  // Each round gets a fresh Bench: a tinybench task can only be run once. Task
+  // functions are shared across rounds, so every round measures the same
+  // pre-created components. GC runs before each task so one measurement window
+  // is never polluted by allocations left over from a previous task.
+  const timerOverheadMs = calibrateTimerOverhead(hrtimeNowTimestampProvider);
+  const roundResults = new Map();
 
-  return bench.tasks.map((task) => {
-    const metadata = taskMetadata.get(task.name);
+  for (let round = 0; round < options.rounds; round++) {
+    for (const [taskName, fn] of taskFns) {
+      const bench = new Bench({
+        iterations: 64,
+        retainSamples: false,
+        throws: true,
+        time: options.time,
+        warmupTime: options.warmupTime,
+      });
 
-    return {
+      bench.add(taskName, fn);
+
+      const task = bench.tasks[0];
+
+      await task.warmup();
+      globalThis.gc?.();
+      await task.run();
+
+      const metadata = taskMetadata.get(task.name);
+      const list = roundResults.get(task.name) ?? [];
+
+      list.push(toResult(task, metadata.implementationId, timerOverheadMs));
+      roundResults.set(task.name, list);
+    }
+  }
+
+  // Report the median round so a single noisy window cannot dominate.
+  const results = [];
+
+  for (const [taskName, samples] of roundResults) {
+    const metadata = taskMetadata.get(taskName);
+    const median = [...samples].sort((a, b) => a.hz - b.hz)[Math.floor(samples.length / 2)];
+
+    results.push({
       scenarioId: metadata.scenarioId,
-      ...toResult(task, metadata.implementationId),
-    };
-  });
+      implementation: median.implementation,
+      hz: median.hz,
+      rme: median.rme,
+    });
+  }
+
+  return results;
 };
 
 const countTasks = (suiteScenarios, adapters) =>
@@ -252,7 +323,8 @@ const runVariantsSuite = async (implementations, options) => {
 
   console.log(`\n${color("Suite 1/2 · variants", colors.bold)}${quickModeNote(options)}`);
   console.log(
-    `Running ${taskCount} tasks (${options.time}ms measure, ${options.warmupTime}ms warmup).`,
+    `Running ${taskCount} tasks × ${options.rounds} rounds ` +
+      `(${options.time}ms measure, ${options.warmupTime}ms warmup).`,
   );
 
   const results = await runScenarioGroup(regularScenarios, adapters, options);
@@ -290,7 +362,7 @@ const runVariantsSuite = async (implementations, options) => {
     `${color("tv current", colors.cyan)} · ` +
       `${color(`tv released v${released.version}`, colors.blue)} · ` +
       `${color(`cva v${cva.version}`, colors.magenta)} · ` +
-      `${options.time}ms measure · ${options.warmupTime}ms warmup`,
+      `${options.time}ms measure · ${options.warmupTime}ms warmup · ${options.rounds} rounds`,
   );
 
   return results;
@@ -305,7 +377,8 @@ const runUtilitiesSuite = async (implementations, options) => {
 
   console.log(`\n${color("Suite 2/2 · utilities", colors.bold)}${quickModeNote(options)}`);
   console.log(
-    `Running ${taskCount} tasks (${options.time}ms measure, ${options.warmupTime}ms warmup).`,
+    `Running ${taskCount} tasks × ${options.rounds} rounds ` +
+      `(${options.time}ms measure, ${options.warmupTime}ms warmup).`,
   );
 
   const results = await runScenarioGroup(utilityScenarios, adapters, options);
@@ -340,7 +413,7 @@ const runUtilitiesSuite = async (implementations, options) => {
     `${color("tv current", colors.cyan)} · ` +
       `${color(`tv released v${released.version}`, colors.blue)} · ` +
       `${color(`cnfast v${cnfast.version}`, colors.magenta)} · ` +
-      `${options.time}ms measure · ${options.warmupTime}ms warmup`,
+      `${options.time}ms measure · ${options.warmupTime}ms warmup · ${options.rounds} rounds`,
   );
 
   return results;
@@ -385,6 +458,7 @@ const writeResultsJson = (
       quick: options.quick,
       time: options.time,
       warmupTime: options.warmupTime,
+      rounds: options.rounds,
     },
     noiseThreshold,
     versions: {
@@ -406,6 +480,7 @@ export const runBenchmarks = async (rawOptions = {}) => {
     quick: false,
     time: 1000,
     warmupTime: 200,
+    rounds: 3,
     ...rawOptions,
   };
   const {variants, utilities} = await loadImplementations();

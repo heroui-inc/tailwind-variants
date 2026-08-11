@@ -71,7 +71,7 @@
     "build": "tsup --config .config/tsup.config.ts",
     "typecheck": "tsc --noEmit && pnpm typecheck:types",
     "typecheck:types": "tsc -p .config/tsconfig.type-tests.json",
-    "benchmark": "pnpm build && node benchmark/run.mjs",
+    "benchmark": "pnpm build && node --expose-gc benchmark/run.mjs",
     "lint": "biome check .",
     "lint:fix": "biome check --write .",
     "test": "vitest run --config .config/vitest.config.ts",

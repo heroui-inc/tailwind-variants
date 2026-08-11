@@ -19,9 +19,15 @@ pnpm benchmark --quick
 BENCHMARK_RESULTS_PATH=benchmark-results.json pnpm benchmark
 ```
 
-`--quick` uses 100 ms measure / 50 ms warmup, drops the faster/slower verdicts from the delta
-columns, and flags the run as `[UNRELIABLE]` in the output. Quick runs are for iteration and CI
-smoke checks only, never for claims.
+`--quick` uses 100 ms measure / 50 ms warmup / a single round, drops the faster/slower verdicts
+from the delta columns, and flags the run as `[UNRELIABLE]` in the output. Quick runs are for
+iteration and CI smoke checks only, never for claims.
+
+Additional flags:
+
+- `--time <ms>` / `--warmup <ms>` override the per-task measure / warmup time.
+- `--rounds <n>` overrides the number of measurement rounds per task (default 3); the median
+  round is reported.
 
 Each run queries npm for the latest published `tailwind-variants`,
 `class-variance-authority`, and `cnfast`, caches those exact packages in the system temporary
@@ -66,8 +72,20 @@ set `NO_COLOR=1` to disable ANSI colors.
 - Lifecycle scenarios deliberately include both construction and invocation.
 - Variant-matrix throughput is batches per second, with five calls in each batch.
 - TV-only features are not presented as direct CVA comparisons.
-- The default measurement is 1,000 ms after a 200 ms warmup. Differences within ±5% should
-  be treated as noise and confirmed with repeated runs on the same machine.
+- The default measurement is 1,000 ms after a 200 ms warmup, repeated for 3 rounds per
+  task. The median round is reported, so a single noisy window (GC pause, scheduler jitter)
+  cannot dominate the result.
+- Each task runs in a fresh `Bench`, and a garbage collection is forced before every task
+  (`node --expose-gc`). This isolates one measurement window from allocations left behind by
+  the previous task.
+- The timer overhead is calibrated with `calibrateTimerOverhead` and subtracted from each
+  task's mean latency (the same correction as tinybench's `subtractTimerOverhead`, applied at
+  the aggregate level). Subtracting per sample instead would clamp most samples to zero for
+  tasks whose latency is close to the overhead, inflating reported throughput by orders of
+  magnitude. The correction is only applied when a task's mean latency is comfortably above
+  the overhead.
+- Differences within ±5% should be treated as noise and confirmed with repeated runs on the
+  same machine.
 - Custom Tailwind Merge configuration runs in a separate final phase because TV's merger cache
   is process-global.
 
