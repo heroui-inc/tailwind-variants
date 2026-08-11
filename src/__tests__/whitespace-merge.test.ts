@@ -9,6 +9,21 @@ describe("whitespace-separated class merging", () => {
     expect(cn("px-2\r\npx-4")).toBe("px-4");
   });
 
+  test("treats tab-separated tokens as multi-token (fast path only checks spaces)", () => {
+    expect(cn("px-2\tpx-4")).toBe("px-4");
+    expect(cn("px-2\vpx-4")).toBe("px-4");
+  });
+
+  test("returns single tokens untouched even with no space present", () => {
+    expect(cn("px-2")).toBe("px-2");
+    expect(cn("[mask-type:luminance]")).toBe("[mask-type:luminance]");
+  });
+
+  test("merges multi-space-separated tokens", () => {
+    expect(cn("px-2  px-4")).toBe("px-4");
+    expect(cn("text-sm   text-lg")).toBe("text-lg");
+  });
+
   test("normalizes multi-line template strings without conflicts", () => {
     expect(
       cn(`flex

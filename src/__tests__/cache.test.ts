@@ -238,6 +238,81 @@ describe("non-finite number serialization", () => {
   });
 });
 
+describe("appendSignatureValue fast paths", () => {
+  test("serializes primitive-array conditions deterministically", () => {
+    const compounds = [{conditionKeys: ["s"], source: {s: ["a", "b"], class: "x"}}];
+    const first = buildCompoundsSignature(compounds, []);
+    const second = buildCompoundsSignature(compounds, []);
+
+    expect(first).not.toBeNull();
+    expect(first).toBe(second);
+  });
+
+  test("tolerates empty and falsy-filled arrays", () => {
+    const empty = [{conditionKeys: ["s"], source: {s: [], class: "x"}}];
+    const falsy = [{conditionKeys: ["s"], source: {s: ["a", null, undefined, false], class: "x"}}];
+
+    expect(buildCompoundsSignature(empty, [])).not.toBeNull();
+    expect(buildCompoundsSignature(falsy, [])).not.toBeNull();
+  });
+
+  test("keeps the full shape of arrays containing objects", () => {
+    const withObjectA = [{conditionKeys: ["s"], source: {s: ["a", {x: 1}], class: "x"}}];
+    const withObjectB = [{conditionKeys: ["s"], source: {s: ["a", {y: 2}], class: "x"}}];
+
+    const sigA = buildCompoundsSignature(withObjectA, []);
+    const sigB = buildCompoundsSignature(withObjectB, []);
+
+    expect(sigA).not.toBeNull();
+    expect(sigB).not.toBeNull();
+    expect(sigA).not.toBe(sigB);
+  });
+
+  test("bails out for non-finite numbers inside arrays", () => {
+    const nan = [{conditionKeys: ["s"], source: {s: [NaN, "a"], class: "x"}}];
+    const infinity = [{conditionKeys: ["s"], source: {s: [Infinity, "a"], class: "x"}}];
+
+    expect(buildCompoundsSignature(nan, [])).toBeNull();
+    expect(buildCompoundsSignature(infinity, [])).toBeNull();
+  });
+
+  test("serializes flat objects of primitives without collapsing them", () => {
+    const classValue = [{conditionKeys: [], source: {class: {base: "r", label: "m"}}}];
+    const otherClassValue = [{conditionKeys: [], source: {class: {base: "r", label: "n"}}}];
+
+    const sigA = buildCompoundsSignature(classValue, []);
+    const sigB = buildCompoundsSignature(otherClassValue, []);
+
+    expect(sigA).not.toBeNull();
+    expect(sigB).not.toBeNull();
+    expect(sigA).not.toBe(sigB);
+  });
+
+  test("bails out for non-finite numbers inside objects", () => {
+    const nan = [{conditionKeys: [], source: {class: {base: "r", n: NaN}}}];
+    const infinity = [{conditionKeys: [], source: {class: {base: Infinity}}}];
+    const nested = [{conditionKeys: [], source: {class: {base: {inner: NaN}}}}];
+
+    expect(buildCompoundsSignature(nan, [])).toBeNull();
+    expect(buildCompoundsSignature(infinity, [])).toBeNull();
+    expect(buildCompoundsSignature(nested, [])).toBeNull();
+  });
+
+  test("bails out for BigInt and circular values without throwing", () => {
+    const bigint = [{conditionKeys: [], source: {class: {base: 123n}}}];
+    const circular: Record<string, unknown> = {};
+
+    circular.self = circular;
+
+    const circularSource = [{conditionKeys: [], source: {class: circular}}];
+
+    expect(() => buildCompoundsSignature(bigint, [])).not.toThrow();
+    expect(buildCompoundsSignature(bigint, [])).toBeNull();
+    expect(() => buildCompoundsSignature(circularSource, [])).not.toThrow();
+    expect(buildCompoundsSignature(circularSource, [])).toBeNull();
+  });
+});
+
 describe("merge engine cache limits", () => {
   test("whole-string cache stays correct past its limit", () => {
     const merger = createMerger();
