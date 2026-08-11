@@ -1,5 +1,6 @@
 import {twMerge} from "tailwind-merge";
 
+import {probeTvCapabilities} from "./capabilities.mjs";
 import {installLatestCnfast, installLatestCVA, installReleasedTV} from "./released.mjs";
 import {readFileSync} from "node:fs";
 import path from "node:path";
@@ -52,6 +53,7 @@ export const loadImplementations = async () => {
       kind: "tv",
       label: "tv",
       version: packageJson.version,
+      capabilities: probeTvCapabilities(tvModule),
       module: tvModule,
     },
     {
@@ -59,6 +61,7 @@ export const loadImplementations = async () => {
       kind: "tv",
       label: `tv(released-${released.version})`,
       version: released.version,
+      capabilities: probeTvCapabilities(releasedModule),
       module: releasedModule,
     },
     {

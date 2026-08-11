@@ -55,42 +55,16 @@ const callMultiExtendBatch = (adapter, component) => {
 };
 
 /**
- * Current TV supports `extend: [a, b, c]`. Released TV does not, so it gets an
- * equivalent inheritance chain. Both produce the same flattened recipe and output.
+ * Compose three independent mixins via array extend. Only implementations that
+ * expose the `arrayExtend` capability (probed at load time) run these
+ * scenarios, so the released branch that used an equivalent single-extend
+ * chain is no longer needed — a released version gains the baseline as soon as
+ * it actually supports the API.
  */
 const createMultiExtended = (adapter, options) => {
   const focusable = adapter.create(focusableConfig, options);
   const animated = adapter.create(animatedConfig, options);
   const surfaced = adapter.create(surfacedConfig, options);
-
-  if (adapter.id === "released") {
-    const focusAnimated = adapter.create(
-      {
-        extend: focusable,
-        base: animatedConfig.base,
-        variants: animatedConfig.variants,
-        defaultVariants: animatedConfig.defaultVariants,
-      },
-      options,
-    );
-    const focusAnimatedSurfaced = adapter.create(
-      {
-        extend: focusAnimated,
-        base: surfacedConfig.base,
-        variants: surfacedConfig.variants,
-        defaultVariants: surfacedConfig.defaultVariants,
-      },
-      options,
-    );
-
-    return adapter.create(
-      {
-        extend: focusAnimatedSurfaced,
-        ...multiExtendChildConfig,
-      },
-      options,
-    );
-  }
 
   return adapter.create(
     {
@@ -335,11 +309,17 @@ export const assertEquivalentOutputs = (adapters) => {
     "TV no-merge slots outputs differ.",
   );
   assert.equal(extendOutputFor(tv), extendOutputFor(released), "TV extend outputs differ.");
-  assert.deepEqual(
-    multiExtendOutputsFor(tv),
-    multiExtendOutputsFor(released),
-    "TV multi-extend (array) and released chain outputs differ.",
-  );
+
+  // Multi-extend output parity is only meaningful when the released module
+  // actually supports array extend; otherwise it silently drops every parent
+  // and the comparison would fail for the wrong reason.
+  if (released.capabilities?.arrayExtend) {
+    assert.deepEqual(
+      multiExtendOutputsFor(tv),
+      multiExtendOutputsFor(released),
+      "TV multi-extend (array) and released outputs differ.",
+    );
+  }
   assert.equal(
     tv.bindMerge(classInputs, {twMerge: true})(),
     released.bindMerge(classInputs, {twMerge: true})(),

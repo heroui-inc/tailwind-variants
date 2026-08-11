@@ -97,18 +97,23 @@ same flattened recipe as a single-parent or chained `extend`.
 | Scenario | What it measures |
 | --- | --- |
 | `composition/extend-multi` | Create three mixins + compose + one call |
-| `construction/extend-multi` | Definition-time compose only (array vs chain) |
+| `construction/extend-multi` | Definition-time compose only |
 | `invocation/extend-multi` | Pre-created recipe, five-call batch (hot path) |
 
-Current TV uses `extend: [a, b, c]`. Released TV (no array API) uses an equivalent inheritance
-chain so outputs stay comparable. Expect:
+These scenarios use `extend: [a, b, c]`, so only implementations that actually support array
+extend are measured. Support is probed at load time (`capabilities.mjs`) — never inferred from
+version numbers, which cannot be anticipated for future releases — and the probe verifies the
+output, because older versions silently ignore an `extend` array instead of throwing.
+
+A released version without array extend is skipped for these scenarios and shows `—` in the
+table; it gains a baseline automatically as soon as a released version ships the API. Expect:
 
 - **invocation/*** (including `extend-multi`): parity with released (noise). Parent folding runs
   only inside `tv({...})`, not on each component call.
 - **composition/extend** (single parent): should stay within noise; single-parent still uses the
   parent recipe directly (no fold loop).
-- **construction/extend-multi** / **composition/extend-multi**: array compose vs a forced chain;
-  usually within noise, sometimes slightly faster (one fold pass vs intermediate recipes).
+- **construction/extend-multi** / **composition/extend-multi**: array compose against a released
+  build that supports it, or against current TV alone until then.
 
 ## Pull request automation
 

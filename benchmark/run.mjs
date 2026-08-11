@@ -39,6 +39,29 @@ const quickModeNote = (options) =>
     ? ` ${color("[UNRELIABLE] quick mode — not suitable for performance claims", colors.yellow)}`
     : "";
 
+/**
+ * True when an adapter participates in a scenario: its kind must be listed,
+ * and every capability the scenario requires must be present. Capabilities are
+ * probed at load time (see capabilities.mjs), never inferred from version
+ * numbers, so a released version that gains array-extend support is picked up
+ * automatically.
+ */
+const scenarioRunsFor = (scenario, adapter) => {
+  if (!scenario.implementations.includes(adapter.kind)) return false;
+
+  const requires = scenario.requiresCapabilities;
+
+  if (!requires) return true;
+
+  const capabilities = adapter.capabilities ?? {};
+
+  for (let index = 0; index < requires.length; index++) {
+    if (!capabilities[requires[index]]) return false;
+  }
+
+  return true;
+};
+
 const RUN_USAGE = `Usage: node benchmark/run.mjs [options]
 
 Options:
@@ -245,7 +268,7 @@ const runScenarioGroup = async (selectedScenarios, adapters, options) => {
 
   for (const scenario of selectedScenarios) {
     for (const adapter of adapters) {
-      if (!scenario.implementations.includes(adapter.kind)) continue;
+      if (!scenarioRunsFor(scenario, adapter)) continue;
 
       const taskName = `${scenario.id}::${adapter.id}`;
 
@@ -308,7 +331,7 @@ const runScenarioGroup = async (selectedScenarios, adapters, options) => {
 const countTasks = (suiteScenarios, adapters) =>
   suiteScenarios.reduce(
     (count, scenario) =>
-      count + adapters.filter((adapter) => scenario.implementations.includes(adapter.kind)).length,
+      count + adapters.filter((adapter) => scenarioRunsFor(scenario, adapter)).length,
     0,
   );
 

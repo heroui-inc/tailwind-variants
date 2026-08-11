@@ -81,16 +81,17 @@ export const scenarioMetadata = [
     category: "composition",
     name: "Create multi-extend and call",
     description:
-      "Lifecycle for three independent mixins. Current TV uses extend: [a,b,c]; released uses an equivalent chain.",
+      "Lifecycle for three independent mixins via extend: [a, b, c]. Implementations are skipped when they lack array-extend support.",
     implementations: ["tv"],
+    requiresCapabilities: ["arrayExtend"],
   },
   {
     id: "construction/extend-multi",
     category: "construction",
     name: "Create multi-extend component",
-    description:
-      "Definition-time cost of composing three mixins (array vs chain). Invocation is not timed.",
+    description: "Definition-time cost of composing three mixins. Invocation is not timed.",
     implementations: ["tv"],
+    requiresCapabilities: ["arrayExtend"],
   },
   {
     id: "invocation/extend-multi",
@@ -99,6 +100,7 @@ export const scenarioMetadata = [
     description:
       "Pre-created multi-parent recipe; five-call batch. Hot path should match single-parent extend.",
     implementations: ["tv"],
+    requiresCapabilities: ["arrayExtend"],
   },
   {
     id: "utilities/cn-merge",
