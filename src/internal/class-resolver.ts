@@ -159,7 +159,7 @@ export const getVariantClassNamesBySlot = (
     const variant = variants[i];
     const variantValue = getVariantValue(variant, defaultVariants, props, slotProps);
     const value =
-      slotKey === "base" && typeof variantValue === "string"
+      slotKey === "base" && (typeof variantValue === "string" || Array.isArray(variantValue))
         ? variantValue
         : variantValue && variantValue[slotKey];
 
