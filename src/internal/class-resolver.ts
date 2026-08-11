@@ -252,6 +252,7 @@ const createVariantResolver = (resolved: ResolvedOptions, cn: CnAdapter): Runtim
   let compiledVariants = resolved.compiledVariants;
   let compiledCompoundSlots: CompiledCompoundSlot[] = EMPTY_ARRAY;
   let cache: ResultCache | null = null;
+  let lastCompoundsSig: string | null = null;
   const mergeOverride = createLazyOverrideMerge(cn, config);
   // First invoke skips cache.
   let coldInvokesRemaining = 1;
@@ -293,29 +294,34 @@ const createVariantResolver = (resolved: ResolvedOptions, cn: CnAdapter): Runtim
       coldInvokesRemaining--;
       core = computeCore(props);
     } else {
-      cache ??= createResultCache();
-
       const propsFingerprint = buildPropsFingerprint(variantKeys, defaultVariants, props);
 
       if (propsFingerprint !== null) {
+        // The signature is rebuilt each call to detect in-place compound
+        // mutation; a change swaps in a fresh cache instead of being embedded
+        // in the key, keeping the key short and cheap to hash.
         const compoundsSig =
           compiledCompoundVariants!.length > 0 || compiledCompoundSlots.length > 0
             ? buildCompoundsSignature(compiledCompoundVariants!, compiledCompoundSlots)
             : "";
-        const cacheKey = propsFingerprint + "#" + compoundsSig;
 
-        // A null compounds signature (unserializable compound values) skips the
-        // cache so two different configs never share a key.
+        // A null compounds signature (unserializable compound values) skips
+        // the cache so two different configs never share a key.
         if (compoundsSig === null) {
           core = computeCore(props);
         } else {
-          const cached = cache.get(cacheKey);
+          if (compoundsSig !== lastCompoundsSig) {
+            lastCompoundsSig = compoundsSig;
+            cache = createResultCache();
+          }
+
+          const cached = cache!.get(propsFingerprint);
 
           if (cached !== CACHE_MISS) {
             core = cached;
           } else {
             core = computeCore(props);
-            cache.set(cacheKey, core);
+            cache!.set(propsFingerprint, core);
           }
         }
       } else {
@@ -340,6 +346,7 @@ const createSlotsResolver = (resolved: ResolvedOptions, cn: CnAdapter): RuntimeC
   let hasCompounds = false;
   let mergeOverride: ReturnType<typeof createLazyOverrideMerge> | null = null;
   let parentCache: ReturnType<typeof createBoundedCache<SlotsResult>> | null = null;
+  let lastCompoundsSig: string | null = null;
   // First parent invoke skips fingerprint/cache setup (lifecycle create+call once).
   let coldParentInvokesRemaining = 1;
 
@@ -448,8 +455,10 @@ const createSlotsResolver = (resolved: ResolvedOptions, cn: CnAdapter): RuntimeC
       return createSlotsResult(props);
     }
 
-    // Recompute each call so in-place compound metadata mutations invalidate cache keys
-    // (aligned with createVariantResolver / tv-default mutation coverage).
+    // Rebuilt each call so in-place compound metadata mutations are detected
+    // (aligned with createVariantResolver / tv-default mutation coverage). A
+    // change swaps in a fresh cache instead of being embedded in the key,
+    // keeping the key short and cheap to hash.
     const compoundsSig = hasCompounds
       ? buildCompoundsSignature(compoundVariants!, compoundSlots!)
       : "";
@@ -458,17 +467,18 @@ const createSlotsResolver = (resolved: ResolvedOptions, cn: CnAdapter): RuntimeC
       return createSlotsResult(props);
     }
 
-    const cacheKey = propsFingerprint + "#" + compoundsSig;
+    if (compoundsSig !== lastCompoundsSig) {
+      lastCompoundsSig = compoundsSig;
+      parentCache = createBoundedCache<SlotsResult>();
+    }
 
-    parentCache ??= createBoundedCache<SlotsResult>();
-
-    const cached = parentCache.get(cacheKey);
+    const cached = parentCache!.get(propsFingerprint);
 
     if (cached !== CACHE_MISS) return cached;
 
     const next = createSlotsResult(props);
 
-    parentCache.set(cacheKey, next);
+    parentCache!.set(propsFingerprint, next);
 
     return next;
   }) as RuntimeComponent;

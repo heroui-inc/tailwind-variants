@@ -282,21 +282,29 @@ type BoundedCache<T> = {
   set(key: string, value: T): void;
 };
 
-/** Two-generation bounded Map cache for arbitrary values. */
+/**
+ * Two-generation bounded Map cache. Stored values are never `undefined`
+ * (strings or slot-result objects), so `get` uses a single lookup per
+ * generation instead of a `has` + `get` pair.
+ */
 export const createBoundedCache = <T>(limit = VARIANT_CACHE_LIMIT): BoundedCache<T> => {
   let primary: Map<string, T> = new Map();
   let secondary: Map<string, T> | null = null;
 
   return {
     get(key: string): T | CacheMiss {
-      if (primary.has(key)) return primary.get(key) as T;
+      const value = primary.get(key);
 
-      if (secondary?.has(key)) {
-        const value = secondary.get(key) as T;
+      if (value !== undefined) return value;
 
-        primary.set(key, value);
+      if (secondary) {
+        const fallback = secondary.get(key);
 
-        return value;
+        if (fallback !== undefined) {
+          primary.set(key, fallback);
+
+          return fallback;
+        }
       }
 
       return CACHE_MISS;
