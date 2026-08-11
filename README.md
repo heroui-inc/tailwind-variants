@@ -21,10 +21,11 @@
 
 - First-class variant API
 - Slots support
-- Composition support
+- Composition support (including multi-extend)
 - Fully typed
 - Framework agnostic
 - Built-in conflict resolution
+- Debugging and tracing (experimental)
 - Tailwind CSS v4 support
 
 ## Installation
@@ -141,6 +142,55 @@ createTV({ twMergeConfig: mergeConfig });
 For `createTailwindMerge`, move the custom parts of the factory into `{ extend, override }` and pass
 that object. Merge functions and full default configs cannot be passed directly.
 
+## Composition
+
+`extend` merges one or more parent recipes into a child. Pass a single `tv()` result, or a **non-empty**
+array merged left-to-right (child options win last).
+
+```ts
+import { tv } from "tailwind-variants";
+
+const focusable = tv({ base: "focus-visible:ring-2" });
+const animated = tv({ base: "transition-all duration-150" });
+
+const button = tv({
+  extend: [focusable, animated],
+  base: "inline-flex items-center",
+});
+
+// Single parent still works:
+const iconButton = tv({ extend: button, base: "gap-2" });
+```
+
+Variants, slots, defaults, and compounds are deep-merged. If two recipes share a variant key that
+should stay separate, call them individually and join with `cx` / `cn` instead.
+
+## Debugging (experimental)
+
+Enable `debug: true` to log how a recipe resolves classes and which ones were overridden by
+`tailwind-merge`. Output appears in the browser console only.
+
+```ts
+import { tv } from "tailwind-variants";
+
+const button = tv(
+  {
+    base: "inline-flex rounded bg-red-500 px-2",
+    variants: {
+      color: { primary: "bg-blue-600 text-white" },
+      size: { sm: "text-sm px-2", lg: "text-lg px-6" },
+    },
+    defaultVariants: { size: "sm" },
+  },
+  { debug: true },
+);
+
+button({ color: "primary", size: "lg" });
+```
+
+In production builds the debug path is fully tree-shaken via `process.env.NODE_ENV` — no logging
+code, no overhead, and recipe behavior remains identical. The `/lite` entry does not support debug.
+
 ## Utility Functions
 
 | Function  | Behavior                                             |
@@ -156,6 +206,9 @@ cx("px-2", "px-4"); // => "px-2 px-4"
 cn("px-2", "px-4"); // => "px-4"
 cnMerge("px-2", "px-4")({ twMerge: false }); // => "px-2 px-4"
 ```
+
+These utilities — and `tv()` results, including slot functions — always return a `string`; when no
+classes remain, the result is an empty string, matching common class name utilities.
 
 ## Documentation
 
