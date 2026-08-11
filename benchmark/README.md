@@ -86,6 +86,12 @@ set `NO_COLOR=1` to disable ANSI colors.
   the overhead.
 - Differences within ±5% should be treated as noise and confirmed with repeated runs on the
   same machine.
+- Before measurement, every TV module is warmed with the same set of config shapes
+  (`equalizeConfigShapeExposure`), using array extend when supported and a single-parent
+  extend otherwise. V8 type feedback is process-global, so a module that runs extra
+  capability-gated scenarios would otherwise be measured with megamorphic inline caches
+  while the other module keeps faster monomorphic ones — an asymmetry that showed up as a
+  spurious 25-35% construction "regression" for the current build.
 - Custom Tailwind Merge configuration runs in a separate final phase because TV's merger cache
   is process-global.
 

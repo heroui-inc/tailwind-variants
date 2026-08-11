@@ -75,6 +75,36 @@ const createMultiExtended = (adapter, options) => {
   );
 };
 
+/**
+ * V8 type feedback is process-global: once a module's `tv` has seen many
+ * config shapes, its property-access inline caches go megamorphic for the
+ * rest of the process. Capability-gated scenarios feed the multi-extend
+ * configs only to modules that support array extend, which would leave the
+ * other TV module in a faster inline-cache state and bias every comparison
+ * row against the richer module. Warm every TV adapter with the same config
+ * shapes up front — via array extend when supported, a single-parent extend
+ * otherwise — so all TV modules are measured in the same many-shapes regime.
+ */
+export const equalizeConfigShapeExposure = (adapters) => {
+  const options = {twMerge: false};
+
+  for (const adapter of adapters) {
+    if (adapter.kind !== "tv") continue;
+
+    for (let i = 0; i < 50; i++) {
+      const focusable = adapter.create(focusableConfig, options);
+      const animated = adapter.create(animatedConfig, options);
+      const surfaced = adapter.create(surfacedConfig, options);
+      const extend = adapter.capabilities?.arrayExtend
+        ? [focusable, animated, surfaced]
+        : focusable;
+      const child = adapter.create({extend, ...multiExtendChildConfig}, options);
+
+      adapter.invoke(child, {size: "sm"});
+    }
+  }
+};
+
 export const scenarios = [
   {
     ...metadata("construction/no-slots"),

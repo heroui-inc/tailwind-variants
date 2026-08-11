@@ -2,7 +2,12 @@ import {Bench, calibrateTimerOverhead, hrtimeNowTimestampProvider} from "tinyben
 
 import {createAdapter, createUtilityAdapter, loadImplementations} from "./harness.mjs";
 import {scenarioMetadataById} from "./metadata.mjs";
-import {assertEquivalentOutputs, hasRetainedResult, scenarios} from "./scenarios.mjs";
+import {
+  assertEquivalentOutputs,
+  equalizeConfigShapeExposure,
+  hasRetainedResult,
+  scenarios,
+} from "./scenarios.mjs";
 import {renderBoxTable} from "./table.mjs";
 import {utilityScenarioMetadataById} from "./utility-metadata.mjs";
 import {
@@ -338,6 +343,7 @@ const countTasks = (suiteScenarios, adapters) =>
 const runVariantsSuite = async (implementations, options) => {
   const adapters = implementations.map(createAdapter);
 
+  equalizeConfigShapeExposure(adapters);
   assertEquivalentOutputs(adapters);
 
   const isolatedScenario = scenarios.find((scenario) => scenario.id === "invocation/custom-merge");
