@@ -1,4 +1,4 @@
-import type {TVConfig, TWMConfig, TWMergeConfig} from "./config.js";
+import type {TVConfig, TVLiteConfig, TWMConfig, TWMergeConfig, TwMergeFn} from "./config.js";
 import type {TV} from "./types.js";
 
 import {diagnostics} from "./internal/debug/decorate.js";
@@ -8,7 +8,7 @@ import {cn, cnAdapter, cnMerge} from "./internal/tw-merge.js";
 import {cx as runtimeCx} from "./utils.js";
 
 export type * from "./types.js";
-export type {TVConfig, TWMConfig, TWMergeConfig};
+export type {TVConfig, TVLiteConfig, TWMConfig, TWMergeConfig, TwMergeFn};
 
 const runtime = getTailwindVariants(cnAdapter, diagnostics);
 

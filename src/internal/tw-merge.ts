@@ -21,7 +21,7 @@ import {joinClassValue} from "./join-class-value.js";
 import {createMerger} from "./merge/index.js";
 import {state} from "./state.js";
 
-/** Normalize TV config shapes into `{ extend, override }`. */
+/** Normalize TV config shapes into `{ extend, override }` plus static TM knobs. */
 const toMergerConfig = (config: TWMergeConfig): ConfigExtension | undefined => {
   if (isEmptyObject(config)) return undefined;
 
@@ -37,10 +37,6 @@ const toMergerConfig = (config: TWMergeConfig): ConfigExtension | undefined => {
     "conflictingClassGroupModifiers",
     "postfixLookupClassGroups",
     "orderSensitiveModifiers",
-    "cacheSize",
-    "prefix",
-    "separator",
-    "experimentalParseClassName",
   ] as const) {
     if (source[key] !== undefined && extend[key] === undefined) {
       extend[key] = source[key];
@@ -48,6 +44,14 @@ const toMergerConfig = (config: TWMergeConfig): ConfigExtension | undefined => {
   }
 
   const result: ConfigExtension = {};
+
+  if (source.cacheSize !== undefined) result.cacheSize = source.cacheSize as number;
+  if (source.prefix !== undefined) result.prefix = source.prefix as string;
+  if (source.experimentalParseClassName !== undefined) {
+    result.experimentalParseClassName = source.experimentalParseClassName as NonNullable<
+      ConfigExtension["experimentalParseClassName"]
+    >;
+  }
 
   if (Object.keys(extend).length > 0) {
     result.extend = extend as NonNullable<ConfigExtension["extend"]>;
@@ -57,7 +61,7 @@ const toMergerConfig = (config: TWMergeConfig): ConfigExtension | undefined => {
     result.override = source.override as NonNullable<ConfigExtension["override"]>;
   }
 
-  if (!result.extend && !result.override) return undefined;
+  if (Object.keys(result).length === 0) return undefined;
 
   return result;
 };
@@ -327,7 +331,9 @@ state.reset = () => {
 const executeMerge = (classnames: CnOptions, config?: TWMConfig): CnReturn => {
   const base = joinArgs(classnames);
 
-  if (!base || !(config?.twMerge ?? true)) return base;
+  if (!base) return base;
+  if (config?.twMerge === false) return base;
+  if (typeof config?.twMerge === "function") return config.twMerge(base);
 
   if (isSingleToken(base)) return base;
 
@@ -342,6 +348,7 @@ const executeMerge = (classnames: CnOptions, config?: TWMConfig): CnReturn => {
 const isDefaultMergeConfig = (config?: TWMConfig): boolean => {
   if (config == null) return true;
   if (config.twMerge === false) return false;
+  if (typeof config.twMerge === "function") return false;
   if (config.twMergeConfig && !isEmptyObject(config.twMergeConfig)) return false;
 
   return true;

@@ -10,10 +10,23 @@ import type {AnyConfig, ConfigExtension} from "./types.js";
 type PropertyObject = Partial<Record<string, readonly unknown[]>>;
 
 /** Merge `{ extend, override }` into `baseConfig` (mutates; pass a fresh default). */
-export const mergeConfigs = (
-  baseConfig: AnyConfig,
-  {extend = {}, override = {}}: ConfigExtension,
-): AnyConfig => {
+export const mergeConfigs = (baseConfig: AnyConfig, extension: ConfigExtension): AnyConfig => {
+  const {extend = {}, override = {}} = extension;
+  const nested = extend as Partial<AnyConfig>;
+
+  // Static fields are always overridden when present (TM rule). Prefer top-level,
+  // then fall back to values nested on `extend` from older toMergerConfig output.
+  const cacheSize = extension.cacheSize ?? nested.cacheSize;
+  const prefix = extension.prefix ?? nested.prefix;
+  const experimentalParseClassName =
+    extension.experimentalParseClassName ?? nested.experimentalParseClassName;
+
+  if (cacheSize !== undefined) baseConfig.cacheSize = cacheSize;
+  if (prefix !== undefined) baseConfig.prefix = prefix;
+  if (experimentalParseClassName !== undefined) {
+    baseConfig.experimentalParseClassName = experimentalParseClassName;
+  }
+
   overrideConfigProperties(baseConfig.theme, override.theme);
   overrideConfigProperties(baseConfig.classGroups, override.classGroups);
   overrideConfigProperties(baseConfig.conflictingClassGroups, override.conflictingClassGroups);

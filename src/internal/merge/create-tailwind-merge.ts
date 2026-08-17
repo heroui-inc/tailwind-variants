@@ -20,8 +20,8 @@ export interface TailwindMerge {
   mergeString(classList: string): string;
 }
 
-/** Two-generation whole-string LRU capacity. */
-const MERGE_CACHE_SIZE = 500;
+/** Default two-generation whole-string LRU capacity when config omits `cacheSize`. */
+const DEFAULT_CACHE_SIZE = 500;
 
 export const createTailwindMerge = (createConfig: () => AnyConfig): TailwindMerge => {
   let configUtils: ConfigUtils;
@@ -29,14 +29,22 @@ export const createTailwindMerge = (createConfig: () => AnyConfig): TailwindMerg
 
   let cache: Record<string, string> = Object.create(null);
   let previousCache: Record<string, string> = Object.create(null);
-  let cacheSize = 0;
+  let cacheCount = 0;
+  let cacheLimit = DEFAULT_CACHE_SIZE;
 
   /** Lazy init; self-patches `mergeString` after first call. */
   const initTailwindMerge = (classList: string) => {
-    configUtils = createConfigUtils(createConfig());
+    const config = createConfig();
+    configUtils = createConfigUtils(config);
     mergeClassList = configUtils.mergeClassList;
-    merge.mergeString = tailwindMerge;
+    cacheLimit = config.cacheSize ?? DEFAULT_CACHE_SIZE;
 
+    if (cacheLimit < 1) {
+      merge.mergeString = mergeClassList;
+      return mergeClassList(classList);
+    }
+
+    merge.mergeString = tailwindMerge;
     return tailwindMerge(classList);
   };
 
@@ -52,8 +60,8 @@ export const createTailwindMerge = (createConfig: () => AnyConfig): TailwindMerg
     }
 
     cache[classList] = result;
-    if (++cacheSize > MERGE_CACHE_SIZE) {
-      cacheSize = 0;
+    if (++cacheCount > cacheLimit) {
+      cacheCount = 0;
       previousCache = cache;
       cache = Object.create(null);
     }

@@ -14,16 +14,33 @@ export type TWMergeConfig = ConfigExtension &
     override?: Partial<AnyConfig>;
   };
 
+/** Join-then-merge function. A string of class names in, merged string out. */
+export type TwMergeFn = (classList: string) => string;
+
 export type TWMConfig = {
   /**
-   * Whether to merge conflicting Tailwind classes.
+   * Whether to merge conflicting classes, or a custom merge function.
+   * A function is the lite-entry way to use an external merger (e.g. `twMerge`
+   * from `tailwind-merge`) without shipping the built-in table.
    * @default true
    */
-  twMerge?: boolean;
+  twMerge?: boolean | TwMergeFn;
   /**
    * Custom merger config (`extend` / `override`, or legacy flat fields).
    */
   twMergeConfig?: TWMergeConfig;
+};
+
+/**
+ * Config accepted by the lite entry. Only `twMerge` is honored —
+ * `twMergeConfig` and `debug` belong on the default entry.
+ */
+export type TVLiteConfig = {
+  /**
+   * A merge function, or `false` to join only.
+   * `true` / omitted still join only: lite has no built-in table.
+   */
+  twMerge?: boolean | TwMergeFn;
 };
 
 /**

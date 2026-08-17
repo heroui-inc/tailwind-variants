@@ -5,7 +5,7 @@
  * @see https://github.com/dcastil/tailwind-merge/blob/main/LICENSE.md
  */
 
-import type {ParsedClassName} from "./types.js";
+import type {AnyConfig, ParsedClassName} from "./types.js";
 
 export const IMPORTANT_MODIFIER = "!";
 
@@ -23,12 +23,13 @@ const createResultObject = (
   hasImportantModifier: boolean,
   baseClassName: string,
   maybePostfixModifierPosition?: number,
+  isExternal?: boolean,
 ): ParsedClassName => ({
   modifiers,
   hasImportantModifier,
   baseClassName,
   maybePostfixModifierPosition,
-  isExternal: undefined,
+  isExternal,
 });
 
 /** Parse a class name into modifiers, base name, and postfix position. */
@@ -92,4 +93,29 @@ export const parseClassName = (className: string): ParsedClassName => {
     baseClassName,
     maybePostfixModifierPosition,
   );
+};
+
+/** Wrap the core parser with optional `prefix` and `experimentalParseClassName`. */
+export const createParseClassName = (config: AnyConfig) => {
+  let parse = parseClassName;
+
+  if (config.prefix) {
+    const fullPrefix = config.prefix + ":";
+    const previous = parse;
+
+    parse = (className: string) =>
+      className.startsWith(fullPrefix)
+        ? previous(className.slice(fullPrefix.length))
+        : createResultObject([], false, className, undefined, true);
+  }
+
+  if (config.experimentalParseClassName) {
+    const previous = parse;
+    const experimentalParseClassName = config.experimentalParseClassName;
+
+    parse = (className: string) =>
+      experimentalParseClassName({className, parseClassName: previous});
+  }
+
+  return parse;
 };

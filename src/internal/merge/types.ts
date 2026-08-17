@@ -11,11 +11,46 @@
 export type ClassNameValue = ClassNameArray | string | null | undefined | 0 | 0n | false;
 type ClassNameArray = readonly ClassNameValue[];
 
+/**
+ * Type of param passed to the `experimentalParseClassName` function.
+ *
+ * This is an experimental feature and may introduce breaking changes in any minor version update.
+ */
+export interface ExperimentalParseClassNameParam {
+  className: string;
+  parseClassName(className: string): ParsedClassName;
+}
+
+/**
+ * The static part of the merger configuration. When merging multiple configurations,
+ * the properties of this interface are always overridden.
+ */
+export interface ConfigStaticPart {
+  /**
+   * Integer indicating size of LRU cache used for memoizing results.
+   * - Cache might be up to twice as big as `cacheSize`
+   * - No cache is used for values <= 0
+   */
+  cacheSize: number;
+  /**
+   * Prefix added to Tailwind-generated classes.
+   * Classes must start with `prefix + ":"` (e.g. `tw:px-2`); otherwise they are external.
+   */
+  prefix?: string;
+  /**
+   * Allows to customize parsing of individual classes passed to the merger.
+   * All classes passed outside of cache hits are passed to this function before it is
+   * determined whether the class is a valid Tailwind CSS class.
+   *
+   * This is an experimental feature and may introduce breaking changes in any minor version update.
+   */
+  experimentalParseClassName?(param: ExperimentalParseClassNameParam): ParsedClassName;
+}
+
 /** Built-in merger configuration shape. */
-export type Config<ClassGroupIds extends string, ThemeGroupIds extends string> = ConfigGroupsPart<
-  ClassGroupIds,
-  ThemeGroupIds
->;
+export interface Config<ClassGroupIds extends string, ThemeGroupIds extends string>
+  extends ConfigStaticPart,
+    ConfigGroupsPart<ClassGroupIds, ThemeGroupIds> {}
 
 /**
  * Result of parsing a single class name into its parts.
@@ -566,7 +601,7 @@ export type AnyThemeGroupIds = string;
 export type AnyConfig = Config<AnyClassGroupIds, AnyThemeGroupIds>;
 
 /** Merger config: `override` replaces class groups, `extend` appends to them. */
-export interface ConfigExtension {
+export interface ConfigExtension extends Partial<ConfigStaticPart> {
   override?: Partial<AnyConfig>;
   extend?: Partial<AnyConfig>;
 }

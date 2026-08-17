@@ -10,5 +10,4 @@ export default defineConfig({
   minify: false,
   treeshake: true,
   splitting: true,
-  external: ["tailwind-merge"],
 });

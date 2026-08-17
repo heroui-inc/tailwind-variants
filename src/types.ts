@@ -1,4 +1,4 @@
-import type {TVConfig} from "./config.js";
+import type {TVConfig, TVLiteConfig} from "./config.js";
 import type {ClassNameValue as ClassValue} from "./internal/merge/types.js";
 
 export type {ClassValue};
@@ -670,7 +670,7 @@ export interface TV {
   ): TVReturnType<V, S, B, EV, ES, E>;
 }
 
-/** Lite `tv` factory (no per-call config). Same signature as {@link TV}. */
+/** Lite `tv` factory. Per-call config accepts `twMerge` only. */
 export interface TVLite {
   <
     V extends TVVariantsConstraint = {},
@@ -699,6 +699,7 @@ export interface TVLite {
         NoInfer<EV>
       >;
     },
+    config?: TVLiteConfig,
   ): TVReturnType<V, S, B, EV, ES, E>;
 }
 

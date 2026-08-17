@@ -1,7 +1,7 @@
-import type {AnyClassGroupIds, AnyConfig} from "./types.js";
+import type {AnyClassGroupIds, AnyConfig, ParsedClassName} from "./types.js";
 
 import {createClassGroupUtils} from "./class-group-utils.js";
-import {IMPORTANT_MODIFIER, parseClassName} from "./parse-class-name.js";
+import {createParseClassName, IMPORTANT_MODIFIER} from "./parse-class-name.js";
 import {createSortModifiers} from "./sort-modifiers.js";
 
 export type ConfigUtils = ReturnType<typeof createConfigUtils>;
@@ -20,6 +20,7 @@ const DESCRIPTOR_CACHE_SIZE = 4096;
 const MAX_CONFLICT_KEYS = 16384;
 
 export const createConfigUtils = (config: AnyConfig) => {
+  const parseClassName = createParseClassName(config);
   const sortModifiers = createSortModifiers(config);
   const postfixLookupClassGroupIds = createPostfixLookupClassGroupIds(config);
   const {getClassGroupId, getConflictingClassGroupIds} = createClassGroupUtils(config);
@@ -85,14 +86,14 @@ export const createConfigUtils = (config: AnyConfig) => {
     return id;
   };
 
-  const computeClassDescriptor = (originalClassName: string): ClassDescriptor => {
+  const computeClassDescriptor = (parsed: ParsedClassName): ClassDescriptor => {
     const {
       isExternal,
       modifiers,
       hasImportantModifier,
       baseClassName,
       maybePostfixModifierPosition,
-    } = parseClassName(originalClassName);
+    } = parsed;
 
     if (isExternal) {
       return EXTERNAL_DESCRIPTOR;
@@ -156,6 +157,9 @@ export const createConfigUtils = (config: AnyConfig) => {
   };
 
   const getClassDescriptor = (originalClassName: string): ClassDescriptor => {
+    // Always parse so prefix / experimentalParseClassName run outside whole-string cache hits.
+    const parsed = parseClassName(originalClassName);
+
     let descriptor = descriptorCache[originalClassName];
     if (descriptor !== undefined) {
       return descriptor;
@@ -163,7 +167,7 @@ export const createConfigUtils = (config: AnyConfig) => {
 
     descriptor = previousDescriptorCache[originalClassName];
     if (descriptor === undefined) {
-      descriptor = computeClassDescriptor(originalClassName);
+      descriptor = computeClassDescriptor(parsed);
     }
 
     descriptorCache[originalClassName] = descriptor;

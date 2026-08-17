@@ -75,13 +75,15 @@ void slotReturnsExactlyString;
 // @ts-expect-error full createTV requires a config object
 createTV();
 
-// @ts-expect-error lite createTV rejects configuration
 createLiteTV({twMerge: false});
+createLiteTV({twMerge: (classList) => classList});
 
-// @ts-expect-error lite tv has no per-component config argument
 liteTV({base: "block"}, {twMerge: false});
 
-// @ts-expect-error twMerge must be boolean
+// @ts-expect-error lite tv does not accept twMergeConfig
+liteTV({base: "block"}, {twMergeConfig: {}});
+
+// @ts-expect-error twMerge must be boolean or a function
 const invalidConfig: TVConfig = {twMerge: "yes"};
 
 void invalidConfig;

@@ -1,3 +1,5 @@
+import type {ExperimentalParseClassNameParam} from "../internal/merge/types.js";
+
 import {afterEach, describe, expect, test} from "vitest";
 
 import {cn, cnMerge, createTV, tv} from "../index";
@@ -94,6 +96,90 @@ describe("createMerger", () => {
     expect(merge.mergeString("w-1/2 w-full")).toBe("w-full");
     expect(merge.mergeString("text-[21px] text-lg")).toBe("text-lg");
     expect(merge.mergeString("bg-[#000] bg-red-500")).toBe("bg-red-500");
+  });
+
+  test("prefix merges prefixed classes and treats unprefixed as external", () => {
+    const merge = createMerger({prefix: "tw"});
+
+    expect(merge.mergeString("tw:px-2 tw:px-4")).toBe("tw:px-4");
+    expect(merge.mergeString("px-2 px-4")).toBe("px-2 px-4");
+  });
+
+  test("cacheSize 0 re-invokes experimentalParseClassName; default cache does not", () => {
+    let calls = 0;
+    const experimentalParseClassName = ({
+      className,
+      parseClassName,
+    }: ExperimentalParseClassNameParam) => {
+      calls += 1;
+      return parseClassName(className);
+    };
+
+    const uncached = createMerger({
+      cacheSize: 0,
+      experimentalParseClassName,
+    });
+
+    expect(uncached.mergeString("px-2 px-4")).toBe("px-4");
+    const afterFirst = calls;
+    expect(afterFirst).toBeGreaterThan(0);
+    expect(uncached.mergeString("px-2 px-4")).toBe("px-4");
+    expect(calls).toBeGreaterThan(afterFirst);
+
+    calls = 0;
+    const cached = createMerger({experimentalParseClassName});
+
+    expect(cached.mergeString("px-2 px-4")).toBe("px-4");
+    const afterCachedFirst = calls;
+    expect(afterCachedFirst).toBeGreaterThan(0);
+    expect(cached.mergeString("px-2 px-4")).toBe("px-4");
+    expect(calls).toBe(afterCachedFirst);
+  });
+});
+
+describe("default-config patches from tailwind-merge main", () => {
+  test("axis shorthands override logical sides", () => {
+    const merge = createMerger();
+
+    expect(merge.mergeString("ps-2 px-4")).toBe("px-4");
+    expect(merge.mergeString("pe-2 px-4")).toBe("px-4");
+    expect(merge.mergeString("px-4 ps-2")).toBe("px-4 ps-2");
+    expect(merge.mergeString("pbs-2 py-4")).toBe("py-4");
+    expect(merge.mergeString("ms-2 mx-4")).toBe("mx-4");
+    expect(merge.mergeString("mbe-2 my-4")).toBe("my-4");
+    expect(merge.mergeString("start-2 inset-x-4")).toBe("inset-x-4");
+    expect(merge.mergeString("end-2 inset-x-4")).toBe("inset-x-4");
+    expect(merge.mergeString("inset-bs-2 inset-y-4")).toBe("inset-y-4");
+    expect(merge.mergeString("border-s-2 border-x-4")).toBe("border-x-4");
+    expect(merge.mergeString("border-be-2 border-y-4")).toBe("border-y-4");
+    expect(merge.mergeString("border-s-red-500 border-x-blue-500")).toBe("border-x-blue-500");
+    expect(merge.mergeString("border-bs-red-500 border-y-blue-500")).toBe("border-y-blue-500");
+    expect(merge.mergeString("scroll-ms-2 scroll-mx-4")).toBe("scroll-mx-4");
+    expect(merge.mergeString("scroll-mbs-2 scroll-my-4")).toBe("scroll-my-4");
+    expect(merge.mergeString("scroll-ps-2 scroll-px-4")).toBe("scroll-px-4");
+    expect(merge.mergeString("scroll-pbe-2 scroll-py-4")).toBe("scroll-py-4");
+  });
+
+  test("shadow-inner conflicts with shadow utilities, not shadow color", () => {
+    const merge = createMerger();
+
+    expect(merge.mergeString("shadow-inner shadow-lg")).toBe("shadow-lg");
+    expect(merge.mergeString("shadow-lg shadow-inner")).toBe("shadow-inner");
+    expect(merge.mergeString("shadow-initial shadow-inner")).toBe("shadow-initial shadow-inner");
+  });
+
+  test("leading-none still merges when the leading theme scale is overridden", () => {
+    const merge = createMerger({
+      override: {
+        theme: {
+          leading: ["tight"],
+        },
+      },
+    });
+
+    expect(merge.mergeString("leading-tight leading-none")).toBe("leading-none");
+    expect(merge.mergeString("leading-none leading-tight")).toBe("leading-tight");
+    expect(merge.mergeString("leading-4 leading-none")).toBe("leading-none");
   });
 });
 
@@ -230,6 +316,13 @@ describe("cn / cnMerge with built-in merger", () => {
     const button = tvFactory({base: "text-foreground text-24-regular"});
 
     expect(button()).toBe("text-foreground text-24-regular");
+  });
+
+  test("createTV twMergeConfig prefix merges prefixed classes", () => {
+    const tvFactory = createTV({twMergeConfig: {prefix: "tw"}});
+    const button = tvFactory({base: "tw:px-2 tw:px-4"});
+
+    expect(button()).toBe("tw:px-4");
   });
 
   test("extend.conflictingClassGroups forces unrelated tokens to conflict", () => {

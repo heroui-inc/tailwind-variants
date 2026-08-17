@@ -1,6 +1,6 @@
 import {describe, expect, test, vi} from "vitest";
 
-import {cn, createTV, cx, tv} from "../lite";
+import {cn, createCN, createTV, cx, tv} from "../lite";
 
 /*
  * The lite entrypoint must never load the merge engine, so bundlers can drop
@@ -44,5 +44,22 @@ describe("lite entrypoint isolation", () => {
     expect(cn("px-2", "px-4")()).toBe("px-2 px-4");
     expect(cx("px-2", ["px-4"])).toBe("px-2 px-4");
     expect(createTV()({base: "m-1 m-2"})()).toBe("m-1 m-2");
+  });
+
+  test("createTV injects a merge function without loading the engine", () => {
+    const tv = createTV({
+      twMerge: (s) => s.replace("px-2", "px-8"),
+    });
+
+    expect(tv({base: "px-2 px-4"})()).toBe("px-8 px-4");
+  });
+
+  test("createCN injects a merge function without loading the engine", () => {
+    const cn = createCN({
+      twMerge: (s) => s.replace("px-2", "px-8"),
+    });
+
+    expect(cn("px-2", "px-4")).toBe("px-8 px-4");
+    expect(createCN()).toBe(cx);
   });
 });

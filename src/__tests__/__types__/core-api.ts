@@ -6,10 +6,11 @@ import type {
   TVReturnType,
   VariantProps,
 } from "../../index.js";
+import type {TVConfig, TVLiteConfig, TwMergeFn} from "../../lite.js";
 import type {Assert, Extends, IsEqual} from "./test-utils.js";
 
 import {createTV, tv} from "../../index.js";
-import {createTV as createLiteTV, tv as liteTV} from "../../lite.js";
+import {createCN, createTV as createLiteTV, tv as liteTV} from "../../lite.js";
 
 // Case: infer callable props, return type, and VariantProps from basic variants.
 const button = tv({
@@ -525,11 +526,36 @@ liteChild({tone: "neutral", size: "sm", weight: "bold"});
 // @ts-expect-error full createTV requires a config object
 createTV();
 
-// @ts-expect-error lite createTV takes no arguments
-createLiteTV({twMerge: false});
+const liteWithMerge: TVLite = createLiteTV({twMerge: (classList) => classList});
 
-// @ts-expect-error TVLite has no per-component config argument
+void liteWithMerge;
+
 liteTV({base: "block"}, {twMerge: false});
+liteTV({base: "block"}, {twMerge: (classList) => classList});
+
+// @ts-expect-error lite factory does not accept twMergeConfig
+createLiteTV({twMergeConfig: {}});
+
+// @ts-expect-error lite factory does not accept debug
+createLiteTV({debug: true});
+
+// @ts-expect-error lite per-call config does not accept twMergeConfig
+liteTV({base: "block"}, {twMergeConfig: {}});
+
+const identity: TwMergeFn = (classList) => classList;
+const liteConfig: TVLiteConfig = {twMerge: identity};
+const _fullConfig: TVConfig = {twMerge: identity, debug: false};
+
+void createLiteTV(liteConfig);
+void _fullConfig;
+
+const boundCn = createCN({twMerge: identity});
+const boundOut: string = boundCn("px-2", "px-4");
+
+void boundOut;
+
+// @ts-expect-error createCN does not accept twMergeConfig
+createCN({twMergeConfig: {}});
 
 // Case: single-signature TV contextually types wrapper parameters; no
 // annotations or assertions needed, and the return type stays checked.
