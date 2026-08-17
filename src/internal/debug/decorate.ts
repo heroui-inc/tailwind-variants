@@ -1,7 +1,7 @@
 /*
- * Diagnostics decorator, injected into `tv` the same way `cn` is. The
- * environment is picked once at module scope so a bundler can fold the
- * `NODE_ENV` ternary and drop the development branch from production builds.
+ * Diagnostics decorator, injected into `tv` the same way `cn` is. A bundler
+ * that replaces `process.env.NODE_ENV` can fold this ternary and drop the
+ * development branch from production builds.
  */
 
 import type {ResolvedOptions, RuntimeComponent} from "../types.js";
@@ -27,14 +27,5 @@ const developmentDiagnostics: Diagnostics = (component, resolved, attachMetadata
 
 const productionDiagnostics: Diagnostics = (component) => component;
 
-const isDevelopment = (): boolean => {
-  try {
-    return process.env.NODE_ENV !== "production";
-  } catch {
-    return false;
-  }
-};
-
-export const diagnostics: Diagnostics = isDevelopment()
-  ? developmentDiagnostics
-  : productionDiagnostics;
+export const diagnostics: Diagnostics =
+  process.env.NODE_ENV !== "production" ? developmentDiagnostics : productionDiagnostics;
