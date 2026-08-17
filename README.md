@@ -38,7 +38,7 @@ yarn add tailwind-variants
 pnpm add tailwind-variants
 ```
 
-**Lite mode:** import from `tailwind-variants/lite` for a smaller bundle without conflict resolution.
+**Lite:** import from `tailwind-variants/lite` for a smaller bundle without conflict resolution.
 
 **Upgrading?**
 
@@ -84,8 +84,8 @@ button({ size: "sm", color: "secondary" });
 
 ## Conflict Resolution
 
-Conflict resolution is built into the default entry — no extra package is required. It is available
-on `tv`, `createTV`, `cn`, and `cnMerge` (`cx` and `/lite` do not merge).
+Conflict resolution is built into the default entry. No extra package is required. It is available
+on `tv`, `createTV`, `cn`, and `cnMerge`. `cx` does not merge.
 
 ```js
 import { tv, cn } from "tailwind-variants";
@@ -97,7 +97,7 @@ tv({ base: "px-2", variants: { size: { lg: "px-4" } } })({ size: "lg" }); // => 
 
 ### Custom configuration
 
-Pass `twMergeConfig` to teach the resolver about custom utilities. Prefer `{ extend, override }` —
+Pass `twMergeConfig` to teach the resolver about custom utilities. Prefer `{ extend, override }`.
 `extend` appends to the defaults, `override` replaces them:
 
 ```ts
@@ -120,8 +120,8 @@ Disable merging with `{ twMerge: false }` on `tv`, `createTV`, or `cnMerge`.
 
 ### Reusing a `tailwind-merge` config
 
-If you already configure `extendTailwindMerge`, reuse the same config object as `twMergeConfig`
-(pass the object — not the returned merge function):
+If you already use `extendTailwindMerge`, reuse the same config object as `twMergeConfig`.
+Pass the object, not the returned merge function:
 
 ```ts
 import { extendTailwindMerge } from "tailwind-merge";
@@ -139,8 +139,20 @@ extendTailwindMerge(mergeConfig);
 createTV({ twMergeConfig: mergeConfig });
 ```
 
-For `createTailwindMerge`, move the custom parts of the factory into `{ extend, override }` and pass
-that object. Merge functions and full default configs cannot be passed directly.
+### Lite build
+
+Import from `tailwind-variants/lite` when you do not need the built-in table.
+Inject a function if you already have one:
+
+```ts
+import { createCN, createTV } from "tailwind-variants/lite";
+import { twMerge } from "tailwind-merge";
+
+export const tv = createTV({ twMerge });
+export const cn = createCN({ twMerge });
+```
+
+`createTV` does not bind `cn`. `twMergeConfig` and `debug` are default-entry only.
 
 ## Composition
 
@@ -198,6 +210,8 @@ code, no overhead, and recipe behavior remains identical. The `/lite` entry does
 | `cx`      | Concatenate class names (no merging)                 |
 | `cn`      | Concatenate and merge with the default config        |
 | `cnMerge` | Concatenate and merge, with optional per-call config |
+
+On `/lite`, `cn` only joins. Use `createCN({ twMerge })` to bind a merger.
 
 ```js
 import { cx, cn, cnMerge } from "tailwind-variants";
