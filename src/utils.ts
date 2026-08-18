@@ -12,34 +12,20 @@ export const removeExtraSpaces = (str: string): string => {
   return str.replace(SPACE_REGEX, " ").trim();
 };
 
+// Doubled spaces, or a tab..carriage-return / NBSP character anywhere.
+const NON_NORMAL_WHITESPACE = / {2}|[\t-\r\u00a0]/;
+
 /** True when the joined string has leading, trailing, doubled, or non-space whitespace. */
 const stringNeedsNormalize = (str: string): boolean => {
   const len = str.length;
 
   if (len === 0) return false;
 
-  const first = str.charCodeAt(0);
-  const last = str.charCodeAt(len - 1);
-
-  if (
-    first === 32 ||
-    last === 32 ||
-    (first >= 9 && first <= 13) ||
-    first === 160 ||
-    (last >= 9 && last <= 13) ||
-    last === 160
-  ) {
-    return true;
-  }
-
-  for (let i = 0; i < len; i++) {
-    const code = str.charCodeAt(i);
-
-    if ((code >= 9 && code <= 13) || code === 160) return true;
-    if (code === 32 && i + 1 < len && str.charCodeAt(i + 1) === 32) return true;
-  }
-
-  return false;
+  // The compiled regex scan beats a charCodeAt loop; edge spaces are cheaper
+  // to check directly than to fold into the pattern.
+  return (
+    str.charCodeAt(0) === 32 || str.charCodeAt(len - 1) === 32 || NON_NORMAL_WHITESPACE.test(str)
+  );
 };
 
 /**
@@ -104,7 +90,7 @@ export const isEqual = (obj1: object, obj2: object): boolean => {
   for (let i = 0; i < keys1.length; i++) {
     const key = keys1[i];
 
-    if (!keys2.includes(key)) return false;
+    if (!Object.hasOwn(record2, key)) return false;
     if (record1[key] !== record2[key]) return false;
   }
 
@@ -152,16 +138,12 @@ export function flatArray<T>(arr: unknown[]): T[] {
 }
 
 export const flatMergeArrays = <T>(...arrays: unknown[][]): T[] => {
+  // `flat` already drops falsy elements, so the result needs no second pass.
   const result: T[] = [];
 
   flat(arrays, result);
-  const filtered: T[] = [];
 
-  for (let i = 0; i < result.length; i++) {
-    if (result[i]) filtered.push(result[i]);
-  }
-
-  return filtered;
+  return result;
 };
 
 const isPlainObject = (value: unknown): value is Record<string, unknown> =>

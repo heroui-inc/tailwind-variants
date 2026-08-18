@@ -1,8 +1,6 @@
 import type {TVConfig} from "../config.js";
 import type {AnyRecord, CnAdapter, CompiledCompoundSlot, CompiledCompoundVariant} from "./types.js";
 
-import {falsyToString} from "../utils.js";
-
 const VARIANT_CACHE_LIMIT = 256;
 const OVERRIDE_CACHE_LIMIT = 128;
 
@@ -36,31 +34,23 @@ const serializeFingerprintValue = (value: unknown): string | null => {
   if (value === undefined) return "";
   if (value === null) return "null";
 
-  if (typeof value === "string") return value;
-  if (typeof value === "boolean") return value ? "true" : "false";
-  if (typeof value === "number") return value === 0 ? "0" : String(value);
-  if (typeof value === "bigint") return String(value);
+  const type = typeof value;
 
-  const mapped = falsyToString(value as any);
-  const mappedType = typeof mapped;
+  if (type === "string") return value as string;
+  if (type === "boolean") return value ? "true" : "false";
+  // `String(NaN)` / `String(Infinity)` stay distinct from "null", so top-level
+  // numbers never need the finite check.
+  if (type === "number" || type === "bigint") return String(value);
 
-  if (
-    mappedType === "string" ||
-    mappedType === "number" ||
-    mappedType === "boolean" ||
-    mappedType === "bigint"
-  ) {
-    return String(mapped);
-  }
-
-  if (mappedType === "object") {
+  if (type === "object") {
     try {
-      return JSON.stringify(mapped, stringifyFiniteOrThrow);
+      return JSON.stringify(value, stringifyFiniteOrThrow);
     } catch {
       return null;
     }
   }
 
+  // Functions and symbols cannot be serialized losslessly.
   return null;
 };
 
@@ -340,49 +330,6 @@ const resolvePropValue = (
   return value;
 };
 
-const collectExtraKeys = (
-  variantKeys: string[],
-  defaultVariants: AnyRecord,
-  props?: AnyRecord,
-  slotProps?: AnyRecord,
-): string[] => {
-  const seen: Record<string, 1> = Object.create(null);
-
-  for (let i = 0; i < variantKeys.length; i++) {
-    seen[variantKeys[i]] = 1;
-  }
-
-  const extras: string[] = [];
-
-  for (const key in defaultVariants) {
-    if (key === "class" || key === "className" || seen[key]) continue;
-    seen[key] = 1;
-    extras.push(key);
-  }
-
-  if (props) {
-    for (const key in props) {
-      if (key === "class" || key === "className" || seen[key] || props[key] === undefined) continue;
-      seen[key] = 1;
-      extras.push(key);
-    }
-  }
-
-  if (slotProps) {
-    for (const key in slotProps) {
-      if (key === "class" || key === "className" || seen[key] || slotProps[key] === undefined) {
-        continue;
-      }
-      seen[key] = 1;
-      extras.push(key);
-    }
-  }
-
-  if (extras.length > 1) extras.sort();
-
-  return extras;
-};
-
 const walkKey = <T>(
   node: PropsNode<T>,
   token: string,
@@ -426,11 +373,74 @@ export const createPropsCache = <T>(
   let secondary: PropsNode<T> | null = null;
   let size = 0;
 
+  // Built once; extras are prop keys outside the recipe's variant axes.
+  const variantKeySet: Record<string, 1> = Object.create(null);
+
+  for (let i = 0; i < variantKeys.length; i++) {
+    variantKeySet[variantKeys[i]] = 1;
+  }
+
+  /**
+   * Keys beyond `variantKeys` that feed the cache key. `null` when there are
+   * none (the common case), so nothing is allocated per lookup.
+   */
+  const collectExtraKeys = (
+    defaultVariants: AnyRecord,
+    props?: AnyRecord,
+    slotProps?: AnyRecord,
+  ): string[] | null => {
+    let extras: string[] | null = null;
+    let seen: Record<string, 1> | null = null;
+
+    for (const key in defaultVariants) {
+      if (key === "class" || key === "className" || variantKeySet[key]) continue;
+      (seen ??= Object.create(null))[key] = 1;
+      (extras ??= []).push(key);
+    }
+
+    if (props) {
+      for (const key in props) {
+        if (
+          key === "class" ||
+          key === "className" ||
+          variantKeySet[key] ||
+          seen?.[key] ||
+          props[key] === undefined
+        ) {
+          continue;
+        }
+        (seen ??= Object.create(null))[key] = 1;
+        (extras ??= []).push(key);
+      }
+    }
+
+    if (slotProps) {
+      for (const key in slotProps) {
+        if (
+          key === "class" ||
+          key === "className" ||
+          variantKeySet[key] ||
+          seen?.[key] ||
+          slotProps[key] === undefined
+        ) {
+          continue;
+        }
+        (seen ??= Object.create(null))[key] = 1;
+        (extras ??= []).push(key);
+      }
+    }
+
+    if (extras && extras.length > 1) extras.sort();
+
+    return extras;
+  };
+
   const lookup = (
     root: PropsNode<T>,
     defaultVariants: AnyRecord,
     props: AnyRecord | undefined,
     slotProps: AnyRecord | undefined,
+    extras: string[] | null,
     create: boolean,
   ): PropsNode<T> | typeof UNCACHEABLE | undefined => {
     let node: PropsNode<T> | undefined = root;
@@ -447,19 +457,19 @@ export const createPropsCache = <T>(
       if (!node) return undefined;
     }
 
-    const extras = collectExtraKeys(variantKeys, defaultVariants, props, slotProps);
+    if (extras) {
+      for (let i = 0; i < extras.length; i++) {
+        const key = extras[i];
+        const serialized = serializeFingerprintValue(
+          resolvePropValue(key, defaultVariants, props, slotProps),
+        );
 
-    for (let i = 0; i < extras.length; i++) {
-      const key = extras[i];
-      const serialized = serializeFingerprintValue(
-        resolvePropValue(key, defaultVariants, props, slotProps),
-      );
+        if (serialized === null) return UNCACHEABLE;
 
-      if (serialized === null) return UNCACHEABLE;
+        node = walkKey(node, key + "\0" + serialized, create);
 
-      node = walkKey(node, key + "\0" + serialized, create);
-
-      if (!node) return undefined;
+        if (!node) return undefined;
+      }
     }
 
     return node;
@@ -467,19 +477,20 @@ export const createPropsCache = <T>(
 
   return {
     get(defaultVariants, props, slotProps) {
-      const node = lookup(primary, defaultVariants, props, slotProps, false);
+      const extras = collectExtraKeys(defaultVariants, props, slotProps);
+      const node = lookup(primary, defaultVariants, props, slotProps, extras, false);
 
       if (node === UNCACHEABLE) return UNCACHEABLE;
 
       if (node && node.hasLeaf) return node.leaf as T;
 
       if (secondary) {
-        const fallback = lookup(secondary, defaultVariants, props, slotProps, false);
+        const fallback = lookup(secondary, defaultVariants, props, slotProps, extras, false);
 
         if (fallback === UNCACHEABLE) return UNCACHEABLE;
 
         if (fallback && fallback.hasLeaf) {
-          const promoted = lookup(primary, defaultVariants, props, slotProps, true);
+          const promoted = lookup(primary, defaultVariants, props, slotProps, extras, true);
 
           if (promoted !== UNCACHEABLE && promoted) {
             if (!promoted.hasLeaf) size++;
@@ -500,7 +511,8 @@ export const createPropsCache = <T>(
         size = 0;
       }
 
-      const node = lookup(primary, defaultVariants, props, slotProps, true);
+      const extras = collectExtraKeys(defaultVariants, props, slotProps);
+      const node = lookup(primary, defaultVariants, props, slotProps, extras, true);
 
       if (node === UNCACHEABLE || !node) return;
 

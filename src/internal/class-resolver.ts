@@ -341,7 +341,11 @@ const createVariantResolver = (resolved: ResolvedOptions, cn: CnAdapter): Runtim
 };
 
 type SlotsResult = Record<string, (slotProps?: AnyRecord) => string>;
-type SlotComputer = (propsRef?: AnyRecord, slotProps?: AnyRecord) => string;
+type SlotComputer = (
+  propsRef?: AnyRecord,
+  slotProps?: AnyRecord,
+  sharedCompleteProps?: AnyRecord,
+) => string;
 
 const createSlotsResolver = (resolved: ResolvedOptions, cn: CnAdapter): RuntimeComponent => {
   const {config, defaultVariants, deferredError, slots, variantKeys} = resolved;
@@ -385,9 +389,9 @@ const createSlotsResolver = (resolved: ResolvedOptions, cn: CnAdapter): RuntimeC
       const slotKey = keys[i];
       const compoundSlotsForKey = compoundSlotsBySlot[slotKey] ?? EMPTY_ARRAY;
 
-      computers[i] = (propsRef, slotProps) => {
+      computers[i] = (propsRef, slotProps, sharedCompleteProps) => {
         const completeProps = hasCompounds
-          ? getCompleteProps(defaultVariants, propsRef, slotProps)
+          ? (sharedCompleteProps ?? getCompleteProps(defaultVariants, propsRef, slotProps))
           : undefined;
         const compoundVariantClasses = completeProps
           ? getCompoundVariantClassesBySlot(slotKey, compoundVariants!, completeProps)
@@ -414,11 +418,14 @@ const createSlotsResolver = (resolved: ResolvedOptions, cn: CnAdapter): RuntimeC
     const computers = slotComputers!;
     const overrideMerge = mergeOverride!;
     const result: SlotsResult = {};
+    // Every slot resolves against the same effective props here; build them
+    // once per invocation instead of once per slot.
+    const sharedCompleteProps = hasCompounds ? getCompleteProps(defaultVariants, props) : undefined;
 
     for (let i = 0; i < slotKeys.length; i++) {
       const compute = computers[i];
       // Capture parent props for this result instance (not shared mutable state).
-      const core = compute(props);
+      const core = compute(props, undefined, sharedCompleteProps);
 
       result[slotKeys[i]] = (slotProps) => {
         if (slotProps == null) return core;

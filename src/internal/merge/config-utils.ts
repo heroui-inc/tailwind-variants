@@ -156,9 +156,16 @@ export const createConfigUtils = (config: AnyConfig) => {
     };
   };
 
+  // A user-supplied experimentalParseClassName may observe every merge, so it
+  // must run per token even on descriptor-cache hits. The built-in parsers
+  // (plain and prefix) are pure; their outcome is fully encoded in the cached
+  // descriptor, so re-parsing on a hit is skipped.
+  const alwaysParse = Boolean(config.experimentalParseClassName);
+
   const getClassDescriptor = (originalClassName: string): ClassDescriptor => {
-    // Always parse so prefix / experimentalParseClassName run outside whole-string cache hits.
-    const parsed = parseClassName(originalClassName);
+    let parsed: ParsedClassName | undefined;
+
+    if (alwaysParse) parsed = parseClassName(originalClassName);
 
     let descriptor = descriptorCache[originalClassName];
     if (descriptor !== undefined) {
@@ -167,7 +174,7 @@ export const createConfigUtils = (config: AnyConfig) => {
 
     descriptor = previousDescriptorCache[originalClassName];
     if (descriptor === undefined) {
-      descriptor = computeClassDescriptor(parsed);
+      descriptor = computeClassDescriptor(parsed ?? parseClassName(originalClassName));
     }
 
     descriptorCache[originalClassName] = descriptor;

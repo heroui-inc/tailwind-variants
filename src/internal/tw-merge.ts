@@ -301,8 +301,7 @@ export const cn = function cn(): CnReturn {
   const first = arguments[0];
 
   if (length === 1) {
-    const joined =
-      typeof first === "string" ? first : joinClassValue(first as JoinClassValue);
+    const joined = typeof first === "string" ? first : joinClassValue(first as JoinClassValue);
 
     return mergeStringDefault(joined);
   }
