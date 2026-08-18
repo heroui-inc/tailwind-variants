@@ -42,13 +42,43 @@ const stringNeedsNormalize = (str: string): boolean => {
   return false;
 };
 
-export const cx = <T extends CnOptions>(...classnames: T): CnReturn => {
-  const result = joinClassValue(classnames as JoinClassValue[]);
+/**
+ * Join class values. `function` + `arguments` so V8 does not allocate a rest
+ * array. String/falsy args stay on a twJoin-shaped loop; objects and arrays
+ * fall through. Normalize once on the joined result.
+ */
+export const cx = function cx(): CnReturn {
+  const length = arguments.length;
+  let result = "";
+  let index = 0;
+
+  for (; index < length; index++) {
+    const item = arguments[index];
+
+    if (!item && item !== 0 && item !== 0n) continue;
+    if (typeof item !== "string") break;
+
+    if (result) result += " ";
+    result += item;
+  }
+
+  for (; index < length; index++) {
+    const item = arguments[index] as JoinClassValue;
+
+    if (!item && item !== 0 && item !== 0n) continue;
+
+    const resolved = typeof item === "string" ? item : joinClassValue(item);
+
+    if (resolved) {
+      if (result) result += " ";
+      result += resolved;
+    }
+  }
 
   if (!result) return "";
 
   return stringNeedsNormalize(result) ? removeExtraSpaces(result) : result;
-};
+} as <T extends CnOptions>(...classnames: T) => CnReturn;
 
 export const falsyToString = <T>(value: T): T | string =>
   value === false ? "false" : value === true ? "true" : value === 0 ? "0" : value;

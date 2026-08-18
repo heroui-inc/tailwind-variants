@@ -69,8 +69,35 @@ export const createTailwindMerge = (createConfig: () => AnyConfig): TailwindMerg
     return result;
   };
 
-  const merge: TailwindMerge = (...args: ClassNameValue[]) =>
-    merge.mergeString(joinClassValue(args as JoinClassValue[]));
+  const merge: TailwindMerge = function (this: void): string {
+    const length = arguments.length;
+
+    if (length === 1) {
+      const only = arguments[0];
+
+      return typeof only === "string"
+        ? merge.mergeString(only)
+        : merge.mergeString(joinClassValue(only as JoinClassValue));
+    }
+
+    let joined = "";
+
+    for (let index = 0; index < length; index++) {
+      const item = arguments[index] as JoinClassValue;
+
+      if (!item && item !== 0 && item !== 0n) continue;
+
+      const resolved = typeof item === "string" ? item : joinClassValue(item);
+
+      if (!resolved) continue;
+
+      if (joined) joined += " ";
+      joined += resolved;
+    }
+
+    return merge.mergeString(joined);
+  } as TailwindMerge;
+
   merge.mergeString = initTailwindMerge;
   return merge;
 };

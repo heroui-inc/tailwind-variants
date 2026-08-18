@@ -170,7 +170,7 @@ const lookupArgCache = (
   firstKeyIndex: number,
   truthyStringCount: number,
   length: number,
-  getItem: (index: number) => unknown,
+  inputs: ArrayLike<unknown>,
 ): string | undefined => {
   let bucket = argCache.get(firstKey);
   if (bucket === undefined) bucket = previousArgCache.get(firstKey);
@@ -186,7 +186,7 @@ const lookupArgCache = (
     let isMatch = true;
 
     for (let index = firstKeyIndex + 1; index < length; index++) {
-      const item = getItem(index);
+      const item = inputs[index];
 
       if (!item) continue;
       if (item !== rest[restIndex++]) {
@@ -234,13 +234,7 @@ const mergeVariadicCached = (inputs: ArrayLike<unknown>): CnReturn => {
   if (truthyStringCount === 0) return "";
   if (truthyStringCount === 1) return mergeStringDefault(firstKey);
 
-  const cached = lookupArgCache(
-    firstKey,
-    firstKeyIndex,
-    truthyStringCount,
-    length,
-    (index) => inputs[index],
-  );
+  const cached = lookupArgCache(firstKey, firstKeyIndex, truthyStringCount, length, inputs);
   if (cached !== undefined) return cached;
 
   let joined = firstKey;
@@ -248,66 +242,6 @@ const mergeVariadicCached = (inputs: ArrayLike<unknown>): CnReturn => {
 
   for (let index = firstKeyIndex + 1; index < length; index++) {
     const item = inputs[index];
-
-    if (!item) continue;
-    joined += " " + (item as string);
-    rest.push(item as string);
-  }
-
-  const result = mergeStringDefault(joined);
-  storeArgCache(firstKey, rest, result);
-
-  return result;
-};
-
-/**
- * Probe/store arg-cache via getter (cn multi-arg reads `arguments` by index, so a hit copies nothing).
- */
-const mergeVariadicFromGetter = (length: number, getItem: (index: number) => unknown): CnReturn => {
-  let firstKey = "";
-  let firstKeyIndex = -1;
-  let truthyStringCount = 0;
-  let everyTruthyIsString = true;
-
-  for (let index = 0; index < length; index++) {
-    const item = getItem(index);
-
-    if (!item) continue;
-
-    if (typeof item !== "string") {
-      everyTruthyIsString = false;
-      break;
-    }
-
-    if (firstKeyIndex === -1) {
-      firstKey = item;
-      firstKeyIndex = index;
-    }
-
-    truthyStringCount++;
-  }
-
-  if (!everyTruthyIsString) {
-    const inputs: unknown[] = new Array(length);
-
-    for (let index = 0; index < length; index++) {
-      inputs[index] = getItem(index);
-    }
-
-    return mergeStringDefault(joinArgs(inputs as CnOptions));
-  }
-
-  if (truthyStringCount === 0) return "";
-  if (truthyStringCount === 1) return mergeStringDefault(firstKey);
-
-  const cached = lookupArgCache(firstKey, firstKeyIndex, truthyStringCount, length, getItem);
-  if (cached !== undefined) return cached;
-
-  let joined = firstKey;
-  const rest: string[] = [];
-
-  for (let index = firstKeyIndex + 1; index < length; index++) {
-    const item = getItem(index);
 
     if (!item) continue;
     joined += " " + (item as string);
@@ -367,23 +301,40 @@ export const cn = function cn(): CnReturn {
   const first = arguments[0];
 
   if (length === 1) {
-    const joined = typeof first === "string" ? first : joinArgs([first] as CnOptions);
+    const joined =
+      typeof first === "string" ? first : joinClassValue(first as JoinClassValue);
 
     return mergeStringDefault(joined);
   }
 
+  // Copy values only. Never pass `arguments` out of this function: that would
+  // materialize it and deopt the single-arg path above.
   if (IS_V8) {
-    // Capture length; read by index only, so an arg-cache hit allocates no array.
-    return mergeVariadicFromGetter(length, (index) => arguments[index]);
+    const inputs: unknown[] = new Array(length);
+
+    for (let index = 0; index < length; index++) {
+      inputs[index] = arguments[index];
+    }
+
+    return mergeVariadicCached(inputs);
   }
 
-  const inputs: unknown[] = new Array(length);
+  let joined = "";
 
   for (let index = 0; index < length; index++) {
-    inputs[index] = arguments[index];
+    const item = arguments[index] as JoinClassValue;
+
+    if (!item && item !== 0 && item !== 0n) continue;
+
+    const resolved = typeof item === "string" ? item : joinClassValue(item);
+
+    if (!resolved) continue;
+
+    if (joined) joined += " ";
+    joined += resolved;
   }
 
-  return mergeStringDefault(joinArgs(inputs as CnOptions));
+  return mergeStringDefault(joined);
 } as <T extends CnOptions>(...classnames: T) => CnReturn;
 
 /**

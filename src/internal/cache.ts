@@ -312,6 +312,210 @@ export const createBoundedCache = <T>(limit = VARIANT_CACHE_LIMIT): BoundedCache
   };
 };
 
+export const UNCACHEABLE = Symbol("tv-uncacheable");
+
+type PropsNode<T> = {
+  children: Map<string, PropsNode<T>>;
+  hasLeaf: boolean;
+  leaf: T | undefined;
+};
+
+const createPropsNode = <T>(): PropsNode<T> => ({
+  children: new Map(),
+  hasLeaf: false,
+  leaf: undefined,
+});
+
+const resolvePropValue = (
+  key: string,
+  defaultVariants: AnyRecord,
+  props?: AnyRecord,
+  slotProps?: AnyRecord,
+): unknown => {
+  let value = defaultVariants[key];
+
+  if (props && props[key] !== undefined) value = props[key];
+  if (slotProps && slotProps[key] !== undefined) value = slotProps[key];
+
+  return value;
+};
+
+const collectExtraKeys = (
+  variantKeys: string[],
+  defaultVariants: AnyRecord,
+  props?: AnyRecord,
+  slotProps?: AnyRecord,
+): string[] => {
+  const seen: Record<string, 1> = Object.create(null);
+
+  for (let i = 0; i < variantKeys.length; i++) {
+    seen[variantKeys[i]] = 1;
+  }
+
+  const extras: string[] = [];
+
+  for (const key in defaultVariants) {
+    if (key === "class" || key === "className" || seen[key]) continue;
+    seen[key] = 1;
+    extras.push(key);
+  }
+
+  if (props) {
+    for (const key in props) {
+      if (key === "class" || key === "className" || seen[key] || props[key] === undefined) continue;
+      seen[key] = 1;
+      extras.push(key);
+    }
+  }
+
+  if (slotProps) {
+    for (const key in slotProps) {
+      if (key === "class" || key === "className" || seen[key] || slotProps[key] === undefined) {
+        continue;
+      }
+      seen[key] = 1;
+      extras.push(key);
+    }
+  }
+
+  if (extras.length > 1) extras.sort();
+
+  return extras;
+};
+
+const walkKey = <T>(
+  node: PropsNode<T>,
+  token: string,
+  create: boolean,
+): PropsNode<T> | undefined => {
+  let next = node.children.get(token);
+
+  if (!next) {
+    if (!create) return undefined;
+    next = createPropsNode<T>();
+    node.children.set(token, next);
+  }
+
+  return next;
+};
+
+export type PropsCache<T> = {
+  get(
+    defaultVariants: AnyRecord,
+    props?: AnyRecord,
+    slotProps?: AnyRecord,
+  ): T | CacheMiss | typeof UNCACHEABLE;
+  set(
+    defaultVariants: AnyRecord,
+    props: AnyRecord | undefined,
+    slotProps: AnyRecord | undefined,
+    value: T,
+  ): void;
+  clear(): void;
+};
+
+/**
+ * Nested props cache. Same key space as `buildPropsFingerprint`, but the hot
+ * path walks Maps instead of concatenating one string.
+ */
+export const createPropsCache = <T>(
+  variantKeys: string[],
+  limit = VARIANT_CACHE_LIMIT,
+): PropsCache<T> => {
+  let primary = createPropsNode<T>();
+  let secondary: PropsNode<T> | null = null;
+  let size = 0;
+
+  const lookup = (
+    root: PropsNode<T>,
+    defaultVariants: AnyRecord,
+    props: AnyRecord | undefined,
+    slotProps: AnyRecord | undefined,
+    create: boolean,
+  ): PropsNode<T> | typeof UNCACHEABLE | undefined => {
+    let node: PropsNode<T> | undefined = root;
+
+    for (let i = 0; i < variantKeys.length; i++) {
+      const serialized = serializeFingerprintValue(
+        resolvePropValue(variantKeys[i], defaultVariants, props, slotProps),
+      );
+
+      if (serialized === null) return UNCACHEABLE;
+
+      node = walkKey(node, serialized, create);
+
+      if (!node) return undefined;
+    }
+
+    const extras = collectExtraKeys(variantKeys, defaultVariants, props, slotProps);
+
+    for (let i = 0; i < extras.length; i++) {
+      const key = extras[i];
+      const serialized = serializeFingerprintValue(
+        resolvePropValue(key, defaultVariants, props, slotProps),
+      );
+
+      if (serialized === null) return UNCACHEABLE;
+
+      node = walkKey(node, key + "\0" + serialized, create);
+
+      if (!node) return undefined;
+    }
+
+    return node;
+  };
+
+  return {
+    get(defaultVariants, props, slotProps) {
+      const node = lookup(primary, defaultVariants, props, slotProps, false);
+
+      if (node === UNCACHEABLE) return UNCACHEABLE;
+
+      if (node && node.hasLeaf) return node.leaf as T;
+
+      if (secondary) {
+        const fallback = lookup(secondary, defaultVariants, props, slotProps, false);
+
+        if (fallback === UNCACHEABLE) return UNCACHEABLE;
+
+        if (fallback && fallback.hasLeaf) {
+          const promoted = lookup(primary, defaultVariants, props, slotProps, true);
+
+          if (promoted !== UNCACHEABLE && promoted) {
+            if (!promoted.hasLeaf) size++;
+            promoted.hasLeaf = true;
+            promoted.leaf = fallback.leaf;
+          }
+
+          return fallback.leaf as T;
+        }
+      }
+
+      return CACHE_MISS;
+    },
+    set(defaultVariants, props, slotProps, value) {
+      if (size >= limit) {
+        secondary = primary;
+        primary = createPropsNode<T>();
+        size = 0;
+      }
+
+      const node = lookup(primary, defaultVariants, props, slotProps, true);
+
+      if (node === UNCACHEABLE || !node) return;
+
+      if (!node.hasLeaf) size++;
+      node.hasLeaf = true;
+      node.leaf = value;
+    },
+    clear() {
+      primary = createPropsNode<T>();
+      secondary = null;
+      size = 0;
+    },
+  };
+};
+
 const createNestedOverrideCache = (limit = OVERRIDE_CACHE_LIMIT): NestedOverrideCache => {
   let primary: Map<string, Map<string, string>> = new Map();
   let secondary: Map<string, Map<string, string>> | null = null;
