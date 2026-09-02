@@ -88,7 +88,12 @@ export const joinObjects = <T extends Record<string, unknown>, U extends Record<
   const target = obj1 as Record<string, any>;
 
   for (const key in obj2) {
-    if (Object.hasOwn(obj2, key)) {
+    // `hasOwnProperty.call` rather than `Object.hasOwn`, which is ES2022 and the single built-in
+    // in the shipped bundle above the ES2021 floor the emitted syntax already sets. It is reached
+    // whenever a definition extends a component with slots, so on iOS Safari 15.0-15.3 and on
+    // Hermes below React Native 0.68 `tv({extend: <slots component>})` throws a TypeError while
+    // everything else in the library works.
+    if (Object.prototype.hasOwnProperty.call(obj2, key)) {
       const val2 = obj2[key];
 
       if (key in target) {

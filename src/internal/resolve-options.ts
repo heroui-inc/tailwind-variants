@@ -6,7 +6,9 @@ import type {
   AnyRecord,
   CompiledCompoundSlot,
   CompiledCompoundVariant,
+  CompiledState,
   CompiledVariant,
+  CompoundIndex,
   ResolvedOptions,
 } from "./types.js";
 
@@ -19,6 +21,15 @@ const synchronizeTwMergeConfig = (config: TVConfig): void => {
     state.cachedTwMergeConfig = config.twMergeConfig!;
   }
 };
+
+/**
+ * A record with no prototype, so a consumer-supplied key never reads back an inherited member.
+ *
+ * `Object.create(null)` rather than the `{__proto__: null}` literal, which is faster in V8 but
+ * only typechecks against a record whose values admit `null` — and none of these do. Every caller
+ * here is a compile-time path, where the difference is unmeasurable.
+ */
+const createNullRecord = <TValue>(): Record<string, TValue> => Object.create(null);
 
 const compileVariants = (variants: AnyRecord, variantKeys: string[]): CompiledVariant[] => {
   const compiledVariants: CompiledVariant[] = [];
@@ -33,50 +44,114 @@ const compileVariants = (variants: AnyRecord, variantKeys: string[]): CompiledVa
   return compiledVariants;
 };
 
-const compileCompoundVariants = (compoundVariants: unknown): CompiledCompoundVariant[] => {
-  if (!Array.isArray(compoundVariants) || compoundVariants.length === 0) return [];
+/**
+ * Which keys a compound conditions on, read from the compound itself.
+ *
+ * `slots` is a condition on a compound VARIANT and metadata on a compound SLOT, which is the only
+ * difference between the two — so it is one parameter rather than two near-identical loops that
+ * can drift apart.
+ */
+const compileConditionKeys = (source: AnyRecord, withSlots: boolean): string[] => {
+  const conditionKeys: string[] = [];
+
+  for (const key in source) {
+    if (key === "class" || key === "className") continue;
+    if (withSlots && key === "slots") continue;
+
+    conditionKeys.push(key);
+  }
+
+  return conditionKeys;
+};
+
+/**
+ * The wrapper shape, in one place.
+ *
+ * Both callers below build the same thing from different inputs — one from the consumer's raw
+ * array, one from a previous index's entries — and the thing they build is what must not drift.
+ */
+const compileCompound = (source: AnyRecord, withSlots: boolean): CompiledCompoundVariant => ({
+  conditionKeys: compileConditionKeys(source, withSlots),
+  source,
+});
+
+const compileCompounds = (compounds: unknown, withSlots: boolean): CompiledCompoundVariant[] => {
+  if (!Array.isArray(compounds) || compounds.length === 0) return [];
   const result: CompiledCompoundVariant[] = [];
 
-  for (let i = 0; i < compoundVariants.length; i++) {
-    const compoundVariant = compoundVariants[i];
-    const conditionKeys: string[] = [];
-
-    for (const key in compoundVariant) {
-      if (key !== "class" && key !== "className") {
-        conditionKeys.push(key);
-      }
-    }
-
-    result.push({conditionKeys, source: compoundVariant});
-  }
+  for (let i = 0; i < compounds.length; i++) result.push(compileCompound(compounds[i], withSlots));
 
   return result;
 };
 
-const compileCompoundSlots = (compoundSlots: unknown): CompiledCompoundSlot[] => {
-  if (!Array.isArray(compoundSlots) || compoundSlots.length === 0) return [];
-  const result: CompiledCompoundSlot[] = [];
+// There is deliberately no "recompile the previous wrappers" path. Compiling from the compiled
+// copy carries its length forward, so an entry the consumer pushed after the definition was built
+// could never appear and one it spliced out could never leave. Every rebuild starts from the
+// consumer's own array instead — `compileCompounds` above — which is the same source the first
+// compile used and the same one change detection watches.
 
-  for (let i = 0; i < compoundSlots.length; i++) {
-    const compoundSlot = compoundSlots[i];
-    const conditionKeys: string[] = [];
+/**
+ * Every prop name a resolved class string can depend on: `matchesConditions` reads exactly
+ * `conditionKeys`, and every other prop read goes through `variantKeys`.
+ *
+ * Copied even when there is nothing to add, because `variantKeys` is also published as
+ * `component.variantKeys`. Handing the same array back would put a consumer-reachable object in
+ * the path that builds every cache key — a `push` on a public property would then quietly change
+ * which props a component's results are keyed by.
+ */
+export const collectDependencyKeys = (
+  variantKeys: string[],
+  compoundVariants: CompiledCompoundVariant[],
+  compoundSlots: CompiledCompoundSlot[],
+): string[] => {
+  if (compoundVariants.length === 0 && compoundSlots.length === 0) return [...variantKeys];
 
-    for (const key in compoundSlot) {
-      if (key !== "slots" && key !== "class" && key !== "className") {
-        conditionKeys.push(key);
+  const keys = [...variantKeys];
+  const seen: Record<string, 1> = createNullRecord();
+
+  for (let i = 0; i < variantKeys.length; i++) seen[variantKeys[i]] = 1;
+
+  const collectFrom = (compounds: CompiledCompoundVariant[]): void => {
+    for (let i = 0; i < compounds.length; i++) {
+      const {conditionKeys} = compounds[i];
+
+      for (let j = 0; j < conditionKeys.length; j++) {
+        const key = conditionKeys[j];
+
+        if (seen[key]) continue;
+
+        seen[key] = 1;
+        keys.push(key);
       }
     }
+  };
 
-    result.push({conditionKeys, source: compoundSlot});
-  }
+  collectFrom(compoundVariants);
+  collectFrom(compoundSlots);
 
-  return result;
+  return keys;
 };
+
+// Shared, and never written to — the loop below is the only writer and it does not run for an
+// empty list. Most definitions have no compound slots at all, and they should pay neither the
+// allocation nor the dictionary-mode cost a null-prototype object carries in V8.
+//
+// Exported so the resolver's placeholder index uses THIS empty record rather than a second one.
+// Null-prototype is the property that matters: a plain `{}` reports a dozen `Object.prototype`
+// members as present, so a slot named `constructor` would read `Object` out of an index that
+// holds nothing — and one empty record with the right prototype cannot drift from another.
+export const EMPTY_SLOT_INDEX: Record<string, CompiledCompoundSlot[]> = createNullRecord();
 
 const indexCompoundSlotsBySlot = (
   compiledCompoundSlots: CompiledCompoundSlot[],
 ): Record<string, CompiledCompoundSlot[]> => {
-  const index: Record<string, CompiledCompoundSlot[]> = {};
+  if (compiledCompoundSlots.length === 0) return EMPTY_SLOT_INDEX;
+
+  // A slot named after an `Object.prototype` member — `toString`, `constructor`, `valueOf` —
+  // otherwise finds the inherited value truthy in the guard below, so the array is never created
+  // and the push throws. Slot names are consumer strings, and `{}` reports a dozen of them as
+  // already present.
+  const index: Record<string, CompiledCompoundSlot[]> = createNullRecord();
 
   for (let i = 0; i < compiledCompoundSlots.length; i++) {
     const compoundSlot = compiledCompoundSlots[i];
@@ -94,6 +169,40 @@ const indexCompoundSlotsBySlot = (
 
   return index;
 };
+
+const buildCompoundIndex = (
+  compoundVariants: CompiledCompoundVariant[],
+  compoundSlots: CompiledCompoundSlot[],
+): CompoundIndex => ({
+  compoundVariants,
+  compoundSlots,
+  bySlot: indexCompoundSlotsBySlot(compoundSlots),
+});
+
+/**
+ * Re-derives every consequence of the compounds' condition key SETS, as one new index.
+ *
+ * Those key sets are captured when the definition compiles, and they are mutable metadata like
+ * the rest of it — deleting a key widens a compound, adding one narrows it. The tracker records
+ * them, so a change is detected; this is what makes the detection take effect rather than being
+ * noticed and ignored.
+ *
+ * Everything derived moves at once, because refreshing part of it is worse than refreshing none.
+ * `conditionKeys` is what the matcher reads and `bySlot` is what the slot computers render from;
+ * a reader that saw one refreshed and the other not would match a compound and then fail to find
+ * the slot it applies to. The caller's `collectDependencyKeys` result is the third derivation and
+ * is assigned in the same step for the same reason — a stale dependency list leaves an added key
+ * out of the cache key AND out of the props the computers see, which fails in opposite directions
+ * on the two paths.
+ */
+export const refreshCompoundIndex = (
+  compoundVariants: unknown,
+  compoundSlots: unknown,
+): CompoundIndex =>
+  buildCompoundIndex(
+    compileCompounds(compoundVariants, false),
+    compileCompounds(compoundSlots, true),
+  );
 
 export const resolveOptions = (options: AnyRecord, configProp?: TVConfig): ResolvedOptions => {
   const {
@@ -170,26 +279,33 @@ export const resolveOptions = (options: AnyRecord, configProp?: TVConfig): Resol
     slots,
     compoundVariants,
     compoundSlots,
-    compiledVariants: null,
-    compiledCompoundVariants: null,
-    compiledCompoundSlots: null,
-    compiledCompoundSlotsBySlot: null,
+    compiled: null,
     deferredError,
     mode,
-    slotKeys: null,
     variantKeys,
   };
 };
 
-export const compileResolvedOptions = (resolved: ResolvedOptions): ResolvedOptions => {
-  if (resolved.compiledVariants !== null) return resolved;
+/**
+ * Compiles a definition once and hands back the result.
+ *
+ * Returning the compiled state rather than the mutated options object is what removes the
+ * assertions at every consumer: the return type IS the proof that all of it is present.
+ */
+export const compileResolvedOptions = (resolved: ResolvedOptions): CompiledState => {
+  if (resolved.compiled !== null) return resolved.compiled;
 
-  resolved.compiledVariants = compileVariants(resolved.variants, resolved.variantKeys);
-  resolved.compiledCompoundVariants = compileCompoundVariants(resolved.compoundVariants);
-  resolved.compiledCompoundSlots = compileCompoundSlots(resolved.compoundSlots);
-  resolved.compiledCompoundSlotsBySlot = indexCompoundSlotsBySlot(resolved.compiledCompoundSlots);
-  resolved.slotKeys =
-    resolved.slots && typeof resolved.slots === "object" ? Object.keys(resolved.slots) : [];
+  resolved.compiled = {
+    variants: compileVariants(resolved.variants, resolved.variantKeys),
+    compounds: buildCompoundIndex(
+      compileCompounds(resolved.compoundVariants, false),
+      compileCompounds(resolved.compoundSlots, true),
+    ),
+    slotKeys: Object.keys(resolved.slots),
+    // Copied, because `resolved.variantKeys` is published as `component.variantKeys` — see the
+    // field's own note. Taken in the same pass as `compileVariants` above, off the same array.
+    variantKeys: [...resolved.variantKeys],
+  };
 
-  return resolved;
+  return resolved.compiled;
 };
