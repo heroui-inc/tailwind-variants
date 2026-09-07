@@ -30,8 +30,8 @@ Additional flags:
   round is reported.
 
 Each run queries npm for the latest published `tailwind-variants`,
-`class-variance-authority`, and `cnfast`, caches those exact packages in the system temporary
-directory, and runs two suites in order:
+`class-variance-authority`, and `cn` (shadcn-ui/cn), caches those exact packages in the system
+temporary directory, and runs two suites in order:
 
 ### Suite 1 · variants
 
@@ -39,17 +39,24 @@ directory, and runs two suites in order:
 - `tv(released-{version})`: the latest `tailwind-variants` published to npm.
 - `cva({version})`: the latest `class-variance-authority` published to npm.
 
-### Suite 2 · utilities (`cx` / `cn` vs `cnfast`)
+### Suite 2 · utilities (`cx` / `cn` vs shadcn-ui/cn)
 
 Compares equivalent class-utility APIs:
 
-| Scenario | TV / released | cnfast |
-| --- | --- | --- |
-| Join mixed values | `cx` | `clsx` |
-| Join string tokens | `cx` | `twJoin` |
-| Join and merge | `cn` | `cn` |
-| Curried merge with config | `cnMerge` | — |
-| Direct Tailwind merge | — | `twMerge` |
+| Scenario (id)                                          | TV / released                          | shadcn-ui/cn |
+| ------------------------------------------------------ | -------------------------------------- | ------------ |
+| cx / clsx (mixed) (`utilities/join-mixed`)             | `cx` (normalizing join)                | `clsx`       |
+| cx / twJoin (strings) (`utilities/join-tokens`)        | `cx` (normalizing join)                | `twJoin`     |
+| twJoin / twJoin (`utilities/tw-join`)                  | `twJoin`                               | `twJoin`     |
+| cn / cn (`utilities/merge`)                            | `cn`                                   | `cn`         |
+| cn / cn (stable args) (`utilities/cn-stable-args`)     | `cn(base, cond && extra, className)`   | same         |
+| cn / cn (new arbitrary) (`utilities/cn-arbitrary-arg`) | `cn(base, cond && extra, "w-[<n>px]")` | same         |
+| cnMerge (`utilities/cn-merge`)                         | `cnMerge`                              | —            |
+| twMerge / twMerge (`utilities/tw-merge`)               | `twMerge`                              | `twMerge`    |
+
+The two `cx` rows measure a different API shape: `cx` normalizes whitespace, keeps a numeric
+`0`, and accepts objects. The `cn` column is the published shadcn-ui/cn package. The `twJoin`
+and `twMerge` rows are like-for-like against it.
 
 The npm registry must be reachable even when packages are already cached, so the cache cannot
 silently turn a stale release into the baseline.
@@ -71,10 +78,31 @@ set `NO_COLOR=1` to disable ANSI colors.
 - Component construction never occurs inside an invocation-only scenario.
 - Lifecycle scenarios deliberately include both construction and invocation.
 - Variant-matrix throughput is batches per second, with five calls in each batch.
+- "Invoke hot" (`invocation/hot-same-props`) and "Invoke slots hot" (`invocation/slots-hot`)
+  call a pre-created component with one stable props object.
+- "Invoke hot + new className" (`invocation/hot-fresh-classname`) passes a new `className`
+  string with the same text on every call, the React render shape.
+- "Invoke SSR (unique className)" (`invocation/unique-classname`) passes a never-repeating
+  `className`, so every merge is a first sighting.
+- "Invoke compound-heavy" (`invocation/compounds-heavy`) runs a recipe with twelve compound
+  variants.
+- "Invoke lite + injected twMerge" (`invocation/lite-inject`) runs the lite entry with this
+  build's own `twMerge` injected. Builds whose lite entry ignores the function (3.3.1) skip it.
+- Every row has a stable `id` (`category/slug`). Names may change, ids and row order do not, so
+  JSON output and compare scripts key on `scenarioId`.
+- Every run prints the default entry's min+gzip size for the current build and the released
+  baseline, and writes it to JSON under `entrySizes`. `src/__tests__/entries.test.ts` fails when
+  the entry grows past its budget or pulls in the table compiler.
+- Scenarios that pass `twMergeConfig` run through `dist/config-entry.js` when the build has it;
+  older builds serve them from `dist/index.js`.
 - TV-only features are not presented as direct CVA comparisons.
 - The default measurement is 1,000 ms after a 200 ms warmup, repeated for 3 rounds per
   task. The median round is reported, so a single noisy window (GC pause, scheduler jitter)
   cannot dominate the result.
+- Each suite runs in its own child process (`--suite variants` / `--suite utilities`). The
+  default run spawns both and prints only the tables. JSON is written only with
+  `--json-out <path>` or `BENCHMARK_RESULTS_PATH`. Running both suites in one process let the
+  variants suite depress the utilities rows through GC pressure.
 - Each task runs in a fresh `Bench`, and a garbage collection is forced before every task
   (`node --expose-gc`). This isolates one measurement window from allocations left behind by
   the previous task.
@@ -100,11 +128,11 @@ set `NO_COLOR=1` to disable ANSI colors.
 Multi-extend folds parents at **definition time** only. The per-call / invocation path is the
 same flattened recipe as a single-parent or chained `extend`.
 
-| Scenario | What it measures |
-| --- | --- |
-| `composition/extend-multi` | Create three mixins + compose + one call |
-| `construction/extend-multi` | Definition-time compose only |
-| `invocation/extend-multi` | Pre-created recipe, five-call batch (hot path) |
+| Scenario                    | What it measures                               |
+| --------------------------- | ---------------------------------------------- |
+| `composition/extend-multi`  | Create three mixins + compose + one call       |
+| `construction/extend-multi` | Definition-time compose only                   |
+| `invocation/extend-multi`   | Pre-created recipe, five-call batch (hot path) |
 
 These scenarios use `extend: [a, b, c]`, so only implementations that actually support array
 extend are measured. Support is probed at load time (`capabilities.mjs`) — never inferred from
@@ -114,7 +142,7 @@ output, because older versions silently ignore an `extend` array instead of thro
 A released version without array extend is skipped for these scenarios and shows `—` in the
 table; it gains a baseline automatically as soon as a released version ships the API. Expect:
 
-- **invocation/*** (including `extend-multi`): parity with released (noise). Parent folding runs
+- **invocation/\*** (including `extend-multi`): parity with released (noise). Parent folding runs
   only inside `tv({...})`, not on each component call.
 - **composition/extend** (single parent): should stay within noise; single-parent still uses the
   parent recipe directly (no fold loop).

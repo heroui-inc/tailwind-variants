@@ -21,7 +21,30 @@ const probeArrayExtend = (module) => {
   }
 };
 
-/** Probe every capability a TV module may or may not support. */
-export const probeTvCapabilities = (module) => ({
+// True when the lite entry calls an injected `twMerge` function (3.3.1 treats it as a flag).
+const probeLiteInject = (liteModule) => {
+  if (!liteModule || typeof liteModule.createTV !== "function") return false;
+
+  try {
+    let calls = 0;
+    const tv = liteModule.createTV({
+      twMerge: (classList) => {
+        calls++;
+
+        return classList;
+      },
+    });
+
+    tv({base: "probe-a probe-b"})();
+
+    return calls > 0;
+  } catch {
+    return false;
+  }
+};
+
+// Probe every capability a TV module may or may not support.
+export const probeTvCapabilities = (module, liteModule) => ({
   arrayExtend: probeArrayExtend(module),
+  liteInject: probeLiteInject(liteModule),
 });

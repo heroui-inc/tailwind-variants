@@ -6,9 +6,14 @@ import {
   buttonConfig,
   buttonProps,
   classInputs,
+  compoundHeavyConfig,
+  compoundHeavyProps,
   customButtonConfig,
   customMergeConfig,
   focusableConfig,
+  hotButtonProps,
+  hotClassNameText,
+  hotSlotsProps,
   multiExtendChildConfig,
   multiExtendProps,
   slotsConfig,
@@ -48,19 +53,24 @@ const callSlotsBatch = (component) => {
   }
 };
 
+// Same five props, each carrying a className no earlier call has seen.
+const callUniqueClassNameBatch = (adapter, component, counter) => {
+  for (let i = 0; i < buttonProps.length; i++) {
+    consume(adapter.invoke(component, {...buttonProps[i], className: `w-[${counter.next++}px]`}));
+  }
+};
+
 const callMultiExtendBatch = (adapter, component) => {
   for (let i = 0; i < multiExtendProps.length; i++) {
     consume(adapter.invoke(component, multiExtendProps[i]));
   }
 };
 
-/**
- * Compose three independent mixins via array extend. Only implementations that
- * expose the `arrayExtend` capability (probed at load time) run these
- * scenarios, so the released branch that used an equivalent single-extend
- * chain is no longer needed — a released version gains the baseline as soon as
- * it actually supports the API.
- */
+// Compose three independent mixins via array extend. Only implementations that
+// expose the `arrayExtend` capability (probed at load time) run these
+// scenarios, so the released branch that used an equivalent single-extend
+// chain is no longer needed — a released version gains the baseline as soon as
+// it actually supports the API.
 const createMultiExtended = (adapter, options) => {
   const focusable = adapter.create(focusableConfig, options);
   const animated = adapter.create(animatedConfig, options);
@@ -75,16 +85,11 @@ const createMultiExtended = (adapter, options) => {
   );
 };
 
-/**
- * V8 type feedback is process-global: once a module's `tv` has seen many
- * config shapes, its property-access inline caches go megamorphic for the
- * rest of the process. Capability-gated scenarios feed the multi-extend
- * configs only to modules that support array extend, which would leave the
- * other TV module in a faster inline-cache state and bias every comparison
- * row against the richer module. Warm every TV adapter with the same config
- * shapes up front — via array extend when supported, a single-parent extend
- * otherwise — so all TV modules are measured in the same many-shapes regime.
- */
+// V8 inline caches go megamorphic once a `tv` has seen many config shapes.
+// Capability-gated scenarios would feed the multi-extend shapes to one module
+// only, leaving the other in a faster state, so every TV adapter is warmed
+// with the same shapes up front (single-parent extend where arrays are
+// unsupported).
 export const equalizeConfigShapeExposure = (adapters) => {
   const options = {twMerge: false};
 
@@ -143,6 +148,61 @@ export const scenarios = [
     },
   },
   {
+    ...metadata("invocation/hot-same-props"),
+    createTask(adapter) {
+      const component = adapter.prepare(buttonConfig)();
+
+      return () => consume(adapter.invoke(component, hotButtonProps));
+    },
+  },
+  {
+    ...metadata("invocation/hot-fresh-classname"),
+    createTask(adapter) {
+      const component = adapter.prepare(buttonConfig)();
+      const {intent, size, disabled} = hotButtonProps;
+
+      return () =>
+        consume(
+          adapter.invoke(component, {
+            intent,
+            size,
+            disabled,
+            // slice() of a longer string yields a new instance with the same text
+            className: `x${hotClassNameText}`.slice(1),
+          }),
+        );
+    },
+  },
+  {
+    ...metadata("invocation/unique-classname"),
+    createTask(adapter) {
+      const component = adapter.prepare(buttonConfig)();
+      const counter = {next: 0};
+
+      return () => callUniqueClassNameBatch(adapter, component, counter);
+    },
+  },
+  {
+    ...metadata("invocation/compounds-heavy"),
+    createTask(adapter) {
+      const component = adapter.prepare(compoundHeavyConfig)();
+
+      return () => {
+        for (let i = 0; i < compoundHeavyProps.length; i++) {
+          consume(adapter.invoke(component, compoundHeavyProps[i]));
+        }
+      };
+    },
+  },
+  {
+    ...metadata("invocation/lite-inject"),
+    createTask(adapter) {
+      const component = adapter.createLite(buttonConfig);
+
+      return () => callButtonBatch(adapter, component);
+    },
+  },
+  {
     ...metadata("invocation/variants-no-merge"),
     createTask(adapter) {
       const component = adapter.prepare(buttonConfig, {twMerge: false})();
@@ -181,6 +241,20 @@ export const scenarios = [
       const component = adapter.createSlots(slotsConfig);
 
       return () => callSlotsBatch(component);
+    },
+  },
+  {
+    ...metadata("invocation/slots-hot"),
+    createTask(adapter) {
+      const component = adapter.createSlots(slotsConfig);
+
+      return () => {
+        const slots = component(hotSlotsProps);
+
+        consume(slots.base());
+        consume(slots.icon());
+        consume(slots.label());
+      };
     },
   },
   {
@@ -277,6 +351,23 @@ const outputsFor = (adapter, options) => {
   return buttonProps.map((props) => adapter.invoke(component, props));
 };
 
+const classNameOutputsFor = (adapter) => {
+  const component = adapter.prepare(buttonConfig)();
+
+  return [
+    adapter.invoke(component, hotButtonProps),
+    ...buttonProps.map((props, index) =>
+      adapter.invoke(component, {...props, className: `w-[${index}px] px-1`}),
+    ),
+  ];
+};
+
+const compoundHeavyOutputsFor = (adapter) => {
+  const component = adapter.prepare(compoundHeavyConfig)();
+
+  return compoundHeavyProps.map((props) => adapter.invoke(component, props));
+};
+
 const slotOutputsFor = (adapter, options) => {
   const component = adapter.createSlots(slotsConfig, options);
 
@@ -332,6 +423,33 @@ export const assertEquivalentOutputs = (adapters) => {
     outputsFor(cva, {twMerge: false}),
     "TV and CVA no-merge outputs differ.",
   );
+  assert.deepEqual(
+    classNameOutputsFor(tv),
+    classNameOutputsFor(released),
+    "TV and released className outputs differ.",
+  );
+  assert.deepEqual(
+    classNameOutputsFor(tv),
+    classNameOutputsFor(cva),
+    "TV and CVA className outputs differ.",
+  );
+  assert.deepEqual(
+    compoundHeavyOutputsFor(tv),
+    compoundHeavyOutputsFor(released),
+    "TV and released compound-heavy outputs differ.",
+  );
+  assert.deepEqual(
+    compoundHeavyOutputsFor(tv),
+    compoundHeavyOutputsFor(cva),
+    "TV and CVA compound-heavy outputs differ.",
+  );
+  if (tv.createLite) {
+    assert.deepEqual(
+      buttonProps.map((props) => tv.invoke(tv.createLite(buttonConfig), props)),
+      outputsFor(tv),
+      "TV lite + injected twMerge outputs differ from the default entry.",
+    );
+  }
   assert.deepEqual(slotOutputsFor(tv), slotOutputsFor(released), "TV slots outputs differ.");
   assert.deepEqual(
     slotOutputsFor(tv, {twMerge: false}),

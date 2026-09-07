@@ -111,13 +111,14 @@ export const installLatestCVA = () => {
   };
 };
 
-export const installLatestCnfast = () => {
-  const version = readLatestVersion("cnfast");
+// shadcn-ui/cn, the reference implementation of the vendored merge engine.
+export const installLatestCn = () => {
+  const version = readLatestVersion("cn");
   const {entryPath, version: installedVersion} = installExactPackage({
-    cacheKey: `cnfast-${version}`,
-    packageName: "cnfast",
+    cacheKey: `cn-${version}`,
+    packageName: "cn",
     version,
-    entryRelativePath: path.join("dist", "index.mjs"),
+    entryRelativePath: path.join("dist", "index.js"),
   });
 
   return {

@@ -15,7 +15,9 @@ import {
   hasRetainedUtilityResult,
   utilityScenarios,
 } from "./utility-scenarios.mjs";
-import {writeFileSync} from "node:fs";
+import {execFileSync} from "node:child_process";
+import {mkdtempSync, readFileSync, rmSync, writeFileSync} from "node:fs";
+import os from "node:os";
 import path from "node:path";
 
 const noiseThreshold = 5;
@@ -44,15 +46,17 @@ const quickModeNote = (options) =>
     ? ` ${color("[UNRELIABLE] quick mode — not suitable for performance claims", colors.yellow)}`
     : "";
 
-/**
- * True when an adapter participates in a scenario: its kind must be listed,
- * and every capability the scenario requires must be present. Capabilities are
- * probed at load time (see capabilities.mjs), never inferred from version
- * numbers, so a released version that gains array-extend support is picked up
- * automatically.
- */
+// True when an adapter participates in a scenario: its kind must be listed,
+// and every capability the scenario requires must be present. Capabilities are
+// probed at load time (see capabilities.mjs), never inferred from version
+// numbers, so a released version that gains array-extend support is picked up
+// automatically.
 const scenarioRunsFor = (scenario, adapter) => {
   if (!scenario.implementations.includes(adapter.kind)) return false;
+  // An older build may lack the method a scenario calls (twJoin / twMerge on 3.3.1).
+  if (scenario.requiresMethod && typeof adapter[scenario.requiresMethod] !== "function") {
+    return false;
+  }
 
   const requires = scenario.requiresCapabilities;
 
@@ -79,6 +83,10 @@ Options:
                     is reported, so one noisy window cannot dominate.
   --json-out <path> Write machine-readable results to a JSON file (also read
                     from BENCHMARK_RESULTS_PATH in CI).
+  --suite <name>    Run only "variants" or "utilities" in this process. Without
+                    it, each suite runs in its own child process so the
+                    utilities rows are not measured on a heap the variants
+                    suite already churned.
   --help            Show this help.`;
 
 const parseRunArgs = (argv) => {
@@ -105,6 +113,8 @@ const parseRunArgs = (argv) => {
       options.rounds = Number(argv[++i]);
     } else if (argument === "--json-out") {
       options.jsonOut = argv[++i];
+    } else if (argument === "--suite") {
+      options.suite = argv[++i];
     } else if (argument === "--help" || argument === "-h") {
       console.log(RUN_USAGE);
       process.exit(0);
@@ -125,6 +135,14 @@ const parseRunArgs = (argv) => {
     throw new RangeError(`--rounds must be a positive integer, received ${options.rounds}.`);
   }
 
+  if (
+    options.suite !== undefined &&
+    options.suite !== "variants" &&
+    options.suite !== "utilities"
+  ) {
+    throw new RangeError(`--suite must be "variants" or "utilities", received ${options.suite}.`);
+  }
+
   return options;
 };
 
@@ -140,11 +158,8 @@ const toResult = (task, implementationId, timerOverheadMs) => {
   let hz = result.throughput.mean;
   let rme = result.throughput.rme;
 
-  // Subtract the calibrated timer overhead from the mean latency at the
-  // aggregate level. This removes the hrtime cost from every measurement the
-  // same way tinybench's `subtractTimerOverhead` option does, but without
-  // clamping individual samples to zero — which would inflate throughput by
-  // orders of magnitude for tasks whose latency is close to the overhead.
+  // Subtract the calibrated timer overhead from the mean, not per sample
+  // (see SUBTRACT_SAFE_RATIO).
   const meanLatencyMs = result.latency.mean;
 
   if (timerOverheadMs > 0 && meanLatencyMs > SUBTRACT_SAFE_RATIO * timerOverheadMs) {
@@ -257,14 +272,10 @@ const deltaStyles = [
   colorDelta,
 ];
 
-// tinybench's `subtractTimerOverhead` subtracts the calibrated overhead from
-// every sample and clamps negatives to zero. For tasks whose latency is the
-// same order of magnitude as the overhead (slots / no-slots construction,
-// cx/twJoin), most samples clamp to zero and the mean-of-rates throughput
-// explodes to physically impossible values (e.g. cva at 158B ops/s). We
-// therefore measure raw and subtract the overhead analytically from the mean
-// latency (see toResult), only when the task is comfortably above the
-// overhead.
+// tinybench's `subtractTimerOverhead` clamps per-sample negatives to zero, which
+// inflates throughput for tasks near the overhead (construction, cx/twJoin).
+// Samples are measured raw and the overhead is subtracted from the mean
+// latency in toResult, only when the task is comfortably above it.
 const SUBTRACT_SAFE_RATIO = 2;
 
 const runScenarioGroup = async (selectedScenarios, adapters, options) => {
@@ -339,6 +350,21 @@ const countTasks = (suiteScenarios, adapters) =>
       count + adapters.filter((adapter) => scenarioRunsFor(scenario, adapter)).length,
     0,
   );
+
+const formatKb = (bytes) => `${(bytes / 1024).toFixed(1)} KB`;
+
+const printEntrySizes = (implementations) => {
+  console.log(`\n${color("Default entry size (min+gzip, bundled from dist)", colors.bold)}`);
+  for (const implementation of implementations) {
+    if (!implementation.entrySize) continue;
+
+    const {minified, gzip} = implementation.entrySize;
+
+    console.log(
+      `  ${implementation.label}: ${color(formatKb(gzip), colors.cyan)} gzip · ${formatKb(minified)} minified`,
+    );
+  }
+};
 
 const runVariantsSuite = async (implementations, options) => {
   const adapters = implementations.map(createAdapter);
@@ -423,12 +449,12 @@ const runUtilitiesSuite = async (implementations, options) => {
     {type: "ops", id: "tv", header: "tv ops/s"},
     {type: "ops", id: "released", header: "released ops/s"},
     {type: "delta", left: "tv", right: "released", header: "tv vs released"},
-    {type: "ops", id: "cnfast", header: "cnfast ops/s"},
-    {type: "delta", left: "tv", right: "cnfast", header: "tv vs cnfast"},
+    {type: "ops", id: "cn", header: "cn ops/s"},
+    {type: "delta", left: "tv", right: "cn", header: "tv vs cn"},
   ];
   const rows = createComparisonRows(utilityScenarios, results, columns, options.quick);
   const released = implementations.find(({id}) => id === "released");
-  const cnfast = implementations.find(({id}) => id === "cnfast");
+  const cn = implementations.find(({id}) => id === "cn");
 
   console.log(`\nUtilities summary${quickModeNote(options)}`);
   console.log(
@@ -441,7 +467,7 @@ const runUtilitiesSuite = async (implementations, options) => {
   console.log(
     `${color("tv current", colors.cyan)} · ` +
       `${color(`tv released v${released.version}`, colors.blue)} · ` +
-      `${color(`cnfast v${cnfast.version}`, colors.magenta)} · ` +
+      `${color(`cn = shadcn-ui/cn@${cn.version}`, colors.magenta)} · ` +
       `${options.time}ms measure · ${options.warmupTime}ms warmup · ${options.rounds} rounds`,
   );
 
@@ -474,9 +500,13 @@ const validateScenarioRegistries = () => {
   validateScenarioRegistry(utilityScenarios, utilityScenarioMetadataById, "utility");
 };
 
+// Private channel from a suite child back to the orchestrating parent.
+const RESULTS_FILE_ENV = "TAILWIND_VARIANTS_BENCHMARK_RESULTS_FILE";
+
 const writeResultsJson = (
   filePath,
   {variantResults, utilityResults, variants, utilities, options},
+  {silent = false} = {},
 ) => {
   const version = (list, id) => list.find((implementation) => implementation.id === id)?.version;
 
@@ -494,16 +524,27 @@ const writeResultsJson = (
       tv: version(variants, "tv"),
       released: version(variants, "released"),
       cva: version(variants, "cva"),
-      cnfast: version(utilities, "cnfast"),
+      cn: version(utilities, "cn"),
     },
+    entrySizes: Object.fromEntries(
+      variants
+        .filter((implementation) => implementation.entrySize)
+        .map((implementation) => [implementation.id, implementation.entrySize]),
+    ),
     variants: variantResults,
     utilities: utilityResults,
   };
 
   writeFileSync(filePath, JSON.stringify(payload, null, 2) + "\n");
-  console.log(`${color("Benchmark results written to", colors.dim)} ${filePath}`);
+  if (!silent) console.log(`${color("Benchmark results written to", colors.dim)} ${filePath}`);
 };
 
+const readJson = (filePath) => JSON.parse(readFileSync(filePath, "utf8"));
+
+// Run one suite here, or both suites in separate child processes. A suite
+// measured after the other one in the same process sees a churned heap and
+// warmed inline caches that the other implementations did not get equally,
+// so the default is one process per suite.
 const runBenchmarks = async (rawOptions = {}) => {
   const options = {
     quick: false,
@@ -512,17 +553,75 @@ const runBenchmarks = async (rawOptions = {}) => {
     rounds: 3,
     ...rawOptions,
   };
+  const jsonPath = options.jsonOut ?? process.env.BENCHMARK_RESULTS_PATH;
+
+  if (options.suite === undefined) {
+    const tempDir = mkdtempSync(path.join(os.tmpdir(), "tailwind-variants-benchmark-"));
+    const results = {};
+    // Children hand their rows back through a private file that is removed
+    // before this process exits; the user's --json-out is written once, here.
+    const {BENCHMARK_RESULTS_PATH: _ignored, ...childEnv} = process.env;
+
+    try {
+      for (const suite of ["variants", "utilities"]) {
+        const suiteJson = path.join(tempDir, `${suite}.json`);
+        const args = [
+          "--expose-gc",
+          import.meta.filename,
+          "--suite",
+          suite,
+          "--time",
+          String(options.time),
+          "--warmup",
+          String(options.warmupTime),
+          "--rounds",
+          String(options.rounds),
+        ];
+
+        execFileSync(process.execPath, options.quick ? [...args, "--quick"] : args, {
+          stdio: "inherit",
+          env: {...childEnv, [RESULTS_FILE_ENV]: suiteJson},
+        });
+        results[suite] = readJson(suiteJson);
+      }
+    } finally {
+      rmSync(tempDir, {force: true, recursive: true});
+    }
+
+    if (jsonPath) {
+      const merged = {
+        ...results.variants,
+        variants: results.variants.variants,
+        utilities: results.utilities.utilities,
+        versions: {...results.variants.versions, ...results.utilities.versions},
+      };
+
+      writeFileSync(jsonPath, `${JSON.stringify(merged, null, 2)}\n`);
+      console.log(`${color("Benchmark results written to", colors.dim)} ${jsonPath}`);
+    }
+
+    return {variants: results.variants.variants, utilities: results.utilities.utilities};
+  }
+
   const {variants, utilities} = await loadImplementations();
 
   validateScenarioRegistries();
 
-  const variantResults = await runVariantsSuite(variants, options);
-  const utilityResults = await runUtilitiesSuite(utilities, options);
+  let variantResults = [];
+  let utilityResults = [];
 
-  const jsonPath = options.jsonOut ?? process.env.BENCHMARK_RESULTS_PATH;
+  if (options.suite === "variants") {
+    printEntrySizes(variants);
+    variantResults = await runVariantsSuite(variants, options);
+  } else {
+    utilityResults = await runUtilitiesSuite(utilities, options);
+  }
 
-  if (jsonPath)
-    writeResultsJson(jsonPath, {variantResults, utilityResults, variants, utilities, options});
+  const payload = {variantResults, utilityResults, variants, utilities, options};
+  const resultsFile = process.env[RESULTS_FILE_ENV];
+
+  if (resultsFile) writeResultsJson(resultsFile, payload, {silent: true});
+  else if (jsonPath) writeResultsJson(jsonPath, payload);
 
   return {variants: variantResults, utilities: utilityResults};
 };

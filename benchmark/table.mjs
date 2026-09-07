@@ -21,18 +21,8 @@ const BORDER = {
   joinJoin: "┼",
 };
 
-/**
- * Renders a box-drawing table via the `table` package — the same look
- * `pnpm benchmark` prints to the terminal.
- *
- * @param {Array<Record<string, string>>} rows  row objects keyed by header.
- * @param {{
- *   styles?: Array<(text: string) => string>,
- *   boldHeaders?: boolean,
- *   color?: (value: string, code: number) => string,
- * }} [options]  `color` applies to bold headers; omit it (or pass identity) for
- * plain output. `styles` colors individual columns.
- */
+// Box-drawing table with the look `pnpm benchmark` prints. `styles` colors
+// columns by index; `color` applies to bold headers (identity for plain output).
 export const renderBoxTable = (rows, {styles = [], boldHeaders = false, color = identity} = {}) => {
   if (rows.length === 0) return "";
 
@@ -48,8 +38,7 @@ export const renderBoxTable = (rows, {styles = [], boldHeaders = false, color = 
     {
       border: BORDER,
       columnDefault: {paddingLeft: 1, paddingRight: 1},
-      // Top border, separator under the header, and bottom border only — no
-      // per-row separators, matching the compact look of `pnpm benchmark`.
+      // Borders and the header separator only, no per-row lines.
       drawHorizontalLine: (index, size) => index === 0 || index === 1 || index === size,
     },
   );
