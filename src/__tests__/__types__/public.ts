@@ -1,4 +1,4 @@
-/**
+/*
  * Public TypeScript usage from https://www.tailwind-variants.org/docs/typescript
  * These cases mirror the documented examples so docs and library stay aligned.
  */
@@ -8,9 +8,7 @@ import type {Assert, IsEqual as Equals, Extends} from "./test-utils.js";
 
 import {tv} from "../../index.js";
 
-// ---------------------------------------------------------------------------
 // VariantProps (docs): extract props a recipe accepts
-// ---------------------------------------------------------------------------
 const button = tv({
   base: "inline-flex cursor-pointer items-center justify-center rounded-full px-4 py-1.5 font-medium select-none",
   variants: {
@@ -75,9 +73,7 @@ button({variant: "quaternary"});
 // @ts-expect-error boolean `flat` rejects its string representation
 button({flat: "true"});
 
-// ---------------------------------------------------------------------------
 // Required variants (docs): modeled with TS utilities, no built-in required flag
-// ---------------------------------------------------------------------------
 const sized = tv({
   variants: {
     size: {
@@ -117,9 +113,7 @@ const _missingSize: RequiredSize = {tone: "brand"};
 
 void _missingSize;
 
-// ---------------------------------------------------------------------------
 // Slotted return types (docs): ReturnType plus destructured slot functions
-// ---------------------------------------------------------------------------
 const alert = tv({
   slots: {
     base: "flex gap-3 rounded-lg p-4",
@@ -173,9 +167,7 @@ alert({color: "default"}).footer();
 // @ts-expect-error invalid color values remain rejected
 Alert({color: "success"});
 
-// ---------------------------------------------------------------------------
 // `as const` for external definitions (docs): preserve literal keys
-// ---------------------------------------------------------------------------
 const externalVariants = {
   primary: "bg-zinc-900 text-white",
   secondary: "bg-zinc-100 text-zinc-900",

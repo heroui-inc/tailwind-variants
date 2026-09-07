@@ -1,11 +1,18 @@
-import type {TVConfig, TWMConfig, TWMergeConfig} from "../../index.js";
+import type {
+  TVConfig,
+  TVCustomConfig,
+  TWMConfig,
+  TWMCustomConfig,
+  TWMergeConfig,
+} from "../../index.js";
 import type {IsEqual} from "./test-utils.js";
 
+import {createTV as createCustomTV, tv as customTV} from "../../config-entry.js";
 import {cn, cnMerge, createTV, cx, defaultConfig, tv} from "../../index.js";
 import {createTV as createLiteTV, cn as liteCn, cx as liteCx, tv as liteTV} from "../../lite.js";
 import {cx as utilityCx} from "../../utils.js";
 
-// Case: accept public Tailwind Merge configuration shapes in TVConfig and TWMConfig.
+// Case: accept public Tailwind Merge configuration shapes on the config entry.
 const twMergeConfig: TWMergeConfig = {
   extend: {
     theme: {
@@ -13,14 +20,27 @@ const twMergeConfig: TWMergeConfig = {
     },
   },
 };
-const twmConfig: TWMConfig = {twMerge: true, twMergeConfig};
+const twmCustomConfig: TWMCustomConfig = {twMerge: true, twMergeConfig};
+const customConfig: TVCustomConfig = twmCustomConfig;
+const twmConfig: TWMConfig = {twMerge: true};
 const config: TVConfig = twmConfig;
 const configuredTV = createTV(config);
+const customConfiguredTV = createCustomTV(customConfig);
 const configuredLiteTV = createLiteTV();
 
-// Case: preserve full, lite, and configured tv return types.
+// Case: the default entry has no table compiler, so it rejects twMergeConfig.
+// @ts-expect-error default tv does not accept twMergeConfig
+tv({base: "block"}, {twMergeConfig});
+// @ts-expect-error default factory does not accept twMergeConfig
+createTV({twMergeConfig});
+// @ts-expect-error default cnMerge does not accept twMergeConfig
+cnMerge("px-2")({twMergeConfig});
+
+// Case: preserve full, custom, lite, and configured tv return types.
 const fullClass: string = tv({base: "px-2"}, config)();
+const customClass: string = customTV({base: "px-2"}, customConfig)();
 const configuredClass: string = configuredTV({base: "px-2"})();
+const customConfiguredClass: string = customConfiguredTV({base: "px-2"})();
 const liteClass: string = configuredLiteTV({base: "px-2"})();
 
 // Case: cn, cnMerge, and cx return plain strings across entrypoints. The
@@ -34,6 +54,8 @@ const liteJoinedClass: string = liteCx("px-2");
 const utilityClass: string = utilityCx("px-2");
 const defaultConfigContract: TVConfig = defaultConfig;
 
+void customClass;
+void customConfiguredClass;
 void fullClass;
 void configuredClass;
 void liteClass;

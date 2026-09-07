@@ -1,31 +1,32 @@
 import {beforeAll, describe, expect, test, vi} from "vitest";
 
-/*
- * The engine detection in tw-merge keys off Error object shape at module load:
- * V8 errors have neither `line` (JSC) nor `lineNumber` (SpiderMonkey). Stubbing
- * Error before a fresh import flips IS_V8 off, so these tests execute the
- * fallback paths that never run on Node otherwise. Expectations mirror the
- * V8-path suites for parity.
- */
-
-type IndexModule = typeof import("../index");
-
-let runtime: IndexModule;
-let stubActiveDuringImport = false;
-
 beforeAll(async () => {
-  class SpiderMonkeyLikeError extends Error {
-    lineNumber = 0;
+  class JscLikeError extends Error {
+    line = 0;
   }
 
-  vi.stubGlobal("Error", SpiderMonkeyLikeError);
+  vi.stubGlobal("Error", JscLikeError);
   vi.resetModules();
-  stubActiveDuringImport = "lineNumber" in new Error("probe");
+  stubActiveDuringImport = "line" in new Error("probe");
   runtime = await import("../index");
   vi.unstubAllGlobals();
 });
 
-describe("non-V8 fallback parity", () => {
+/*
+ * The compiled engine picks its whole-string cache at module load by looking
+ * at the Error object shape: JavaScriptCore (Bun, Safari) puts `line` on
+ * Error instances, V8 does not. On JSC a Map front serves cache hits; on V8 a
+ * dictionary object does. Stubbing Error before a fresh import flips the
+ * detection, so these tests execute the Map-backed paths that never run on
+ * Node otherwise. Expectations mirror the V8-path suites for parity.
+ */
+type IndexModule = typeof import("../index");
+
+let runtime: IndexModule;
+
+let stubActiveDuringImport = false;
+
+describe("JSC whole-string cache parity", () => {
   test("the engine stub was active while the module initialized", () => {
     expect(stubActiveDuringImport).toBe(true);
   });
@@ -68,18 +69,21 @@ describe("non-V8 fallback parity", () => {
     expect(cnMerge("px-2", "px-4")({twMerge: true})).toBe("px-4");
   });
 
-  test("repeated calls stay stable without the argument cache", () => {
+  test("repeated and unique calls stay stable through the Map cache", () => {
     const {cn, cnMerge} = runtime;
 
     for (let i = 0; i < 70; i++) {
+      expect(cn("px-2", `m-${i}`)).toBe(`px-2 m-${i}`);
       expect(cn("px-2", `m-${i}`)).toBe(`px-2 m-${i}`);
       expect(cnMerge("px-2", `m-${i}`)()).toBe(`px-2 m-${i}`);
     }
 
     expect(cn("px-2", "m-0")).toBe("px-2 m-0");
+    expect(cn("px-2 m-0 px-4")).toBe("m-0 px-4");
+    expect(cn("px-2 m-0 px-4")).toBe("m-0 px-4");
   });
 
-  test("tv works end-to-end on the fallback paths", () => {
+  test("tv works end-to-end on the Map-backed paths", () => {
     const {tv} = runtime;
     const button = tv({
       base: "font-medium px-2 px-4",
@@ -89,6 +93,7 @@ describe("non-V8 fallback parity", () => {
     });
 
     expect(button({color: "red"})).toBe("font-medium px-4 text-red-500");
+    expect(button({color: "blue", class: "px-6"})).toBe("font-medium text-blue-500 px-6");
     expect(button({color: "blue", class: "px-6"})).toBe("font-medium text-blue-500 px-6");
   });
 });

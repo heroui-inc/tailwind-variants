@@ -7,23 +7,39 @@ import {cn, createCN, createTV, cx, tv} from "../lite";
  * it. Each engine module is mocked with a throwing factory: if a future change
  * adds an import edge from lite into the engine, this whole file fails to load.
  */
-vi.mock("../internal/tw-merge.js", () => {
-  throw new Error("lite must not load internal/tw-merge");
+vi.mock("../internal/merge-adapter.js", () => {
+  throw new Error("lite must not load the merge adapter");
 });
-vi.mock("../internal/merge/index.js", () => {
+
+vi.mock("../internal/engine-instance.js", () => {
+  throw new Error("lite must not load the default engine");
+});
+
+vi.mock("../internal/merge-engine/engine.js", () => {
   throw new Error("lite must not load the merge engine");
 });
-vi.mock("../internal/merge/create-tailwind-merge.js", () => {
-  throw new Error("lite must not load the merge engine");
+
+vi.mock("../internal/merge-engine/tables.generated.js", () => {
+  throw new Error("lite must not load the compiled tables");
 });
-vi.mock("../internal/merge/default-config.js", () => {
-  throw new Error("lite must not load the merge engine");
+
+vi.mock("../internal/merge-engine/compiler.js", () => {
+  throw new Error("lite must not load the table compiler");
+});
+
+vi.mock("../internal/compile-config/compile.js", () => {
+  throw new Error("lite must not load the custom-config compiler");
+});
+
+vi.mock("../internal/engine-cache.js", () => {
+  throw new Error("lite must not load the custom-config merge layer");
 });
 
 describe("lite entrypoint isolation", () => {
   test("tripwire: the mocked engine modules throw when loaded", async () => {
     // Vitest wraps the factory error, so only the rejection itself is asserted.
-    await expect(import("../internal/merge/index.js")).rejects.toThrow();
+    await expect(import("../internal/engine-instance.js")).rejects.toThrow();
+    await expect(import("../internal/merge-engine/engine.js")).rejects.toThrow();
   });
 
   test("lite tv works without the merge engine", () => {

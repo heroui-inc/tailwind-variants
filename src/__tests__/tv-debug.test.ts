@@ -21,17 +21,17 @@ const spyOnConsole = (): ConsoleSpies => ({
   groupEnd: vi.spyOn(console, "groupEnd").mockImplementation(() => {}),
 });
 
-/** Everything printed by one invocation, headers included, as plain text. */
+// Everything printed by one invocation, headers included, as plain text.
 const printed = (spies: ConsoleSpies): string =>
   [...spies.groupCollapsed.mock.calls, ...spies.log.mock.calls]
     .map((call) => call.map(String).join(" "))
     .join("\n");
 
-/** Group headers in print order, as plain text (format markers stripped). */
+// Group headers in print order, as plain text (format markers stripped).
 const headers = (spies: ConsoleSpies): string[] =>
   spies.groupCollapsed.mock.calls.map((call: any[]) => String(call[0]).replace(/%c/g, "").trim());
 
-/** Rows printed as `label` followed by the live value passed to the console. */
+// Rows printed as `label` followed by the live value passed to the console.
 const rowsOf = (spies: ConsoleSpies): Map<string, unknown> => {
   const rows = new Map<string, unknown>();
 

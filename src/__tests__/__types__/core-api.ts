@@ -1,3 +1,4 @@
+import type {TVCustomConfig} from "../../config-entry.js";
 import type {
   TV,
   TVCompoundSlots,
@@ -9,6 +10,7 @@ import type {
 import type {TVConfig, TVLiteConfig, TwMergeFn} from "../../lite.js";
 import type {Assert, Extends, IsEqual} from "./test-utils.js";
 
+import {tv as customTV} from "../../config-entry.js";
 import {createTV, tv} from "../../index.js";
 import {createCN, createTV as createLiteTV, tv as liteTV} from "../../lite.js";
 
@@ -563,6 +565,16 @@ const _myTV: TV = (options, config) => {
   return tv(options, {
     ...config,
     twMerge: config?.twMerge ?? false,
+  });
+};
+
+void _myTV;
+
+// Case: the config entry's TV carries twMergeConfig through a wrapper.
+const _myCustomTV: TV<TVCustomConfig> = (options, config) => {
+  return customTV(options, {
+    ...config,
+    twMerge: config?.twMerge ?? false,
     twMergeConfig: {
       ...config?.twMergeConfig,
       classGroups: {
@@ -575,4 +587,4 @@ const _myTV: TV = (options, config) => {
   });
 };
 
-void _myTV;
+void _myCustomTV;

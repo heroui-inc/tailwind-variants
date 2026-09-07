@@ -104,9 +104,7 @@ const unknownSlotCompound = {
 // @ts-expect-error single-parent compoundSlots still reject unknown slots
 tv(unknownSlotCompound);
 
-// ---------------------------------------------------------------------------
 // Slot-shaped class values may only name declared slots
-// ---------------------------------------------------------------------------
 
 // Case: an unknown slot in a variant option value errors on that key.
 tv({

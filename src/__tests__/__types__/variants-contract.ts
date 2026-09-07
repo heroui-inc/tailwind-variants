@@ -1,4 +1,4 @@
-/**
+/*
  * Structural guardrails for the variants type system.
  *
  * TVVariants must stay a plain record of axes to option maps. Putting a
@@ -18,9 +18,7 @@ import type {Assert, IsEqual} from "./test-utils.js";
 
 import {tv} from "../../index.js";
 
-// ---------------------------------------------------------------------------
 // TVVariants shape freeze
-// ---------------------------------------------------------------------------
 
 // No union branches; axes map to option maps only.
 type TVVariantsFrozenShape = Assert<
@@ -41,9 +39,7 @@ const tvVariantsFrozen: [TVVariantsFrozenShape, TVVariantsFrozenSlotShape] = [tr
 
 void tvVariantsFrozen;
 
-// ---------------------------------------------------------------------------
 // MergeVariantMaps via the public TVProps path
-// ---------------------------------------------------------------------------
 
 type LeftOnlyProps = TVProps<{size: {sm: string; md: string}}, undefined, undefined, undefined>;
 type RightOnlyProps = TVProps<
@@ -72,9 +68,7 @@ const mergeSemanticsChecks: MergeSemanticsChecks = [true, true, true, true];
 
 void mergeSemanticsChecks;
 
-// ---------------------------------------------------------------------------
 // TVVariants is documentation, not the inference constraint
-// ---------------------------------------------------------------------------
 
 // satisfies keeps authored literals intact.
 const authoredVariants = {
@@ -116,9 +110,7 @@ wideButton({color: "primary"});
 
 void widePropsChecks;
 
-// ---------------------------------------------------------------------------
 // LiteralUnion: relaxed axes only
-// ---------------------------------------------------------------------------
 
 // Known keys plus an index signature keep literal autocompletion
 // ("primary" | (string & {})) instead of collapsing to bare string.
