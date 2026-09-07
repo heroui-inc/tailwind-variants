@@ -2,36 +2,46 @@
 
 ### ✨ Features
 
-- compiled merge tables: a single-pass engine replaces the Map-based merger, and the default entry exports `twMerge`, `twJoin`, and `clsx` (also default) so `tailwind-merge` and `clsx` can be aliased to this package
-- `tailwind-variants/merge` entry: the merge utilities without the recipe runtime
-- `tailwind-variants/config` entry: `twMergeConfig` on `tv`, `createTV`, and `cnMerge`, plus `extendTailwindMerge`, `createTailwindMerge`, `createTwMerge`, `fromTheme`, `validators`, `mergeConfigs`, and `getDefaultConfig`
-- `tailwind-variants/lite` exports a strings-only `clsx`, like `clsx/lite`
+- compiled merge tables; default entry exports `twMerge`, `twJoin`, and `clsx`
+- `tailwind-variants/merge`: merger without `tv`
+- `tailwind-variants/config`: `twMergeConfig` and `extendTailwindMerge` / `createTailwindMerge` / `createTwMerge` / `fromTheme` / `validators` / `mergeConfigs` / `getDefaultConfig`
+- multi-extend via `extend: [a, b, c]` ([#297](https://github.com/heroui-inc/tailwind-variants/issues/297))
+- empty class lists return `""` ([#289](https://github.com/heroui-inc/tailwind-variants/issues/289))
+- array compound / variant classes apply to the base slot ([#263](https://github.com/heroui-inc/tailwind-variants/pull/263))
+- experimental `debug` mode
+- inject `twMerge` from `tailwind-variants/lite` ([#307](https://github.com/heroui-inc/tailwind-variants/issues/307))
+- `cacheSize` and `prefix` on the default tables
 
 ### ⚡ Performance
 
-- static core per recipe and per slot, and a `class` / `className` cache keyed by text so a new string with the same text still hits
-- hot `tv()` runs about 1.6×–2× faster than 3.3.1 and faster than cva; `cn()` is about 3× faster than 3.3.1 on join-and-merge and about 2× on unique arbitrary values
-- custom configs compile once per structural key, so a config literal rebuilt on every call compiles once
+- hot `tv()` about 1.6×–2× vs 3.3.1
+- `cn()` about 3× vs 3.3.1 on join-and-merge, about 2× on unique arbitrary values
+- pre-merged static core; `class` / `className` cached by text
 
 ### 🐛 Fixes
 
-- unlabeled `font-[Inter]` is a font family and `font-[700]` a weight, as in Tailwind v4
-- fill Tailwind grammar gaps: custom animation names, composable `contain-*`, legacy `bg-gradient-to-*` and `bg-conic`, `columns-auto`, `max-h-none`, and the container and spacing scales on more families
+- unlabeled `font-[Inter]` is family, `font-[700]` is weight
+- animation names, `contain-*`, `bg-gradient-to-*`, `bg-conic`, `columns-auto`, `max-h-none`, extra size scales
+- debug reporter stripped when `NODE_ENV` is production
 
 ### 🚨 Breaking Changes
 
-- **twMergeConfig:** only `tailwind-variants/config` accepts it; the default entry throws
-- **experimentalParseClassName:** not supported; inject `tailwind-merge`'s `extendTailwindMerge(...)` through `twMerge`
-- **cn and 0:** `cn("a", 0)` drops the zero like clsx; `cn(0)` stays `"0"` and `cx` is unchanged
-- **twMerge: false:** joins with `cx` semantics; recipe class strings are whitespace-normalized when the recipe compiles
-- **one engine per app:** alias `tailwind-merge` and `clsx` here, or use the lite entry with the merger you already ship
+- **twMergeConfig:** `tailwind-variants/config` only; default entry throws
+- **experimentalParseClassName:** removed
+- **cn:** `cn("a", 0)` → `"a"`; `cn(0)` → `"0"`
+- **empty lists:** `""` instead of `undefined`
+- **types:** unknown variant / slot keys error
+- **peers:** `tailwind-merge` and `tailwindcss` removed
+- **lite:** function `twMerge` is called (3.3.1 treated it as `true`)
+- **twMerge: false:** `cx` join; whitespace normalized at compile
 
 ### 🛠 Chores
 
-- `pnpm compile-tables` regenerates the default merge tables from the source config
-- benchmarks run each suite in its own process and print entry sizes
+- `pnpm compile-tables`
+- isolated benchmark suites
+- pkg.pr.new
 
-See [migration guide](./.docs/migrations/v3-to-v4.md).
+See [.docs/migrations/v3-to-v4.md](./.docs/migrations/v3-to-v4.md).
 
 ## [3.3.1](https://github.com/heroui-inc/tailwind-variants/compare/v3.3.0...v3.3.1) (2026-08-03)
 
