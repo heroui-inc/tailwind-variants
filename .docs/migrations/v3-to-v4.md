@@ -50,7 +50,7 @@ export const tv = createTV({ twMerge: extendTailwindMerge({ experimentalParseCla
 `cn` follows `clsx` on every engine. A lone `0` still stringifies, and `cx` keeps `0` everywhere.
 
 ```ts
-cn("foo", 0); // "foo"   (was "foo 0" on non-V8 engines)
+cn("foo", 0); // "foo"  (3.3.1: "foo 0")
 cn(0); // "0"
 cx("foo", 0); // "foo 0"
 ```

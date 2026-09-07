@@ -42,6 +42,7 @@ pnpm add tailwind-variants
 
 **Upgrading?**
 
+- v3 → v4: [migration guide](./.docs/migrations/v3-to-v4.md)
 - v2 → v3: [migration guide](./.docs/migrations/v2-to-v3.md)
 - v1 → v2: [migration guide](./.docs/migrations/v1-to-v2.md)
 
