@@ -2,30 +2,36 @@
 
 ## Breaking Changes
 
-### Two builds
+### Introduction of `/lite` entry point (no `tailwind-merge`)
 
-```ts
-// Default. Conflict resolution included.
-import {tv, cn, cx} from "tailwind-variants";
+In v3, `tailwind-variants` is now offered in two builds:
 
-// Lite. No built-in merge, smaller bundle.
-import {tv, cx} from "tailwind-variants/lite";
+- **Original build** – includes `tailwind-merge` (same as before)
+- **Lite build** – excludes `tailwind-merge` for a smaller bundle and faster runtime
+
+#### What changed?
+
+- `tailwind-merge` is no longer lazily loaded; it's statically included in the original build only
+- Lite build completely removes `tailwind-merge` and its config
+- `createTV`, `tv`, and `cn` in the lite build **no longer accept `config` (tailwind-merge config)**
+
+#### Migration Steps
+
+If you use the default configuration with `twMerge: true` (conflict resolution enabled), make sure to install `tailwind-merge` in your project:
+
+```bash
+# npm
+npm install tailwind-merge
+
+# yarn
+yarn add tailwind-merge
+
+# pnpm
+pnpm add tailwind-merge
 ```
 
-Conflict resolution ships in the default build. You do not need `tailwind-merge` unless your app calls it directly.
-
-`{twMerge: false}` turns merging off at runtime. It does not remove the table from the bundle. Use `/lite` for that.
-
-### Lite with an existing merger
-
-If you already have `twMerge`, inject it:
+If you do not need conflict resolution, switch to the lite build by importing from `tailwind-variants/lite`:
 
 ```ts
-import {createCN, createTV} from "tailwind-variants/lite";
-import {twMerge} from "tailwind-merge";
-
-export const tv = createTV({twMerge});
-export const cn = createCN({twMerge});
+import {createTV, tv, cn, cx} from "tailwind-variants/lite";
 ```
-
-`createTV` does not bind `cn`. Configure that function in `tailwind-merge`, not with `twMergeConfig`.
