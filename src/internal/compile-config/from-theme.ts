@@ -2,6 +2,7 @@ import type {DefaultThemeGroupIds, NoInfer, ThemeGetter, ThemeObject} from "./ty
 
 const fallbackThemeArr: ThemeObject<DefaultThemeGroupIds>[DefaultThemeGroupIds] = [];
 
+/** Theme getter for class-group definitions, like tailwind-merge's `fromTheme`. */
 export const fromTheme = <
   AdditionalThemeGroupIds extends string = never,
   DefaultThemeGroupIdsInner extends string = DefaultThemeGroupIds,

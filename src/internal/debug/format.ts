@@ -45,10 +45,8 @@ const SUPPORTS_ANSI = /* @__PURE__ */ (() =>
 const ANSI_RESET = "\u001B[0m";
 const ANSI_BOLD = "\u001B[1m";
 
-/**
- * Minimal semantic palette: `props` blue, `result` green (slightly stronger
- * than the muted `base`), overrides amber, everything else muted.
- */
+// Minimal semantic palette: `props` blue, `result` green (slightly stronger
+// than the muted `base`), overrides amber, everything else muted.
 type Tone = "muted" | "props" | "result" | "warn";
 
 const ANSI_TONES: Record<Tone, string> = {
@@ -70,17 +68,15 @@ const LABEL_WIDTH = 11;
 const pad = (label: string): string =>
   label.length >= LABEL_WIDTH ? label + " " : label + " ".repeat(LABEL_WIDTH - label.length);
 
-/** `%` is a format specifier for the devtools console. */
+// `%` is a format specifier for the devtools console.
 const escapeFormat = (text: string): string => text.replace(/%/g, "%%");
 
 const statusOf = (count: number): string =>
   count === 0 ? "✓ no overrides" : "⚠ " + count + (count === 1 ? " override" : " overrides");
 
-/**
- * Total overrides across the whole trace tree. The root of a slot recipe
- * mirrors its `base` slot, so when `slots` is present they are the single
- * source of truth; counting the root as well would double-count `base`.
- */
+// Total overrides across the whole trace tree. The root of a slot recipe
+// mirrors its `base` slot, so when `slots` is present they are the single
+// source of truth; counting the root as well would double-count `base`.
 export const countTreeOverrides = (trace: DebugTrace): number => {
   const slots = trace.slots;
 
@@ -93,7 +89,7 @@ export const countTreeOverrides = (trace: DebugTrace): number => {
   return total;
 };
 
-/** `tv  ⚠ 2 overrides` — the clickable line of a collapsed group. */
+// `tv  ⚠ 2 overrides` — the clickable line of a collapsed group.
 const header = (title: string, count: number): any[] => {
   const status = statusOf(count);
   const tone: Tone = count > 0 ? "warn" : "muted";
@@ -109,7 +105,7 @@ const header = (title: string, count: number): any[] => {
   return [title + "  " + status];
 };
 
-/** One `label value` line. The value is a trailing argument, never stringified. */
+// One `label value` line. The value is a trailing argument, never stringified.
 const row = (out: ConsoleLike, label: string, tone: Tone, value: unknown): void => {
   if (IS_BROWSER) out.log("%c" + pad(label), CSS_TONES[tone], value);
   else if (SUPPORTS_ANSI) out.log(ANSI_TONES[tone] + pad(label) + ANSI_RESET, value);
@@ -148,7 +144,7 @@ const group = (out: ConsoleLike, segments: any[], body: () => void): void => {
 
 const getConsole = (): ConsoleLike | undefined => globals.console;
 
-/** Prints one invocation, expanding each slot of a multi-part recipe. */
+// Prints one invocation, expanding each slot of a multi-part recipe.
 export const logTrace = (trace: DebugTrace): void => {
   const out = getConsole();
 
@@ -175,7 +171,7 @@ export const logTrace = (trace: DebugTrace): void => {
   });
 };
 
-/** Prints a single slot call that carried its own props. */
+// Prints a single slot call that carried its own props.
 export const logSlotTrace = (trace: DebugTrace, slotKey: string): void => {
   const out = getConsole();
 

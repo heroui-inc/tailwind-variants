@@ -1,13 +1,17 @@
 /*
- * Default class-group / theme configuration for the built-in merger.
+ * Default class groups and theme scales for the built-in merger, from
+ * tailwind-merge's default config (MIT). HeroUI's conflict-group patches
+ * (axis shorthands overriding logical sides, `shadow-inner` kept apart from
+ * shadow colors, `leading-none` with an overridden theme scale) and the cn#74
+ * grammar additions live here, never in `../merge-engine/engine.ts`;
+ * `pnpm compile-tables` bakes them into `tables.generated.ts`.
  *
+ * @see https://github.com/dcastil/tailwind-merge/blob/main/src/lib/default-config.ts
  * @see https://github.com/dcastil/tailwind-merge
- * @see https://github.com/dcastil/tailwind-merge/blob/main/LICENSE.md
  */
 
 import type {Config, DefaultClassGroupIds, DefaultThemeGroupIds} from "./types.js";
 
-import {fromTheme} from "./from-theme.js";
 import {
   isAny,
   isAnyNonArbitrary,
@@ -34,14 +38,15 @@ import {
   isNumber,
   isPercent,
   isTshirtSize,
-} from "./validators.js";
+} from "../merge-engine/validators.js";
+
+import {fromTheme} from "./from-theme.js";
 
 export const getDefaultConfig = () => {
   /**
    * Theme getters for theme variable namespaces
    * @see https://tailwindcss.com/docs/theme#theme-variable-namespaces
    */
-  /***/
 
   const themeColor = fromTheme("color");
   const themeFont = fromTheme("font");
@@ -239,9 +244,10 @@ export const getDefaultConfig = () => {
   const scaleTranslate = () => [isFraction, "full", ...scaleUnambiguousSpacing()] as const;
 
   return {
-    cacheSize: 500,
+    cacheSize: 8192,
     theme: {
-      animate: ["spin", "ping", "pulse", "bounce"],
+      // Open-ended: Tailwind v4 themes and plugins define their own animation names (cn#74).
+      animate: [isAny],
       aspect: ["video"],
       blur: [isTshirtSize],
       breakpoint: [isTshirtSize],
@@ -314,7 +320,10 @@ export const getDefaultConfig = () => {
        * Columns
        * @see https://tailwindcss.com/docs/columns
        */
-      columns: [{columns: [isNumber, isArbitraryValue, isArbitraryVariable, themeContainer]}],
+      columns: [
+        {columns: [isNumber, isArbitraryValue, isArbitraryVariable, themeContainer]},
+        "columns-auto",
+      ],
       /**
        * Break After
        * @see https://tailwindcss.com/docs/break-after
@@ -392,6 +401,17 @@ export const getDefaultConfig = () => {
        * @see https://tailwindcss.com/docs/object-fit
        */
       "object-fit": [{object: ["contain", "cover", "fill", "none", "scale-down"]}],
+      /**
+       * Containment. The reset utilities form one group; each flag keeps its
+       * own group because Tailwind's independent `--tw-contain-*` variables
+       * let `contain-layout contain-paint` compose (cn#74).
+       * @see https://tailwindcss.com/docs/contain
+       */
+      contain: [{contain: ["none", "content", "strict", isArbitraryVariable, isArbitraryValue]}],
+      "contain-size": [{contain: ["size", "inline-size"]}],
+      "contain-layout": ["contain-layout"],
+      "contain-paint": ["contain-paint"],
+      "contain-style": ["contain-style"],
       /**
        * Object Position
        * @see https://tailwindcss.com/docs/object-position
@@ -614,12 +634,12 @@ export const getDefaultConfig = () => {
        * Grid Auto Columns
        * @see https://tailwindcss.com/docs/grid-auto-columns
        */
-      "auto-cols": [{"auto-cols": scaleGridAutoColsRows()}],
+      "auto-cols": [{"auto-cols": scaleGridAutoColsRows()}, {"auto-cols": [themeSpacing]}],
       /**
        * Grid Auto Rows
        * @see https://tailwindcss.com/docs/grid-auto-rows
        */
-      "auto-rows": [{"auto-rows": scaleGridAutoColsRows()}],
+      "auto-rows": [{"auto-rows": scaleGridAutoColsRows()}, {"auto-rows": [themeSpacing]}],
       /**
        * Gap
        * @see https://tailwindcss.com/docs/gap
@@ -825,17 +845,23 @@ export const getDefaultConfig = () => {
        * Inline Size
        * @see https://tailwindcss.com/docs/width
        */
-      "inline-size": [{inline: ["auto", ...scaleSizingInline()]}],
+      "inline-size": [{inline: ["auto", ...scaleSizingInline()]}, {inline: [themeContainer]}],
       /**
        * Min-Inline Size
        * @see https://tailwindcss.com/docs/min-width
        */
-      "min-inline-size": [{"min-inline": ["auto", ...scaleSizingInline()]}],
+      "min-inline-size": [
+        {"min-inline": ["auto", ...scaleSizingInline()]},
+        {"min-inline": [themeContainer]},
+      ],
       /**
        * Max-Inline Size
        * @see https://tailwindcss.com/docs/max-width
        */
-      "max-inline-size": [{"max-inline": ["none", ...scaleSizingInline()]}],
+      "max-inline-size": [
+        {"max-inline": ["none", ...scaleSizingInline()]},
+        {"max-inline": [themeContainer]},
+      ],
       /**
        * Block Size
        * @see https://tailwindcss.com/docs/height
@@ -903,7 +929,7 @@ export const getDefaultConfig = () => {
        * Max-Height
        * @see https://tailwindcss.com/docs/max-height
        */
-      "max-h": [{"max-h": ["screen", "lh", ...scaleSizing()]}],
+      "max-h": [{"max-h": ["screen", "lh", ...scaleSizing()]}, "max-h-none"],
 
       // ------------------
       // --- Typography ---
@@ -1211,6 +1237,9 @@ export const getDefaultConfig = () => {
             isArbitraryImage,
           ],
         },
+        // Tailwind v3 direction names and the bare conic utility (cn#74).
+        {"bg-gradient-to": ["t", "tr", "r", "br", "b", "bl", "l", "tl"]},
+        "bg-conic",
       ],
       /**
        * Background Color
@@ -2385,6 +2414,11 @@ export const getDefaultConfig = () => {
     },
     conflictingClassGroups: {
       "container-named": ["container-type"],
+      contain: ["contain-size", "contain-layout", "contain-paint", "contain-style"],
+      "contain-size": ["contain"],
+      "contain-layout": ["contain"],
+      "contain-paint": ["contain"],
+      "contain-style": ["contain"],
       overflow: ["overflow-x", "overflow-y"],
       overscroll: ["overscroll-x", "overscroll-y"],
       inset: [

@@ -1,5 +1,5 @@
 /*
- * Merger config and class-group types (compatible with common extend/override shapes).
+ * Merger config types (compatible with common extend/override shapes).
  *
  * Theme key docs: https://github.com/dcastil/tailwind-merge/blob/main/docs/configuration.md#theme
  *
@@ -7,19 +7,7 @@
  * @see https://github.com/dcastil/tailwind-merge/blob/main/LICENSE.md
  */
 
-/** Class value accepted by the callable merger (`createMerger()`). */
-export type ClassNameValue = ClassNameArray | string | null | undefined | 0 | 0n | false;
-type ClassNameArray = readonly ClassNameValue[];
-
-/**
- * Type of param passed to the `experimentalParseClassName` function.
- *
- * This is an experimental feature and may introduce breaking changes in any minor version update.
- */
-export interface ExperimentalParseClassNameParam {
-  className: string;
-  parseClassName(className: string): ParsedClassName;
-}
+export type {ClassNameValue} from "../merge-engine/types.js";
 
 /**
  * The static part of the merger configuration. When merging multiple configurations,
@@ -37,61 +25,12 @@ export interface ConfigStaticPart {
    * Classes must start with `prefix + ":"` (e.g. `tw:px-2`); otherwise they are external.
    */
   prefix?: string;
-  /**
-   * Allows to customize parsing of individual classes passed to the merger.
-   * All classes passed outside of cache hits are passed to this function before it is
-   * determined whether the class is a valid Tailwind CSS class.
-   *
-   * This is an experimental feature and may introduce breaking changes in any minor version update.
-   */
-  experimentalParseClassName?(param: ExperimentalParseClassNameParam): ParsedClassName;
 }
 
 /** Built-in merger configuration shape. */
 export interface Config<ClassGroupIds extends string, ThemeGroupIds extends string>
   extends ConfigStaticPart,
     ConfigGroupsPart<ClassGroupIds, ThemeGroupIds> {}
-
-/**
- * Result of parsing a single class name into its parts.
- */
-export interface ParsedClassName {
-  /**
-   * Whether the class is external and merging logic should be sipped.
-   *
-   * If this is `true`, the class will be treated as if it wasn't a Tailwind class and will be passed through as is.
-   */
-  isExternal?: boolean | undefined;
-  /**
-   * Modifiers of the class in the order they appear in the class.
-   *
-   * @example ['hover', 'dark'] // for `hover:dark:bg-gray-100`
-   */
-  modifiers: string[];
-  /**
-   * Whether the class has an `!important` modifier.
-   *
-   * @example true // for `hover:dark:!bg-gray-100`
-   */
-  hasImportantModifier: boolean;
-  /**
-   * Base class without preceding modifiers.
-   *
-   * @example 'bg-gray-100' // for `hover:dark:bg-gray-100`
-   */
-  baseClassName: string;
-  /**
-   * Index position of a possible postfix modifier in the class.
-   * If the class has no postfix modifier, this is `undefined`.
-   *
-   * Prefixed with "maybe" because a `/` may be a postfix modifier or part of the base class name.
-   * When present, matching tries `baseClassName` without the possible postfix first; if that fails
-   * or the group is in `postfixLookupClassGroups`, it retries with the postfix attached.
-   *
-   * @example 11 // for `bg-gray-100/50`
-   */
-  maybePostfixModifierPosition?: number | undefined;
-}
 
 /**
  * Dynamic merger config groups. When merging configs, use `override` or `extend`.
@@ -291,6 +230,11 @@ export type DefaultClassGroupIds =
   | "columns"
   | "container"
   | "container-named"
+  | "contain"
+  | "contain-layout"
+  | "contain-paint"
+  | "contain-size"
+  | "contain-style"
   | "container-type"
   | "content"
   | "contrast"

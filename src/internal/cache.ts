@@ -1,19 +1,17 @@
-import type {TVConfig} from "../config.js";
-import type {AnyRecord, CnAdapter, CompiledCompoundSlot, CompiledCompoundVariant} from "./types.js";
+import type {
+  AnyRecord,
+  CompiledCompoundSlot,
+  CompiledCompoundVariant,
+  MergeAdapter,
+} from "./types.js";
 
 const VARIANT_CACHE_LIMIT = 256;
-const OVERRIDE_CACHE_LIMIT = 128;
 
 export const CACHE_MISS = Symbol("tv-cache-miss");
 
-export type CacheMiss = typeof CACHE_MISS;
+type CacheMiss = typeof CACHE_MISS;
 
-type NestedOverrideCache = {
-  get(coreKey: string, overrideKey: string): string | CacheMiss;
-  set(coreKey: string, overrideKey: string, value: string): void;
-};
-
-export type OverrideMerge = (core: string, props?: AnyRecord) => string;
+type OverrideMerge = (core: string, props?: AnyRecord) => string;
 
 const hasClassOverride = (props?: AnyRecord): boolean =>
   (props?.class != null && props.class !== "") ||
@@ -61,15 +59,14 @@ const appendSignatureValue = (out: string, value: unknown): string | null => {
   const type = typeof value;
 
   if (type === "string" || type === "number" || type === "boolean" || type === "bigint") {
-    // `String(NaN)` is "NaN" — distinct from "null", so top-level primitives
-    // never collide. Only the object/array branches need the finite check.
+    // `String(NaN)` is "NaN", distinct from "null", so only the object and
+    // array branches need the finite check.
     return out + String(value);
   }
 
   if (Array.isArray(value)) {
-    // Primitive arrays serialize through `join` — the v3.3.1 fast path. Arrays
-    // containing objects keep their full shape via the replacer, and arrays
-    // with non-finite numbers bail to the uncached path to avoid key collisions.
+    // Primitive arrays serialize through `join`. Arrays with objects keep their
+    // full shape via the replacer; non-finite numbers bail to the uncached path.
     for (let i = 0; i < value.length; i++) {
       const item = value[i];
 
@@ -118,7 +115,7 @@ const appendSignatureValue = (out: string, value: unknown): string | null => {
   }
 };
 
-/** Result-cache key; omits class/className. */
+// Result-cache key; omits class/className.
 export const buildPropsFingerprint = (
   variantKeys: string[],
   defaultVariants: AnyRecord,
@@ -190,16 +187,14 @@ export const buildPropsFingerprint = (
   return fingerprint;
 };
 
-/**
- * Invalidates cache when compound metadata mutates.
- *
- * Returns `null` when a value cannot be serialized losslessly (non-finite
- * numbers, circular objects), so callers skip the cache instead of keying two
- * different configs alike.
- */
+// Invalidates cache when compound metadata mutates.
+//
+// Returns `null` when a value cannot be serialized losslessly (non-finite
+// numbers, circular objects), so callers skip the cache instead of keying two
+// different configs alike.
 export const buildCompoundsSignature = (
-  compoundVariants: CompiledCompoundVariant[],
-  compoundSlots: CompiledCompoundSlot[],
+  compoundVariants: readonly Pick<CompiledCompoundVariant, "conditionKeys" | "source">[],
+  compoundSlots: readonly Pick<CompiledCompoundSlot, "conditionKeys" | "source">[],
 ): string | null => {
   let signature = "";
 
@@ -265,11 +260,9 @@ type BoundedCache<T> = {
   set(key: string, value: T): void;
 };
 
-/**
- * Two-generation bounded Map cache. Stored values are never `undefined`
- * (strings or slot-result objects), so `get` uses a single lookup per
- * generation instead of a `has` + `get` pair.
- */
+// Two-generation bounded Map cache. Stored values are never `undefined`
+// (strings or slot-result objects), so `get` uses a single lookup per
+// generation instead of a `has` + `get` pair.
 export const createBoundedCache = <T>(limit = VARIANT_CACHE_LIMIT): BoundedCache<T> => {
   let primary: Map<string, T> = new Map();
   let secondary: Map<string, T> | null = null;
@@ -346,7 +339,7 @@ const walkKey = <T>(
   return next;
 };
 
-export type PropsCache<T> = {
+type PropsCache<T> = {
   get(
     defaultVariants: AnyRecord,
     props?: AnyRecord,
@@ -361,10 +354,8 @@ export type PropsCache<T> = {
   clear(): void;
 };
 
-/**
- * Nested props cache. Same key space as `buildPropsFingerprint`, but the hot
- * path walks Maps instead of concatenating one string.
- */
+// Nested props cache. Same key space as `buildPropsFingerprint`, but the hot
+// path walks Maps instead of concatenating one string.
 export const createPropsCache = <T>(
   variantKeys: string[],
   limit = VARIANT_CACHE_LIMIT,
@@ -380,10 +371,8 @@ export const createPropsCache = <T>(
     variantKeySet[variantKeys[i]] = 1;
   }
 
-  /**
-   * Keys beyond `variantKeys` that feed the cache key. `null` when there are
-   * none (the common case), so nothing is allocated per lookup.
-   */
+  // Keys beyond `variantKeys` that feed the cache key. `null` when there are
+  // none (the common case), so nothing is allocated per lookup.
   const collectExtraKeys = (
     defaultVariants: AnyRecord,
     props?: AnyRecord,
@@ -528,95 +517,14 @@ export const createPropsCache = <T>(
   };
 };
 
-const createNestedOverrideCache = (limit = OVERRIDE_CACHE_LIMIT): NestedOverrideCache => {
-  let primary: Map<string, Map<string, string>> = new Map();
-  let secondary: Map<string, Map<string, string>> | null = null;
-  let size = 0;
-
-  return {
-    get(coreKey: string, overrideKey: string): string | CacheMiss {
-      const primaryInner = primary.get(coreKey);
-
-      if (primaryInner) {
-        const value = primaryInner.get(overrideKey);
-
-        if (value !== undefined) return value;
-      }
-
-      if (secondary) {
-        const secondaryInner = secondary.get(coreKey);
-
-        if (secondaryInner) {
-          const value = secondaryInner.get(overrideKey);
-
-          if (value !== undefined) {
-            let promoteInner = primary.get(coreKey);
-
-            if (!promoteInner) {
-              promoteInner = new Map();
-              primary.set(coreKey, promoteInner);
-            }
-
-            if (!promoteInner.has(overrideKey)) size++;
-            promoteInner.set(overrideKey, value);
-
-            return value;
-          }
-        }
-      }
-
-      return CACHE_MISS;
-    },
-    set(coreKey: string, overrideKey: string, value: string) {
-      if (size >= limit) {
-        secondary = primary;
-        primary = new Map();
-        size = 0;
-      }
-
-      let inner = primary.get(coreKey);
-
-      if (!inner) {
-        inner = new Map();
-        primary.set(coreKey, inner);
-      }
-
-      if (!inner.has(overrideKey)) size++;
-      inner.set(overrideKey, value);
-    },
-  };
-};
-
-export const createLazyOverrideMerge = (cn: CnAdapter, config: TVConfig): OverrideMerge => {
-  let cache: NestedOverrideCache | null = null;
-
+// Merge `class` / `className` onto a resolved core only when one is present.
+// The merge adapter's argument-identity cache serves repeats: the core is a
+// cached string and a stable className literal keeps its identity, so a hit
+// costs a few pointer compares and no string is built.
+export const createLazyOverrideMerge = (merge: MergeAdapter): OverrideMerge => {
   return (core, props) => {
     if (!hasClassOverride(props)) return core;
 
-    const classVal = props!.class;
-    const classNameVal = props!.className;
-
-    if (
-      (classVal != null && classVal !== "" && typeof classVal !== "string") ||
-      (classNameVal != null && classNameVal !== "" && typeof classNameVal !== "string")
-    ) {
-      return cn(config, core, classVal, classNameVal);
-    }
-
-    cache ??= createNestedOverrideCache();
-
-    const overrideKey =
-      (typeof classVal === "string" ? classVal : "") +
-      "\0" +
-      (typeof classNameVal === "string" ? classNameVal : "");
-    const cached = cache.get(core, overrideKey);
-
-    if (cached !== CACHE_MISS) return cached;
-
-    const merged = cn(config, core, classVal, classNameVal);
-
-    cache.set(core, overrideKey, merged);
-
-    return merged;
+    return merge.override(core, props!.class, props!.className);
   };
 };

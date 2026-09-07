@@ -4,17 +4,26 @@ import type {
   CompiledCompoundSlot,
   CompiledCompoundVariant,
   CompiledVariant,
+  NormalizedOption,
   ResolvedOptions,
   RuntimeComponent,
   RuntimeExtend,
+  SlotClassMap,
 } from "./types.js";
 
-import {cx, flatMergeArrays, isEmptyObject, isEqual, joinObjects, mergeObjects} from "../utils.js";
+import {
+  cx,
+  flatMergeArrays,
+  isEmptyObject,
+  joinObjects,
+  mergeObjects,
+  normalizeClassString,
+} from "../utils.js";
 
 import {defaultConfig} from "./default-config.js";
-import {state} from "./state.js";
+import {joinClassValue} from "./join-class-value.js";
 
-/** Flattened recipe fields used while folding parents / merging the child. */
+// Flattened recipe fields used while folding parents / merging the child.
 type RecipeFields = {
   base: any;
   variants: AnyRecord;
@@ -42,10 +51,8 @@ const recipeFromComponent = (component: RuntimeComponent): RecipeFields => ({
   compoundSlots: component.compoundSlots ?? [],
 });
 
-/**
- * Merge two already-flattened recipes left-to-right.
- * Later recipe wins class conflicts (same rules as single-parent extend).
- */
+// Merge two already-flattened recipes left-to-right.
+// Later recipe wins class conflicts (same rules as single-parent extend).
 const mergeRecipe = (acc: RecipeFields, next: RecipeFields): RecipeFields => {
   const base = acc.base != null || next.base != null ? cx(acc.base, next.base) : undefined;
 
@@ -97,7 +104,7 @@ const mergeRecipe = (acc: RecipeFields, next: RecipeFields): RecipeFields => {
   };
 };
 
-/** Fold 2+ parents left-to-right. Single-parent callers skip this and use the parent as-is. */
+// Fold 2+ parents left-to-right. Single-parent callers skip this and use the parent as-is.
 const foldParents = (parents: RuntimeComponent[]): RecipeFields => {
   let acc = emptyRecipe();
 
@@ -108,14 +115,48 @@ const foldParents = (parents: RuntimeComponent[]): RecipeFields => {
   return acc;
 };
 
-const synchronizeTwMergeConfig = (config: TVConfig): void => {
-  if (
-    !isEmptyObject(config.twMergeConfig) &&
-    !isEqual(config.twMergeConfig as object, state.cachedTwMergeConfig)
-  ) {
-    state.didTwMergeConfigChange = true;
-    state.cachedTwMergeConfig = config.twMergeConfig!;
+// Class value → single whitespace-normalized string. Falsy values (and NaN) become "".
+export const normalizeClassValue = (value: unknown): string =>
+  value ? normalizeClassString(joinClassValue(value as Parameters<typeof joinClassValue>[0])) : "";
+
+// `class` + `className` of a compound as one string.
+export const normalizeCompoundClasses = (source: AnyRecord): string => {
+  const first = normalizeClassValue(source.class);
+  const second = normalizeClassValue(source.className);
+
+  if (!first) return second;
+  if (!second) return first;
+
+  return first + " " + second;
+};
+
+const appendSlotClasses = (target: SlotClassMap, slotKey: string, classes: string): void => {
+  if (!classes) return;
+
+  const existing = target[slotKey];
+
+  target[slotKey] = existing ? existing + " " + classes : classes;
+};
+
+// Per-slot `class` / `className` of a compound. Strings and arrays belong to
+// the `base` slot; an object spreads over its slot keys.
+export const normalizeCompoundSlotClasses = (source: AnyRecord): SlotClassMap => {
+  const target: SlotClassMap = {};
+  const values = [source.class, source.className];
+
+  for (let i = 0; i < values.length; i++) {
+    const value = values[i];
+
+    if (typeof value === "string" || Array.isArray(value)) {
+      appendSlotClasses(target, "base", normalizeClassValue(value));
+    } else if (value && typeof value === "object") {
+      for (const slotKey in value) {
+        appendSlotClasses(target, slotKey, normalizeClassValue(value[slotKey]));
+      }
+    }
   }
+
+  return target;
 };
 
 const compileVariants = (variants: AnyRecord, variantKeys: string[]): CompiledVariant[] => {
@@ -125,10 +166,67 @@ const compileVariants = (variants: AnyRecord, variantKeys: string[]): CompiledVa
     const key = variantKeys[i];
     const values = variants[key];
 
-    compiledVariants.push({key, values, isEmpty: isEmptyObject(values)});
+    compiledVariants.push({
+      key,
+      values,
+      isEmpty: isEmptyObject(values),
+      normalizedFrom: null,
+      normalized: null,
+    });
   }
 
   return compiledVariants;
+};
+
+// Normalize one variant option. Slot-mode strings and arrays apply to the
+// `base` slot only; an object carries one string per slot. Variants mode
+// always yields a string. The raw value is remembered so an in-place edit of
+// the option (a different value under the same key) is picked up.
+export const normalizeVariantOption = (
+  variant: CompiledVariant,
+  optionKey: string,
+  raw: unknown,
+  slotMode: boolean,
+): NormalizedOption => {
+  let normalized: NormalizedOption;
+
+  if (!slotMode || typeof raw === "string" || Array.isArray(raw)) {
+    normalized = normalizeClassValue(raw);
+  } else if (raw && typeof raw === "object") {
+    const map: SlotClassMap = {};
+
+    for (const slotKey in raw as AnyRecord) {
+      const classes = normalizeClassValue((raw as AnyRecord)[slotKey]);
+
+      if (classes) map[slotKey] = classes;
+    }
+
+    normalized = map;
+  } else {
+    normalized = "";
+  }
+
+  (variant.normalizedFrom ??= {})[optionKey] = raw;
+  (variant.normalized ??= {})[optionKey] = normalized;
+
+  return normalized;
+};
+
+// Forget the normalized classes of every compound. They are rebuilt from the
+// live `source` the next time the compound matches, so a metadata edit is
+// picked up without normalizing compounds that never apply.
+export const invalidateCompoundClasses = (
+  compoundVariants: CompiledCompoundVariant[],
+  compoundSlots: CompiledCompoundSlot[],
+): void => {
+  for (let i = 0; i < compoundVariants.length; i++) {
+    compoundVariants[i].classes = null;
+    compoundVariants[i].slotClasses = null;
+  }
+
+  for (let i = 0; i < compoundSlots.length; i++) {
+    compoundSlots[i].classes = null;
+  }
 };
 
 const compileCompoundVariants = (compoundVariants: unknown): CompiledCompoundVariant[] => {
@@ -145,7 +243,7 @@ const compileCompoundVariants = (compoundVariants: unknown): CompiledCompoundVar
       }
     }
 
-    result.push({conditionKeys, source: compoundVariant});
+    result.push({conditionKeys, source: compoundVariant, classes: null, slotClasses: null});
   }
 
   return result;
@@ -165,7 +263,7 @@ const compileCompoundSlots = (compoundSlots: unknown): CompiledCompoundSlot[] =>
       }
     }
 
-    result.push({conditionKeys, source: compoundSlot});
+    result.push({conditionKeys, source: compoundSlot, classes: null});
   }
 
   return result;
@@ -233,8 +331,6 @@ export const resolveOptions = (options: AnyRecord, configProp?: TVConfig): Resol
     extend?.defaultVariants && !isEmptyObject(extend.defaultVariants)
       ? {...extend.defaultVariants, ...defaultVariantsProps}
       : defaultVariantsProps;
-
-  synchronizeTwMergeConfig(config);
 
   const isExtendedSlotsEmpty = !extend?.slots || isEmptyObject(extend.slots);
   const componentBase = hasSlots

@@ -14,18 +14,13 @@ export const mergeConfigs = (baseConfig: AnyConfig, extension: ConfigExtension):
   const {extend = {}, override = {}} = extension;
   const nested = extend as Partial<AnyConfig>;
 
-  // Static fields are always overridden when present (TM rule). Prefer top-level,
-  // then fall back to values nested on `extend` from older toMergerConfig output.
+  // Static fields always override (tailwind-merge rule). Top-level wins over
+  // values nested on `extend` by older toMergerConfig output.
   const cacheSize = extension.cacheSize ?? nested.cacheSize;
   const prefix = extension.prefix ?? nested.prefix;
-  const experimentalParseClassName =
-    extension.experimentalParseClassName ?? nested.experimentalParseClassName;
 
   if (cacheSize !== undefined) baseConfig.cacheSize = cacheSize;
   if (prefix !== undefined) baseConfig.prefix = prefix;
-  if (experimentalParseClassName !== undefined) {
-    baseConfig.experimentalParseClassName = experimentalParseClassName;
-  }
 
   overrideConfigProperties(baseConfig.theme, override.theme);
   overrideConfigProperties(baseConfig.classGroups, override.classGroups);

@@ -1,6 +1,7 @@
-import type {TVConfig} from "../config.js";
+import type {TVCustomConfig} from "../config.js";
 
-export const defaultConfig: TVConfig = {
+// Shared by every entry; `twMergeConfig` is only honored by `tailwind-variants/config`.
+export const defaultConfig: TVCustomConfig = {
   twMerge: true,
   twMergeConfig: {},
 };

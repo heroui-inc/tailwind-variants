@@ -15,7 +15,7 @@ export const removeExtraSpaces = (str: string): string => {
 // Doubled spaces, or a tab..carriage-return / NBSP character anywhere.
 const NON_NORMAL_WHITESPACE = / {2}|[\t-\r\u00a0]/;
 
-/** True when the joined string has leading, trailing, doubled, or non-space whitespace. */
+// True when the joined string has leading, trailing, doubled, or non-space whitespace.
 const stringNeedsNormalize = (str: string): boolean => {
   const len = str.length;
 
@@ -28,11 +28,13 @@ const stringNeedsNormalize = (str: string): boolean => {
   );
 };
 
-/**
- * Join class values. `function` + `arguments` so V8 does not allocate a rest
- * array. String/falsy args stay on a twJoin-shaped loop; objects and arrays
- * fall through. Normalize once on the joined result.
- */
+// Collapse whitespace runs and trim, but only when the string needs it.
+export const normalizeClassString = (str: string): string =>
+  stringNeedsNormalize(str) ? removeExtraSpaces(str) : str;
+
+// Join class values. `function` + `arguments` so V8 does not allocate a rest
+// array. String/falsy args stay on a twJoin-shaped loop; objects and arrays
+// fall through. Normalize once on the joined result.
 export const cx = function cx(): CnReturn {
   const length = arguments.length;
   let result = "";
@@ -149,14 +151,12 @@ export const flatMergeArrays = <T>(...arrays: unknown[][]): T[] => {
 const isPlainObject = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null && !isArray(value);
 
-/**
- * Deep-merges variant/slot maps. Call sites pass the child as `obj1` and the
- * parent as `obj2`.
- *
- * When one side is a class string and the other a slot object, the string is
- * folded into `{base: string}` so composing with slots does not produce
- * `"[object Object]"`.
- */
+// Deep-merges variant/slot maps. Call sites pass the child as `obj1` and the
+// parent as `obj2`.
+//
+// When one side is a class string and the other a slot object, the string is
+// folded into `{base: string}` so composing with slots does not produce
+// `"[object Object]"`.
 export const mergeObjects = <T extends object, U extends object>(
   obj1: T,
   obj2: U,

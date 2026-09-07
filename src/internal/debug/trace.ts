@@ -10,40 +10,38 @@ import type {AnyRecord, ResolvedOptions} from "../types.js";
 import {cx} from "../../utils.js";
 import {
   getCompleteProps,
-  getVariantClassNames,
-  getVariantClassNamesBySlot,
   matchesConditions,
   pushCompoundClassForSlot,
+  pushVariantClasses,
+  pushVariantClassesBySlot,
 } from "../class-resolver.js";
 import {compileResolvedOptions} from "../resolve-options.js";
 
 const EMPTY_COMPOUND_SLOTS: never[] = [];
 const WHITESPACE = /\s+/;
 
-/** What one invocation resolved, per layer. Shaped for the reporter, not for consumers. */
+// What one invocation resolved, per layer. Shaped for the reporter, not for consumers.
 export interface DebugTrace {
-  /** Effective props: `defaultVariants` merged with the props actually passed. */
+  // Effective props: `defaultVariants` merged with the props actually passed.
   props: Record<string, any>;
-  /** Resolved `base` classes (the slot's own classes for a slot trace). */
+  // Resolved `base` classes (the slot's own classes for a slot trace).
   base: string;
-  /** Applied classes keyed by variant axis; axes that contributed nothing are omitted. */
+  // Applied classes keyed by variant axis; axes that contributed nothing are omitted.
   variants: Record<string, string>;
-  /** Classes contributed by matching `compoundVariants` / `compoundSlots`. */
+  // Classes contributed by matching `compoundVariants` / `compoundSlots`.
   compounds: string[];
-  /** Classes present in the joined input but dropped by `tailwind-merge`. */
+  // Classes present in the joined input but dropped by `tailwind-merge`.
   overridden: string[];
-  /** Final resolved class string. */
+  // Final resolved class string.
   result: string;
-  /** Per-slot breakdown; present only for recipes that declare `slots`. */
+  // Per-slot breakdown; present only for recipes that declare `slots`.
   slots?: Record<string, DebugTrace>;
 }
 
-/**
- * Classes that made it into `raw` but not into `result` — what the merger threw
- * away. Splitting on whitespace runs absorbs empty and repeated separators, and
- * the two sets absorb duplicates, so `""`, `"bg-red-500   p-4"`, and a class
- * listed twice all behave.
- */
+// Classes that made it into `raw` but not into `result` — what the merger threw
+// away. Splitting on whitespace runs absorbs empty and repeated separators, and
+// the two sets absorb duplicates, so `""`, `"bg-red-500   p-4"`, and a class
+// listed twice all behave.
 export const diffOverriddenClasses = (raw: string, result: string): string[] => {
   if (!raw) return [];
 
@@ -98,11 +96,11 @@ const buildTrace = (
   };
 };
 
-/** Class override carried on props, mirroring what the resolvers merge in last. */
+// Class override carried on props, mirroring what the resolvers merge in last.
 const overrideClasses = (props?: AnyRecord): string => cx(props?.class, props?.className);
 
-/** Debug data for a `plain` / `variants` recipe, whose result is a single string. */
-export const traceFlat = (
+// Debug data for a `plain` / `variants` recipe, whose result is a single string.
+const traceFlat = (
   resolved: ResolvedOptions,
   props: AnyRecord | undefined,
   result: string,
@@ -111,7 +109,7 @@ export const traceFlat = (
   const completeProps = getCompleteProps(defaultVariants, props);
   const variants: Record<string, string> = {};
 
-  getVariantClassNames(resolved.compiledVariants!, defaultVariants, props, variants);
+  pushVariantClasses([], 0, resolved.compiledVariants!, defaultVariants, props, variants);
 
   for (const key in variants) {
     variants[key] = cx(variants[key]);
@@ -124,7 +122,7 @@ export const traceFlat = (
   for (let i = 0; i < compiledCompoundVariants.length; i++) {
     const compound = compiledCompoundVariants[i];
 
-    if (!matchesConditions(compound, completeProps)) continue;
+    if (!matchesConditions(compound, defaultVariants, props)) continue;
 
     const applied = cx(compound.source.class, compound.source.className);
 
@@ -141,10 +139,8 @@ export const traceFlat = (
   );
 };
 
-/**
- * Debug data for one slot. `slotProps` mirrors the runtime rule that a slot
- * call may re-resolve every axis with its own props layered over the parent's.
- */
+// Debug data for one slot. `slotProps` mirrors the runtime rule that a slot
+// call may re-resolve every axis with its own props layered over the parent's.
 export const traceSlot = (
   resolved: ResolvedOptions,
   slotKey: string,
@@ -156,7 +152,9 @@ export const traceSlot = (
   const completeProps = getCompleteProps(defaultVariants, props, slotProps);
   const variants: Record<string, string> = {};
 
-  getVariantClassNamesBySlot(
+  pushVariantClassesBySlot(
+    [],
+    0,
     slotKey,
     resolved.compiledVariants!,
     defaultVariants,
@@ -177,7 +175,7 @@ export const traceSlot = (
   for (let i = 0; i < compiledCompoundVariants.length; i++) {
     const compound = compiledCompoundVariants[i];
 
-    if (!matchesConditions(compound, completeProps)) continue;
+    if (!matchesConditions(compound, defaultVariants, props, slotProps)) continue;
 
     collected.length = 0;
     pushCompoundClassForSlot(collected, slotKey, compound.source.class);
@@ -193,7 +191,7 @@ export const traceSlot = (
   for (let i = 0; i < compoundSlots.length; i++) {
     const compoundSlot = compoundSlots[i];
 
-    if (!matchesConditions(compoundSlot, completeProps)) continue;
+    if (!matchesConditions(compoundSlot, defaultVariants, props, slotProps)) continue;
 
     const applied = cx(compoundSlot.source.class, compoundSlot.source.className);
 
@@ -212,10 +210,8 @@ export const traceSlot = (
   );
 };
 
-/**
- * Full debug data for one invocation. The root mirrors the `base` slot so the
- * reporter can render a single "tv" header with every slot underneath.
- */
+// Full debug data for one invocation. The root mirrors the `base` slot so the
+// reporter can render a single "tv" header with every slot underneath.
 export const collectTrace = (
   resolved: ResolvedOptions,
   props: AnyRecord | undefined,

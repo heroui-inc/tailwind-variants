@@ -1,21 +1,21 @@
-import type {TWMergeConfig} from "../config.js";
-
-export type TwMergeFn = (classList: string) => string;
-
+/*
+ * Process-global reset hook for the merge layer. Tests call `state.reset()`
+ * to drop the default engine, every compiled custom config, and the argument
+ * caches, so one test's config cannot leak into the next.
+ */
 type State = {
-  cachedTwMerge: TwMergeFn | null;
-  cachedTwMergeConfig: TWMergeConfig;
-  didTwMergeConfigChange: boolean;
   reset: () => void;
+  // Register a reset callback (module init only).
+  onReset: (hook: () => void) => void;
 };
 
+const hooks: (() => void)[] = [];
+
 export const state: State = {
-  cachedTwMerge: null,
-  cachedTwMergeConfig: {},
-  didTwMergeConfigChange: false,
   reset() {
-    state.cachedTwMerge = null;
-    state.cachedTwMergeConfig = {};
-    state.didTwMergeConfigChange = false;
+    for (let i = 0; i < hooks.length; i++) hooks[i]!();
+  },
+  onReset(hook) {
+    hooks.push(hook);
   },
 };

@@ -1,3 +1,14 @@
+/*
+ * Validator predicates, vendored from shadcn-ui/cn (MIT), pinned at cn@0.2.5.
+ * Semantics follow tailwind-merge's validators. The engine compiles these to
+ * span opcodes; the function forms serve the compiler's classifier, custom
+ * configs, and the `validators` export of `tailwind-variants/config`.
+ *
+ * @see https://github.com/shadcn-ui/cn
+ * @see https://github.com/shadcn-ui/cn/blob/main/packages/cn/src/validators.ts
+ * @see https://github.com/dcastil/tailwind-merge
+ */
+
 const arbitraryValueRegex = /^\[(?:(\w[\w-]*):)?(.+)\]$/i;
 const arbitraryVariableRegex = /^\((?:(\w[\w-]*):)?(.+)\)$/i;
 const fractionRegex = /^\d+(?:\.\d+)?\/\d+(?:\.\d+)?$/;
@@ -32,6 +43,9 @@ const isLengthOnly = (value: string) =>
   // otherwise be misclassified as lengths.
   lengthUnitRegex.test(value) && !colorFunctionRegex.test(value);
 
+// delta vs upstream (Tailwind v4 rule, cn#23): unlabeled `font-[…]` is a
+// weight only when numeric, otherwise a family name
+const isNotNumber = (v: string) => !isNumber(v);
 const isNever = () => false;
 
 const isShadow = (value: string) => shadowRegex.test(value);
@@ -57,11 +71,10 @@ export const isArbitraryLength = (value: string) =>
 export const isArbitraryNumber = (value: string) =>
   getIsArbitraryValue(value, isLabelNumber, isNumber);
 
-export const isArbitraryWeight = (value: string) =>
-  getIsArbitraryValue(value, isLabelWeight, isAny);
+export const isArbitraryWeight = (v: string) => getIsArbitraryValue(v, isLabelWeight, isNumber);
 
-export const isArbitraryFamilyName = (value: string) =>
-  getIsArbitraryValue(value, isLabelFamilyName, isNever);
+export const isArbitraryFamilyName = (v: string) =>
+  getIsArbitraryValue(v, isLabelFamilyName, isNotNumber);
 
 export const isArbitraryPosition = (value: string) =>
   getIsArbitraryValue(value, isLabelPosition, isNever);

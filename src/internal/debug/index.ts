@@ -9,14 +9,12 @@ import type {AnyRecord, ResolvedOptions, RuntimeComponent, RuntimeResult} from "
 import {IS_BROWSER, logSlotTrace, logTrace} from "./format.js";
 import {collectTrace, traceSlot} from "./trace.js";
 
-/**
- * Wraps a recipe so each invocation logs how it resolved. The wrapper keeps the
- * call signature intact — consumers never change how they render.
- *
- * Logging is browser-only so SSR passes stay silent. Debug data is collected
- * from the actual output of the underlying resolver, so the printed `result` is
- * always exactly what the caller received.
- */
+// Wraps a recipe so each invocation logs how it resolved. The wrapper keeps the
+// call signature intact — consumers never change how they render.
+//
+// Logging is browser-only so SSR passes stay silent. Debug data is collected
+// from the actual output of the underlying resolver, so the printed `result` is
+// always exactly what the caller received.
 export const createDebugComponent = (
   component: RuntimeComponent,
   resolved: ResolvedOptions,
