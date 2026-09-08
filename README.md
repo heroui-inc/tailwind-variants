@@ -214,8 +214,8 @@ should stay separate, call them individually and join with `cx` / `cn` instead.
 
 ## Debugging (experimental)
 
-Enable `debug: true` to log how a recipe resolves classes and which ones were overridden by
-`tailwind-merge`. Output appears in the browser console only.
+Enable `debug: true` to log how a recipe resolves classes and which ones the merger dropped.
+Output appears in the browser console only.
 
 ```ts
 import { tv } from "tailwind-variants";

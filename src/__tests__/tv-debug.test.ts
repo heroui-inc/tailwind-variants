@@ -7,6 +7,9 @@ import {countTreeOverrides} from "../internal/debug/format";
 import {diffOverriddenClasses} from "../internal/debug/trace";
 import {tv as liteTV} from "../lite";
 
+import {readFileSync} from "node:fs";
+import path from "node:path";
+
 type ConsoleSpies = {
   log: ReturnType<typeof vi.spyOn>;
   group: ReturnType<typeof vi.spyOn>;
@@ -457,15 +460,44 @@ describe("production isolation", () => {
     expect(spies.groupCollapsed).not.toHaveBeenCalled();
   });
 
-  test("loads safely in an environment without a global process", async () => {
+  test("selects the development branch when NODE_ENV is not production", async () => {
     vi.resetModules();
-    vi.stubGlobal("process", undefined);
+    vi.stubEnv("NODE_ENV", "development");
+    vi.stubGlobal("window", {});
+    vi.stubGlobal("document", {});
 
-    await expect(import("../index")).resolves.toBeDefined();
+    const {tv: devTV} = await import("../index");
+    const button = devTV({base: "bg-red-500 bg-blue-500"}, {debug: true});
 
-    const {tv: processlessTV} = await import("../index");
+    expect(button()).toBe("bg-blue-500");
+    expect(spies.groupCollapsed).toHaveBeenCalled();
+  });
 
-    expect(processlessTV({base: "px-2"})({})).toBe("px-2");
+  test("selects the development branch on the config entry too", async () => {
+    vi.resetModules();
+    vi.stubEnv("NODE_ENV", "development");
+    vi.stubGlobal("window", {});
+    vi.stubGlobal("document", {});
+
+    const {tv: configTV} = await import("../config-entry");
+    const button = configTV({base: "px-2"}, {debug: true});
+
+    expect(button()).toBe("px-2");
+    expect(spies.groupCollapsed).toHaveBeenCalled();
+  });
+
+  test("reads process.env.NODE_ENV without a typeof process guard", () => {
+    // Bundlers replace the member expression `process.env.NODE_ENV`, but not a
+    // `typeof process` check. In a browser bundle without a `process` global
+    // the guard would pick the production branch even in development.
+    const source = readFileSync(
+      path.join(import.meta.dirname, "..", "internal", "debug", "decorate.ts"),
+      "utf8",
+    );
+    const code = source.replace(/\/\*[\s\S]*?\*\/|\/\/[^\n]*/g, "");
+
+    expect(code).not.toMatch(/typeof\s+process/);
+    expect(code).toMatch(/process\.env\.NODE_ENV\s*!==\s*"production"/);
   });
 });
 

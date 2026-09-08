@@ -28,6 +28,4 @@ const developmentDiagnostics: Diagnostics = (component, resolved, attachMetadata
 const productionDiagnostics: Diagnostics = (component) => component;
 
 export const diagnostics: Diagnostics =
-  typeof process !== "undefined" && process.env.NODE_ENV !== "production"
-    ? developmentDiagnostics
-    : productionDiagnostics;
+  process.env.NODE_ENV !== "production" ? developmentDiagnostics : productionDiagnostics;
