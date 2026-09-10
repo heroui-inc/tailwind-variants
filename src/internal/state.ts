@@ -1,50 +1,21 @@
-import type {TWMergeConfig} from "../config.js";
-
-export type TwMergeFn = (classList: string) => string;
-
+/*
+ * Process-global reset hook for the merge layer. Tests call `state.reset()`
+ * to drop the default engine, every compiled custom config, and the argument
+ * caches, so one test's config cannot leak into the next.
+ */
 type State = {
-  cachedTwMerge: TwMergeFn | null;
-  cachedTwMergeConfig: TWMergeConfig;
-  didTwMergeConfigChange: boolean;
   reset: () => void;
+  // Register a reset callback (module init only).
+  onReset: (hook: () => void) => void;
 };
 
-function createState(): State {
-  let cachedTwMerge: TwMergeFn | null = null;
-  let cachedTwMergeConfig: TWMergeConfig = {};
-  let didTwMergeConfigChange = false;
+const hooks: (() => void)[] = [];
 
-  return {
-    get cachedTwMerge() {
-      return cachedTwMerge;
-    },
-
-    set cachedTwMerge(value) {
-      cachedTwMerge = value;
-    },
-
-    get cachedTwMergeConfig() {
-      return cachedTwMergeConfig;
-    },
-
-    set cachedTwMergeConfig(value) {
-      cachedTwMergeConfig = value;
-    },
-
-    get didTwMergeConfigChange() {
-      return didTwMergeConfigChange;
-    },
-
-    set didTwMergeConfigChange(value) {
-      didTwMergeConfigChange = value;
-    },
-
-    reset() {
-      cachedTwMerge = null;
-      cachedTwMergeConfig = {};
-      didTwMergeConfigChange = false;
-    },
-  };
-}
-
-export const state = createState();
+export const state: State = {
+  reset() {
+    for (let i = 0; i < hooks.length; i++) hooks[i]!();
+  },
+  onReset(hook) {
+    hooks.push(hook);
+  },
+};

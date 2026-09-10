@@ -93,6 +93,60 @@ export const slotsProps = [
   {intent: "danger", size: "lg"},
 ];
 
+// One stable props object for hot-path scenarios (same props every call).
+export const hotButtonProps = {intent: "secondary", size: "lg", disabled: true};
+
+// One stable props object for the hot slots scenario.
+export const hotSlotsProps = {intent: "secondary", size: "lg", disabled: true};
+
+// className text for the fresh-instance scenario; a new string instance is built per call.
+export const hotClassNameText = "px-6 shadow-sm";
+
+// A recipe where compound matching dominates: three axes and twelve compound
+// variants, several of which match for every prop set below.
+export const compoundHeavyConfig = {
+  base: "inline-flex items-center rounded",
+  variants: {
+    intent: {
+      primary: "bg-blue-500 text-white",
+      secondary: "bg-white text-gray-800",
+      danger: "bg-red-500 text-white",
+    },
+    size: {sm: "h-8 px-2", md: "h-10 px-4", lg: "h-12 px-6"},
+    disabled: {true: "opacity-50", false: "opacity-100"},
+  },
+  compoundVariants: [
+    {intent: "primary", size: "sm", class: "text-xs"},
+    {intent: "primary", size: "md", class: "text-sm"},
+    {intent: "primary", size: "lg", class: "text-base"},
+    {intent: "secondary", size: "sm", class: "text-xs border"},
+    {intent: "secondary", size: "md", class: "text-sm border"},
+    {intent: "secondary", size: "lg", class: "text-base border"},
+    {intent: ["primary", "danger"], disabled: true, class: "cursor-not-allowed"},
+    {intent: ["primary", "secondary", "danger"], disabled: false, class: "cursor-pointer"},
+    {size: ["sm", "md"], disabled: false, class: "hover:brightness-95"},
+    {intent: "danger", size: ["md", "lg"], class: "font-semibold"},
+    {intent: "danger", disabled: false, class: "hover:bg-red-600"},
+    {intent: "secondary", disabled: true, class: "border-gray-200"},
+  ],
+  defaultVariants: {intent: "primary", size: "md", disabled: false},
+};
+
+export const compoundHeavyProps = [
+  {},
+  {intent: "secondary", size: "sm"},
+  {intent: "danger", size: "lg", disabled: true},
+  {intent: "secondary", disabled: true},
+  {intent: "danger", size: "md"},
+];
+
+// Stable string instances for the `cn` argument-identity scenarios.
+export const cnStableInputs = {
+  base: "inline-flex items-center justify-center rounded-md border px-4 py-2 text-sm font-medium",
+  extra: "bg-blue-500 text-white hover:bg-blue-600",
+  className: "px-6 shadow-sm",
+};
+
 export const customMergeConfig = {
   theme: {
     spacing: ["unit-2", "unit-4", "unit-6"],
@@ -123,10 +177,10 @@ export const classInputs = [
   "trailing",
 ];
 
-/** String/falsy tokens shared by TV `cx` and cnfast `twJoin`. */
+// String/falsy tokens shared by TV `cx` and shadcn-ui/cn `twJoin`.
 export const tokenInputs = ["px-2", false, null, undefined, "py-2", "", "rounded", "shadow"];
 
-/** Mixed inputs that exercise join + conflict resolution (`cn`). */
+// Mixed inputs that exercise join + conflict resolution (`cn`).
 export const mergeClassInputs = [
   "button px-2 py-2 text-sm",
   ["px-4", {active: true, hidden: false}],
@@ -134,11 +188,65 @@ export const mergeClassInputs = [
   "text-lg trailing",
 ];
 
-/** Token inputs for direct `twMerge` (no object dictionaries). */
+// Token inputs for direct `twMerge` (no object dictionaries).
 export const mergeTokenInputs = [
   "button px-2 py-2 text-sm",
   false,
   null,
   "px-4",
   "text-lg trailing",
+];
+
+// Independent style primitives for multi-parent `extend` benchmarks.
+export const focusableConfig = {
+  base: "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500",
+  variants: {
+    focus: {
+      visible: "ring-2",
+      none: "ring-0",
+    },
+  },
+  defaultVariants: {focus: "visible"},
+};
+
+export const animatedConfig = {
+  base: "transition-all duration-150 ease-out",
+  variants: {
+    motion: {
+      normal: "duration-150",
+      slow: "duration-300",
+    },
+  },
+  defaultVariants: {motion: "normal"},
+};
+
+export const surfacedConfig = {
+  base: "bg-white border border-gray-200 shadow-sm",
+  variants: {
+    tone: {
+      neutral: "bg-white text-gray-900",
+      muted: "bg-gray-50 text-gray-700",
+    },
+  },
+  defaultVariants: {tone: "neutral"},
+};
+
+export const multiExtendChildConfig = {
+  base: "inline-flex items-center rounded-md px-3 py-2 font-medium",
+  variants: {
+    size: {
+      sm: "text-sm h-8",
+      md: "text-base h-10",
+      lg: "text-lg h-12",
+    },
+  },
+  defaultVariants: {size: "md"},
+};
+
+export const multiExtendProps = [
+  {},
+  {focus: "none", motion: "slow"},
+  {tone: "muted", size: "sm"},
+  {focus: "visible", motion: "normal", tone: "neutral", size: "lg"},
+  {focus: "none", tone: "muted", size: "md"},
 ];

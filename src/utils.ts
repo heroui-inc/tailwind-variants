@@ -1,5 +1,7 @@
-import {type JoinClassValue, joinClassValue} from "./internal/join-class-value.js";
+import type {JoinClassValue} from "./internal/join-class-value.js";
 import type {CnOptions, CnReturn} from "./types.js";
+
+import {joinClassValue} from "./internal/join-class-value.js";
 
 const SPACE_REGEX = /\s+/g;
 const isArray = Array.isArray;
@@ -10,43 +12,61 @@ export const removeExtraSpaces = (str: string): string => {
   return str.replace(SPACE_REGEX, " ").trim();
 };
 
-/** Dirty leading/trailing/doubled/non-space whitespace on the final joined string. */
+// Doubled spaces, or a tab..carriage-return / NBSP character anywhere.
+const NON_NORMAL_WHITESPACE = / {2}|[\t-\r\u00a0]/;
+
+// True when the joined string has leading, trailing, doubled, or non-space whitespace.
 const stringNeedsNormalize = (str: string): boolean => {
   const len = str.length;
 
   if (len === 0) return false;
 
-  const first = str.charCodeAt(0);
-  const last = str.charCodeAt(len - 1);
-
-  if (
-    first === 32 ||
-    last === 32 ||
-    (first >= 9 && first <= 13) ||
-    first === 160 ||
-    (last >= 9 && last <= 13) ||
-    last === 160
-  ) {
-    return true;
-  }
-
-  for (let i = 0; i < len; i++) {
-    const code = str.charCodeAt(i);
-
-    if ((code >= 9 && code <= 13) || code === 160) return true;
-    if (code === 32 && i + 1 < len && str.charCodeAt(i + 1) === 32) return true;
-  }
-
-  return false;
+  // The compiled regex scan beats a charCodeAt loop; edge spaces are cheaper
+  // to check directly than to fold into the pattern.
+  return (
+    str.charCodeAt(0) === 32 || str.charCodeAt(len - 1) === 32 || NON_NORMAL_WHITESPACE.test(str)
+  );
 };
 
-export const cx = <T extends CnOptions>(...classnames: T): CnReturn => {
-  const result = joinClassValue(classnames as JoinClassValue[]);
+// Collapse whitespace runs and trim, but only when the string needs it.
+export const normalizeClassString = (str: string): string =>
+  stringNeedsNormalize(str) ? removeExtraSpaces(str) : str;
 
-  if (!result) return undefined;
+// Join class values. `function` + `arguments` so V8 does not allocate a rest
+// array. String/falsy args stay on a twJoin-shaped loop; objects and arrays
+// fall through. Normalize once on the joined result.
+export const cx = function cx(): CnReturn {
+  const length = arguments.length;
+  let result = "";
+  let index = 0;
+
+  for (; index < length; index++) {
+    const item = arguments[index];
+
+    if (!item && item !== 0 && item !== 0n) continue;
+    if (typeof item !== "string") break;
+
+    if (result) result += " ";
+    result += item;
+  }
+
+  for (; index < length; index++) {
+    const item = arguments[index] as JoinClassValue;
+
+    if (!item && item !== 0 && item !== 0n) continue;
+
+    const resolved = typeof item === "string" ? item : joinClassValue(item);
+
+    if (resolved) {
+      if (result) result += " ";
+      result += resolved;
+    }
+  }
+
+  if (!result) return "";
 
   return stringNeedsNormalize(result) ? removeExtraSpaces(result) : result;
-};
+} as <T extends CnOptions>(...classnames: T) => CnReturn;
 
 export const falsyToString = <T>(value: T): T | string =>
   value === false ? "false" : value === true ? "true" : value === 0 ? "0" : value;
@@ -72,7 +92,7 @@ export const isEqual = (obj1: object, obj2: object): boolean => {
   for (let i = 0; i < keys1.length; i++) {
     const key = keys1[i];
 
-    if (!keys2.includes(key)) return false;
+    if (!Object.hasOwn(record2, key)) return false;
     if (record1[key] !== record2[key]) return false;
   }
 
@@ -120,18 +140,23 @@ export function flatArray<T>(arr: unknown[]): T[] {
 }
 
 export const flatMergeArrays = <T>(...arrays: unknown[][]): T[] => {
+  // `flat` already drops falsy elements, so the result needs no second pass.
   const result: T[] = [];
 
   flat(arrays, result);
-  const filtered: T[] = [];
 
-  for (let i = 0; i < result.length; i++) {
-    if (result[i]) filtered.push(result[i]);
-  }
-
-  return filtered;
+  return result;
 };
 
+const isPlainObject = (value: unknown): value is Record<string, unknown> =>
+  typeof value === "object" && value !== null && !isArray(value);
+
+// Deep-merges variant/slot maps. Call sites pass the child as `obj1` and the
+// parent as `obj2`.
+//
+// When one side is a class string and the other a slot object, the string is
+// folded into `{base: string}` so composing with slots does not produce
+// `"[object Object]"`.
 export const mergeObjects = <T extends object, U extends object>(
   obj1: T,
   obj2: U,
@@ -148,8 +173,14 @@ export const mergeObjects = <T extends object, U extends object>(
 
       if (isArray(val1) || isArray(val2)) {
         result[key] = flatMergeArrays(val2, val1);
-      } else if (typeof val1 === "object" && typeof val2 === "object" && val1 && val2) {
+      } else if (isPlainObject(val1) && isPlainObject(val2)) {
         result[key] = mergeObjects(val1, val2);
+      } else if (isPlainObject(val1) && typeof val2 === "string") {
+        // Child is a slot object, parent is a string: fold the parent into base.
+        result[key] = mergeObjects(val1, {base: val2});
+      } else if (typeof val1 === "string" && isPlainObject(val2)) {
+        // Child is a string, parent is a slot object: fold the child into base.
+        result[key] = mergeObjects({base: val1}, val2);
       } else {
         result[key] = val2 + " " + val1;
       }

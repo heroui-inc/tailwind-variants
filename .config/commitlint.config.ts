@@ -1,4 +1,5 @@
 import type {UserConfig} from "@commitlint/types";
+
 import {RuleConfigSeverity} from "@commitlint/types";
 
 const config: UserConfig = {
@@ -9,7 +10,19 @@ const config: UserConfig = {
     "type-enum": [
       RuleConfigSeverity.Error,
       "always",
-      ["feat", "feature", "fix", "refactor", "docs", "build", "test", "ci", "chore"],
+      [
+        "feat",
+        "feature",
+        "fix",
+        "refactor",
+        "docs",
+        "build",
+        "test",
+        "ci",
+        "chore",
+        "perf",
+        "performance",
+      ],
     ],
   },
 };

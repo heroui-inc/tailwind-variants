@@ -21,7 +21,7 @@ export type JoinClassValue =
 
 const isArray = Array.isArray;
 
-/** Join class values into a single space-separated string. */
+// Join class values into a single space-separated string.
 export const joinClassValue = (value: JoinClassValue): string => {
   if (!value && value !== 0 && value !== 0n) return "";
 
