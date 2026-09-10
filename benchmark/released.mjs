@@ -7,12 +7,38 @@ const repoRoot = path.resolve(import.meta.dirname, "..");
 const cacheRoot = path.join(os.tmpdir(), "tailwind-variants-benchmark");
 const safeVersion = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/;
 
+/** Tokens cmd.exe will not reinterpret: no spaces, quotes, or metacharacters. */
+const shellSafeArgument = /^[\w@./+:-]+$/;
+
 const readJson = (filePath) => JSON.parse(readFileSync(filePath, "utf8"));
 
+/**
+ * Unix: run `pnpm` directly.
+ * Windows: `pnpm` is a `.cmd` shim. Bare name → ENOENT; naming the shim → EINVAL.
+ * Join into one string and set `shell: true`. Only admit safe tokens.
+ */
+export const buildPnpmInvocation = (args, platform = process.platform) => {
+  if (platform !== "win32") {
+    return {file: "pnpm", args, useShell: false};
+  }
+
+  for (const argument of args) {
+    if (!shellSafeArgument.test(argument)) {
+      throw new TypeError(
+        `Refusing to pass ${JSON.stringify(argument)} through the Windows shell unescaped.`,
+      );
+    }
+  }
+
+  return {file: `pnpm ${args.join(" ")}`, args: [], useShell: true};
+};
+
 const runPnpm = (args, options = {}) => {
-  const output = execFileSync("pnpm", args, {
+  const invocation = buildPnpmInvocation(args);
+  const output = execFileSync(invocation.file, invocation.args, {
     encoding: "utf8",
     stdio: ["ignore", "pipe", "inherit"],
+    shell: invocation.useShell,
     ...options,
   });
 
