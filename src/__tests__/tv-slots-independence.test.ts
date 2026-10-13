@@ -2,6 +2,7 @@ import {describe, expect, test} from "vitest";
 
 import {createTV, tv} from "../index";
 import {createTV as createTVLite, tv as tvLite} from "../lite";
+import {defineSlots, type LooseRecord} from "./support/loose.js";
 
 const slotsConfig = {
   slots: {
@@ -250,9 +251,11 @@ describe.each(runtimes)("%s slots independence (#304)", (_label, createTv) => {
 
     expect(primary).not.toBe(secondary);
     expect(primary.title()).toHaveClass(["title-base"]);
-    expect(primary.title()).not.toHaveClass(["truncate"]);
     expect(secondary.title()).toHaveClass(["title-base", "truncate"]);
-    expect(primary.title()).not.toHaveClass(["truncate"]);
+    // Positive and exact, because `toHaveClass` is set equality: the negative form here would
+    // only fail if the result were EXACTLY {truncate}, so a contaminated "title-base truncate"
+    // would slip through the one assertion guarding against contamination.
+    expect(primary.title()).toHaveClass(["title-base"]);
   });
 
   test("invalidates parent cache after in-place compoundVariants mutation", () => {
@@ -271,13 +274,17 @@ describe.each(runtimes)("%s slots independence (#304)", (_label, createTv) => {
       defaultVariants: {color: "primary"},
     });
 
+    // Called repeatedly before mutating: the first parent invoke skips the cache, so a single
+    // call here would leave `parentCache` empty and the assertions below would pass even with
+    // invalidation removed entirely.
+    expect(menu({color: "primary"}).title()).toHaveClass(["title", "title-p", "compound-old"]);
+    expect(menu({color: "primary"}).title()).toHaveClass(["title", "title-p", "compound-old"]);
     expect(menu({color: "primary"}).title()).toHaveClass(["title", "title-p", "compound-old"]);
 
     menu.compoundVariants[0].color = "secondary";
     menu.compoundVariants[0].class = {title: "compound-new"};
 
     expect(menu({color: "primary"}).title()).toHaveClass(["title", "title-p"]);
-    expect(menu({color: "primary"}).title()).not.toHaveClass(["compound-old", "compound-new"]);
     expect(menu({color: "secondary"}).title()).toHaveClass(["title", "title-s", "compound-new"]);
   });
 
@@ -305,11 +312,53 @@ describe.each(runtimes)("%s slots independence (#304)", (_label, createTv) => {
       },
     });
 
+    // Called repeatedly before mutating, for the same reason as above.
+    expect(menu().title()).toHaveClass(["title-base", "truncate"]);
+    expect(menu().title()).toHaveClass(["title-base", "truncate"]);
     expect(menu().title()).toHaveClass(["title-base", "truncate"]);
 
     menu.compoundSlots[0].class = "line-clamp-2";
 
     expect(menu().title()).toHaveClass(["title-base", "line-clamp-2"]);
-    expect(menu().title()).not.toHaveClass(["truncate"]);
+  });
+
+  test("a held result answers the same way whether or not a parent call happened in between", () => {
+    // A slots result is handed to a consumer who keeps it and calls its slot functions later —
+    // in React, across renders, interleaved with other components' results and with metadata
+    // mutations. Everything a slot function renders from therefore has to be captured WITH the
+    // result, exactly as its props already are. Reading the per-slot compound index from the
+    // resolver instead makes the same held result, given the same argument, answer differently
+    // depending on whether some unrelated call happened to rebuild that index in between.
+    const compound: LooseRecord = {slots: ["label"], tone: "on", class: "cs"};
+    const menu = defineSlots(createTv, {
+      slots: {base: "root", label: "lbl"},
+      variants: {tone: {on: {base: "b-on", label: "l-on"}}},
+      compoundSlots: [compound],
+      defaultVariants: {tone: "on"},
+    });
+
+    for (let call = 0; call < 3; call++) menu({tone: "on"});
+
+    const held = menu({tone: "on"});
+
+    // Retarget the compound slot. `held` was built before this and must stay internally
+    // consistent; what a NEW call renders is a separate question, pinned elsewhere.
+    compound.slots = ["base"];
+
+    // Slot props force a recompute rather than returning the memoised core, which is where a
+    // live read of the index would show.
+    const before = {base: held.base({tone: "on"}), label: held.label({tone: "on"})};
+
+    menu({tone: "on"});
+
+    const after = {base: held.base({tone: "on"}), label: held.label({tone: "on"})};
+
+    expect(after).toEqual(before);
+
+    // And a fresh call does see the retarget — capturing must not mean freezing the component.
+    const fresh = menu({tone: "on"});
+
+    expect(fresh.base()).toHaveClass(["root", "b-on", "cs"]);
+    expect(fresh.label()).toHaveClass(["lbl", "l-on"]);
   });
 });

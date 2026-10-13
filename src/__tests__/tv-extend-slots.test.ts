@@ -1,6 +1,7 @@
 import {describe, expect, test} from "vitest";
 
 import {tv} from "../index";
+import {defineSlots} from "./support/loose.js";
 
 describe("tv.extend (slots)", () => {
   test("inherits parent slots when the child defines no slots", () => {
@@ -546,5 +547,26 @@ describe("tv.extend (slots)", () => {
       "color--red--wrapper--menuBase",
       "color--red--isBig--wrapper--menuBase",
     ]);
+  });
+
+  test("an extended slots component with no compounds reuses its parent result", () => {
+    // Extending a slots component and adding a slot, with no compounds anywhere, is the plainest
+    // composition the library offers and the only mainstream shape with no warm coverage — every
+    // other extend case either carries compounds or is called once. Warm is what puts the parent
+    // cache under test: the same props must hand back the same result object.
+    const parent = defineSlots(tv, {
+      slots: {base: "base"},
+      variants: {tone: {loud: {base: "tone-loud"}}},
+    });
+    const child = defineSlots(tv, {extend: parent, slots: {title: "title"}});
+
+    child({tone: "loud"});
+
+    const first = child({tone: "loud"});
+    const second = child({tone: "loud"});
+
+    expect(first).toBe(second);
+    expect(first.base()).toHaveClass(["base", "tone-loud"]);
+    expect(first.title()).toHaveClass(["title"]);
   });
 });

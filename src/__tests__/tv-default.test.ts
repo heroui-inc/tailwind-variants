@@ -1,6 +1,7 @@
 import {describe, expect, test} from "vitest";
 
 import {tv} from "../index";
+import {defineVariants} from "./support/loose.js";
 
 describe("tv", () => {
   test("flattens nested class arrays", () => {
@@ -490,6 +491,11 @@ describe("tv", () => {
       compoundVariants: [{color: "red", class: "font-normal"}],
     });
 
+    // Called repeatedly before mutating: the first invoke skips the cache, so a single call
+    // here would leave nothing cached and the assertions below would pass even with
+    // invalidation removed entirely.
+    expect(button({color: "red"})).toBe("text-red-500 font-normal");
+    expect(button({color: "red"})).toBe("text-red-500 font-normal");
     expect(button({color: "red"})).toBe("text-red-500 font-normal");
 
     button.compoundVariants[0].color = "blue";
@@ -497,5 +503,25 @@ describe("tv", () => {
 
     expect(button({color: "red"})).toBe("text-red-500");
     expect(button({color: "blue"})).toBe("text-blue-500 font-bold");
+  });
+
+  test("an array variant value selects nothing rather than stringifying into a key", () => {
+    // A variant value is looked up by property name, and every JS value answers to one. `["sm"]`
+    // stringifies to exactly `"sm"`, so without the object guard a caller who hands over a
+    // reactive box, a ref array or a stray array gets the `sm` variant they never asked for — and
+    // the value is unkeyable, so the wrong answer is recomputed rather than cached where someone
+    // might notice it. The prop WAS provided, so the default must not step in either.
+    const button = defineVariants(tv, {
+      base: "base",
+      variants: {size: {sm: "text-sm", lg: "text-lg"}},
+      defaultVariants: {size: "lg"},
+    });
+
+    expect(button({size: "sm"})).toHaveClass(["base", "text-sm"]);
+
+    // The array is what discriminates: `{}` stringifies to a name no variant answers to, so it is
+    // inert with or without the guard.
+    expect(button({size: ["sm"]})).toHaveClass(["base"]);
+    expect(button({size: {}})).toHaveClass(["base"]);
   });
 });
