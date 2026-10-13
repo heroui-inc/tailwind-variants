@@ -1,0 +1,416 @@
+import {describe, expect, test} from "vitest";
+
+import {tv} from "../index";
+
+describe("tv (compound slots)", () => {
+  test("applies compound slots without variants", () => {
+    const pagination = tv({
+      slots: {
+        base: "flex flex-wrap relative gap-1 max-w-fit",
+        item: "",
+        prev: "",
+        next: "",
+        cursor: ["absolute", "flex", "overflow-visible"],
+      },
+      compoundSlots: [
+        {
+          slots: ["item", "prev", "next"],
+          class: ["flex", "flex-wrap", "truncate"],
+        },
+      ],
+    });
+    const {base, item, prev, next, cursor} = pagination();
+
+    expect(base()).toHaveClass(["flex", "flex-wrap", "relative", "gap-1", "max-w-fit"]);
+    expect(item()).toHaveClass(["flex", "flex-wrap", "truncate"]);
+    expect(prev()).toHaveClass(["flex", "flex-wrap", "truncate"]);
+    expect(next()).toHaveClass(["flex", "flex-wrap", "truncate"]);
+    expect(cursor()).toHaveClass(["absolute", "flex", "overflow-visible"]);
+  });
+
+  test("preserves deferred validation for invalid compoundSlots", () => {
+    const component = tv({
+      slots: {base: "base"},
+      // @ts-expect-error runtime validation coverage
+      compoundSlots: {},
+    });
+
+    expect(component).toThrow('The "compoundSlots" prop must be an array. Received: object');
+  });
+
+  test("matches one default variant in compound slots", () => {
+    const pagination = tv({
+      slots: {
+        base: "flex flex-wrap relative gap-1 max-w-fit",
+        item: "",
+        prev: "",
+        next: "",
+        cursor: ["absolute", "flex", "overflow-visible"],
+      },
+      variants: {
+        size: {
+          xs: {},
+          sm: {},
+          md: {},
+          lg: {},
+          xl: {},
+        },
+      },
+      compoundSlots: [
+        {
+          slots: ["item", "prev", "next"],
+          class: ["flex", "flex-wrap", "truncate"],
+        },
+        {
+          slots: ["item", "prev", "next"],
+          size: "xs",
+          class: "w-7 h-7 text-xs",
+        },
+      ],
+      defaultVariants: {
+        size: "xs",
+      },
+    });
+    const {base, item, prev, next, cursor} = pagination();
+
+    expect(base()).toHaveClass(["flex", "flex-wrap", "relative", "gap-1", "max-w-fit"]);
+    expect(item()).toHaveClass(["flex", "flex-wrap", "truncate", "w-7", "h-7", "text-xs"]);
+    expect(prev()).toHaveClass(["flex", "flex-wrap", "truncate", "w-7", "h-7", "text-xs"]);
+    expect(next()).toHaveClass(["flex", "flex-wrap", "truncate", "w-7", "h-7", "text-xs"]);
+    expect(cursor()).toHaveClass(["absolute", "flex", "overflow-visible"]);
+  });
+
+  test("matches one explicit variant in compound slots", () => {
+    const pagination = tv({
+      slots: {
+        base: "flex flex-wrap relative gap-1 max-w-fit",
+        item: "",
+        prev: "",
+        next: "",
+        cursor: ["absolute", "flex", "overflow-visible"],
+      },
+      variants: {
+        size: {
+          xs: {},
+          sm: {},
+          md: {},
+          lg: {},
+          xl: {},
+        },
+      },
+      compoundSlots: [
+        {
+          slots: ["item", "prev", "next"],
+          class: ["flex", "flex-wrap", "truncate"],
+        },
+        {
+          slots: ["item", "prev", "next"],
+          size: "xs",
+          class: "w-7 h-7 text-xs",
+        },
+      ],
+      defaultVariants: {
+        size: "sm",
+      },
+    });
+    const {base, item, prev, next, cursor} = pagination({
+      size: "xs",
+    });
+
+    expect(base()).toHaveClass(["flex", "flex-wrap", "relative", "gap-1", "max-w-fit"]);
+    expect(item()).toHaveClass(["flex", "flex-wrap", "truncate", "w-7", "h-7", "text-xs"]);
+    expect(prev()).toHaveClass(["flex", "flex-wrap", "truncate", "w-7", "h-7", "text-xs"]);
+    expect(next()).toHaveClass(["flex", "flex-wrap", "truncate", "w-7", "h-7", "text-xs"]);
+    expect(cursor()).toHaveClass(["absolute", "flex", "overflow-visible"]);
+  });
+
+  test("matches one boolean variant in compound slots", () => {
+    const nav = tv({
+      base: "base",
+      slots: {
+        toggle: "slot--toggle",
+        item: "slot--item",
+      },
+      variants: {
+        isActive: {
+          true: "",
+        },
+      },
+      compoundSlots: [
+        {
+          slots: ["item", "toggle"],
+          class: "compound--item-toggle",
+        },
+        {
+          slots: ["item", "toggle"],
+          isActive: true,
+          class: "compound--item-toggle--active",
+        },
+      ],
+    });
+
+    let styles = nav({isActive: false});
+
+    expect(styles.base()).toHaveClass(["base"]);
+    expect(styles.toggle()).toHaveClass(["slot--toggle", "compound--item-toggle"]);
+    expect(styles.item()).toHaveClass(["slot--item", "compound--item-toggle"]);
+
+    styles = nav({isActive: true});
+
+    expect(styles.base()).toHaveClass(["base"]);
+    expect(styles.toggle()).toHaveClass([
+      "slot--toggle",
+      "compound--item-toggle",
+      "compound--item-toggle--active",
+    ]);
+    expect(styles.item()).toHaveClass([
+      "slot--item",
+      "compound--item-toggle",
+      "compound--item-toggle--active",
+    ]);
+  });
+
+  test("treats missing boolean variants as false in compoundSlots", () => {
+    const nav = tv({
+      slots: {
+        item: "slot--item",
+      },
+      variants: {
+        isActive: {
+          true: {
+            item: "active",
+          },
+        },
+      },
+      compoundSlots: [
+        {
+          slots: ["item"],
+          isActive: false,
+          class: "scalar-false",
+        },
+        {
+          slots: ["item"],
+          isActive: [false],
+          class: "array-false",
+        },
+        {
+          slots: ["item"],
+          isActive: [false, undefined],
+          class: "array-explicit-undefined",
+        },
+      ],
+    });
+
+    expect(nav().item()).toHaveClass([
+      "slot--item",
+      "scalar-false",
+      "array-false",
+      "array-explicit-undefined",
+    ]);
+    expect(nav({isActive: true}).item()).toHaveClass(["slot--item", "active"]);
+  });
+
+  test("matches multiple default variants in compound slots", () => {
+    const pagination = tv({
+      slots: {
+        base: "flex flex-wrap relative gap-1 max-w-fit",
+        item: "",
+        prev: "",
+        next: "",
+        cursor: ["absolute", "flex", "overflow-visible"],
+      },
+      variants: {
+        size: {
+          xs: {},
+          sm: {},
+          md: {},
+          lg: {},
+          xl: {},
+        },
+        color: {
+          primary: {},
+          secondary: {},
+        },
+        isBig: {
+          true: {},
+        },
+      },
+      compoundSlots: [
+        {
+          slots: ["item", "prev", "next"],
+          class: ["flex", "flex-wrap", "truncate"],
+        },
+        {
+          slots: ["item", "prev", "next"],
+          size: "xs",
+          color: "primary",
+          isBig: false,
+          class: "w-7 h-7 text-xs",
+        },
+      ],
+      defaultVariants: {
+        size: "xs",
+        color: "primary",
+        isBig: false,
+      },
+    });
+    const {base, item, prev, next, cursor} = pagination();
+
+    expect(base()).toHaveClass(["flex", "flex-wrap", "relative", "gap-1", "max-w-fit"]);
+    expect(item()).toHaveClass(["flex", "flex-wrap", "truncate", "w-7", "h-7", "text-xs"]);
+    expect(prev()).toHaveClass(["flex", "flex-wrap", "truncate", "w-7", "h-7", "text-xs"]);
+    expect(next()).toHaveClass(["flex", "flex-wrap", "truncate", "w-7", "h-7", "text-xs"]);
+    expect(cursor()).toHaveClass(["absolute", "flex", "overflow-visible"]);
+  });
+
+  test("matches multiple explicit variants in compound slots", () => {
+    const pagination = tv({
+      slots: {
+        base: "flex flex-wrap relative gap-1 max-w-fit",
+        item: "",
+        prev: "",
+        next: "",
+        cursor: ["absolute", "flex", "overflow-visible"],
+      },
+      variants: {
+        size: {
+          xs: {},
+          sm: {},
+          md: {},
+          lg: {},
+          xl: {},
+        },
+        color: {
+          primary: {},
+          secondary: {},
+        },
+        isBig: {
+          true: {},
+        },
+      },
+      compoundSlots: [
+        {
+          slots: ["item", "prev", "next"],
+          class: ["flex", "flex-wrap", "truncate"],
+        },
+        {
+          slots: ["item", "prev", "next"],
+          size: "xs",
+          color: "primary",
+          isBig: true,
+          class: "w-7 h-7 text-xs",
+        },
+      ],
+      defaultVariants: {
+        size: "sm",
+        color: "secondary",
+        isBig: false,
+      },
+    });
+    const {base, item, prev, next, cursor} = pagination({
+      size: "xs",
+      color: "primary",
+      isBig: true,
+    });
+
+    expect(base()).toHaveClass(["flex", "flex-wrap", "relative", "gap-1", "max-w-fit"]);
+    expect(item()).toHaveClass(["flex", "flex-wrap", "truncate", "w-7", "h-7", "text-xs"]);
+    expect(prev()).toHaveClass(["flex", "flex-wrap", "truncate", "w-7", "h-7", "text-xs"]);
+    expect(next()).toHaveClass(["flex", "flex-wrap", "truncate", "w-7", "h-7", "text-xs"]);
+    expect(cursor()).toHaveClass(["absolute", "flex", "overflow-visible"]);
+  });
+});
+
+describe("tv (compoundVariants array class without slot key)", () => {
+  test("applies array class to base when no slot key is specified", () => {
+    const component = tv({
+      base: "",
+      slots: {title: ""},
+      compoundVariants: [{class: ["truncate"]}],
+    });
+
+    const {base, title} = component();
+
+    expect(base()).toHaveClass(["truncate"]);
+    expect(title()).not.toHaveClass(["truncate"]);
+  });
+
+  test("applies array className to base when no slot key is specified", () => {
+    const component = tv({
+      base: "",
+      slots: {title: ""},
+      compoundVariants: [{className: ["truncate", "font-bold"]}],
+    });
+
+    const {base, title} = component();
+
+    expect(base()).toHaveClass(["truncate", "font-bold"]);
+    expect(title()).not.toHaveClass(["truncate", "font-bold"]);
+  });
+
+  test("applies array class to base under variant conditions", () => {
+    const component = tv({
+      base: "font-medium",
+      slots: {icon: ""},
+      variants: {size: {sm: "text-sm", lg: "text-lg"}},
+      compoundVariants: [{size: "sm", class: ["truncate", "underline"]}],
+    });
+
+    const {base, icon} = component({size: "sm"});
+
+    expect(base()).toHaveClass(["font-medium", "text-sm", "truncate", "underline"]);
+    expect(icon()).not.toHaveClass(["truncate", "underline"]);
+
+    expect(component({size: "lg"}).base()).toHaveClass(["font-medium", "text-lg"]);
+  });
+
+  test("keeps array class and slot-keyed object class independent", () => {
+    const component = tv({
+      base: "text-3xl",
+      slots: {title: "text-2xl"},
+      variants: {
+        color: {primary: {}, tertiary: {}},
+      },
+      compoundVariants: [
+        {color: "tertiary", class: ["color--tertiary-base"]},
+        {color: "tertiary", class: {title: "color--tertiary-title"}},
+      ],
+      defaultVariants: {color: "primary"},
+    });
+
+    const {base, title} = component({color: "tertiary"});
+
+    expect(base()).toHaveClass(["text-3xl", "color--tertiary-base"]);
+    expect(title()).toHaveClass(["text-2xl", "color--tertiary-title"]);
+  });
+
+  test("filters falsy entries in array class targeting base", () => {
+    const component = tv({
+      base: "",
+      slots: {title: ""},
+      compoundVariants: [{class: ["truncate", null, false]}],
+    });
+
+    const {base, title} = component();
+
+    expect(base()).toHaveClass(["truncate"]);
+    expect(title()).not.toHaveClass(["truncate"]);
+  });
+
+  test("array class targeting base coexists with scalar string class", () => {
+    const component = tv({
+      base: "",
+      slots: {title: ""},
+      compoundVariants: [
+        {class: ["truncate"]},
+        {class: "font-bold"},
+        {class: {title: "title--compound"}},
+      ],
+    });
+
+    const {base, title} = component();
+
+    expect(base()).toHaveClass(["truncate", "font-bold"]);
+    expect(title()).toHaveClass(["title--compound"]);
+  });
+});

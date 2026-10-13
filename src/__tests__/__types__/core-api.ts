@@ -1,16 +1,18 @@
-import {
-  createTV,
-  type TV,
-  type TVLite,
-  type TVReturnProps,
-  type TVReturnType,
-  tv,
-  type VariantProps,
+import type {TVCustomConfig} from "../../config-entry.js";
+import type {
+  TV,
+  TVCompoundSlots,
+  TVLite,
+  TVReturnProps,
+  TVReturnType,
+  VariantProps,
 } from "../../index.js";
-import {createTV as createLiteTV, tv as liteTV} from "../../lite.js";
+import type {TVConfig, TVLiteConfig, TwMergeFn} from "../../lite.js";
+import type {Assert, Extends, IsEqual} from "./test-utils.js";
 
-type Assert<T extends true> = T;
-type Extends<Left, Right> = Left extends Right ? true : false;
+import {tv as customTV} from "../../config-entry.js";
+import {createTV, tv} from "../../index.js";
+import {createCN, createTV as createLiteTV, tv as liteTV} from "../../lite.js";
 
 // Case: infer callable props, return type, and VariantProps from basic variants.
 const button = tv({
@@ -54,6 +56,266 @@ const extendedButton = tv({
 });
 
 extendedButton({color: "primary", size: "lg"});
+
+// Case: multi-parent extend merges variant axes from each parent into VariantProps.
+const focusable = tv({
+  base: "focus-visible:ring-2",
+  variants: {
+    focus: {
+      visible: "ring-2",
+      none: "ring-0",
+    },
+  },
+});
+const animated = tv({
+  base: "transition-all",
+  variants: {
+    motion: {
+      normal: "duration-150",
+      slow: "duration-300",
+    },
+  },
+});
+const multiExtended = tv({
+  extend: [focusable, animated],
+  base: "inline-flex",
+  variants: {
+    size: {
+      sm: "text-sm",
+      lg: "text-lg",
+    },
+  },
+});
+
+const multiProps: VariantProps<typeof multiExtended> = {
+  focus: "visible",
+  motion: "slow",
+  size: "lg",
+};
+
+multiExtended(multiProps);
+
+// @ts-expect-error variant keys not on any parent or the child are rejected
+multiExtended({tone: "neutral"});
+
+type MultiExtendMetadata = Assert<
+  Extends<typeof multiExtended.extend, readonly [typeof focusable, typeof animated]>
+>;
+
+const multiExtendChecks: MultiExtendMetadata = true;
+
+void multiProps;
+void multiExtendChecks;
+
+// Case: overlapping parent variant axes union their option keys in VariantProps.
+const sizeLeft = tv({
+  variants: {
+    size: {
+      sm: "text-sm",
+      md: "text-base",
+    },
+  },
+});
+const sizeRight = tv({
+  variants: {
+    size: {
+      sm: "py-1",
+      lg: "text-lg",
+    },
+  },
+});
+const sizeMerged = tv({
+  extend: [sizeLeft, sizeRight],
+});
+
+const sizeMergedProps: VariantProps<typeof sizeMerged> = {size: "lg"};
+
+sizeMerged({size: "sm"});
+sizeMerged({size: "md"});
+sizeMerged(sizeMergedProps);
+
+type SizeMergedSize = NonNullable<VariantProps<typeof sizeMerged>["size"]>;
+// Overlapping parent axes must resolve to the exact option union (not `string`).
+type SizeMergedSizeChecks = [
+  Assert<IsEqual<SizeMergedSize, "sm" | "md" | "lg">>,
+  Assert<Extends<"sm", SizeMergedSize>>,
+  Assert<Extends<"md", SizeMergedSize>>,
+  Assert<Extends<"lg", SizeMergedSize>>,
+];
+
+const sizeMergedSizeChecks: SizeMergedSizeChecks = [true, true, true, true];
+
+void sizeMergedSizeChecks;
+
+// @ts-expect-error overlapping merged size rejects options outside the union
+sizeMerged({size: "xl"});
+
+// Case: defaultVariants may target variant keys inherited from parents.
+tv({
+  extend: [focusable, animated],
+  defaultVariants: {
+    focus: "visible",
+    motion: "slow",
+  },
+});
+
+tv({
+  extend: [focusable, animated],
+  defaultVariants: {
+    // @ts-expect-error defaultVariants reject invalid values on inherited parent axes
+    focus: "nope",
+  },
+});
+
+tv({
+  extend: [focusable, animated],
+  defaultVariants: {
+    // @ts-expect-error defaultVariants reject keys absent from parents and child (Exact)
+    tone: "neutral",
+  },
+});
+
+// Case: multi-parent slots appear on the returned slot map.
+const frameSlots = tv({
+  slots: {
+    base: "rounded-xl",
+    title: "font-medium",
+  },
+});
+const mediaSlots = tv({
+  slots: {
+    base: "border",
+    media: "aspect-video",
+  },
+});
+const multiSlotted = tv({
+  extend: [frameSlots, mediaSlots],
+  slots: {
+    title: "text-base",
+  },
+});
+
+const multiSlotResult = multiSlotted();
+
+multiSlotResult.base();
+multiSlotResult.title();
+multiSlotResult.media();
+
+// @ts-expect-error unknown slots remain rejected after multi-parent slot merge
+multiSlotResult.footer();
+
+// Case: child compoundVariants may condition on parent variant axes.
+tv({
+  extend: [focusable, animated],
+  compoundVariants: [{focus: "visible", motion: "slow", class: "combo"}],
+});
+
+tv({
+  extend: [focusable, animated],
+  // @ts-expect-error compoundVariants reject invalid values on inherited parent axes
+  compoundVariants: [{focus: "nope", class: "nope"}],
+});
+
+// Case: child compoundSlots may condition on parent variant axes and inherited slots.
+const sizedSlots = tv({
+  slots: {
+    base: "slot-base",
+    icon: "slot-icon",
+  },
+  variants: {
+    size: {
+      sm: {},
+      lg: {},
+    },
+  },
+});
+const tonalOnly = tv({
+  variants: {
+    tone: {
+      neutral: "",
+      info: "",
+    },
+  },
+});
+
+type MultiParentCompoundSlots = TVCompoundSlots<
+  undefined,
+  typeof sizedSlots.slots,
+  undefined,
+  typeof sizedSlots.variants & typeof tonalOnly.variants
+>;
+
+const multiParentCompoundSlots: MultiParentCompoundSlots = [
+  {slots: ["base", "icon"], size: "sm", tone: "info", class: "cs-combo"},
+];
+
+const multiParentCompoundSlotsBad: MultiParentCompoundSlots = [
+  // @ts-expect-error compoundSlots reject unknown slots after multi-parent merge
+  {slots: ["footer"], size: "sm", class: "nope"},
+];
+
+// Factory accepts child compoundSlots conditioned on parent axes/slots without redeclaring them.
+tv({
+  extend: [sizedSlots, tonalOnly],
+  compoundSlots: [{slots: ["base", "icon"], size: "sm", tone: "info", class: "cs-combo"}],
+});
+
+void multiParentCompoundSlots;
+void multiParentCompoundSlotsBad;
+
+tv({
+  // @ts-expect-error extend requires a non-empty TVExtendList
+  extend: [],
+  base: "inline-flex",
+});
+
+tv({
+  // @ts-expect-error extend arrays reject non-tv values
+  extend: [focusable, "not-a-component"],
+  base: "inline-flex",
+});
+
+// Case: lite multi-parent extend keeps the same VariantProps merge behavior.
+const liteFocusable = liteTV({
+  variants: {
+    focus: {
+      visible: "ring-2",
+      none: "ring-0",
+    },
+  },
+});
+const liteAnimated = liteTV({
+  variants: {
+    motion: {
+      normal: "duration-150",
+      slow: "duration-300",
+    },
+  },
+});
+const liteMultiExtended = liteTV({
+  extend: [liteFocusable, liteAnimated],
+  variants: {
+    size: {
+      sm: "text-sm",
+      lg: "text-lg",
+    },
+  },
+});
+
+const liteMultiProps: VariantProps<typeof liteMultiExtended> = {
+  focus: "visible",
+  motion: "slow",
+  size: "lg",
+};
+
+liteMultiExtended(liteMultiProps);
+
+// @ts-expect-error lite multi-extend also rejects unknown variant keys
+liteMultiExtended({tone: "neutral"});
+
+void sizeMergedProps;
+void multiSlotResult;
+void liteMultiProps;
 
 // Case: expose the source component and all return metadata fields.
 type ExtendedMetadata = Assert<Extends<typeof extendedButton.extend, typeof button>>;
@@ -133,7 +395,7 @@ const extendedImplicitBase = tv({
 
 extendedImplicitBase().base();
 
-// Case: return a string for a component without slot mode.
+// Case: return a string for a component without slots.
 const plainComponent = tv({base: "block"});
 const plainComponentClass: string = plainComponent();
 
@@ -263,11 +525,66 @@ const liteChild = liteFactory({
 
 liteChild({tone: "neutral", size: "sm", weight: "bold"});
 
-// @ts-expect-error full createTV keeps its existing required config parameter
+// @ts-expect-error full createTV requires a config object
 createTV();
 
-// @ts-expect-error lite createTV keeps its existing no-argument contract
-createLiteTV({twMerge: false});
+const liteWithMerge: TVLite = createLiteTV({twMerge: (classList) => classList});
 
-// @ts-expect-error TVLite has no per-component config argument
+void liteWithMerge;
+
 liteTV({base: "block"}, {twMerge: false});
+liteTV({base: "block"}, {twMerge: (classList) => classList});
+
+// @ts-expect-error lite factory does not accept twMergeConfig
+createLiteTV({twMergeConfig: {}});
+
+// @ts-expect-error lite factory does not accept debug
+createLiteTV({debug: true});
+
+// @ts-expect-error lite per-call config does not accept twMergeConfig
+liteTV({base: "block"}, {twMergeConfig: {}});
+
+const identity: TwMergeFn = (classList) => classList;
+const liteConfig: TVLiteConfig = {twMerge: identity};
+const _fullConfig: TVConfig = {twMerge: identity, debug: false};
+
+void createLiteTV(liteConfig);
+void _fullConfig;
+
+const boundCn = createCN({twMerge: identity});
+const boundOut: string = boundCn("px-2", "px-4");
+
+void boundOut;
+
+// @ts-expect-error createCN does not accept twMergeConfig
+createCN({twMergeConfig: {}});
+
+// Case: single-signature TV contextually types wrapper parameters; no
+// annotations or assertions needed, and the return type stays checked.
+const _myTV: TV = (options, config) => {
+  return tv(options, {
+    ...config,
+    twMerge: config?.twMerge ?? false,
+  });
+};
+
+void _myTV;
+
+// Case: the config entry's TV carries twMergeConfig through a wrapper.
+const _myCustomTV: TV<TVCustomConfig> = (options, config) => {
+  return customTV(options, {
+    ...config,
+    twMerge: config?.twMerge ?? false,
+    twMergeConfig: {
+      ...config?.twMergeConfig,
+      classGroups: {
+        ...config?.twMergeConfig?.classGroups,
+      },
+      theme: {
+        ...config?.twMergeConfig?.theme,
+      },
+    },
+  });
+};
+
+void _myCustomTV;
