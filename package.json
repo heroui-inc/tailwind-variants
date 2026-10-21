@@ -98,7 +98,7 @@
     "tinybench": "6.1.2",
     "tsup": "8.5.1",
     "typescript": "5.6.3",
-    "vitest": "4.1.10"
+    "vitest": "4.1.11"
   },
   "peerDependencies": {
     "tailwind-merge": ">=3.0.0",

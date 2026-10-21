@@ -1,5 +1,13 @@
 saveExact: true
 
+overrides:
+  # Keep transitive build and template tooling on patched versions.
+  "tsup@8.5.1>esbuild": "0.28.1"
+  "giget@1.2.5>tar": "7.5.22"
+  "nanoid@<3.3.18": "3.3.18"
+  "source-map-js@>=1.0.0 <1.2.2": "1.2.2"
+  "vite@>=8.0.0 <=8.1.5": "8.1.6"
+
 allowBuilds:
   "@swc/core": false
   esbuild: true
