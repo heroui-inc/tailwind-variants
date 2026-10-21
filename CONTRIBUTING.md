@@ -14,7 +14,7 @@ Welcome, and thanks for your interest in contributing! Please take a moment to r
 
 1. [Fork the repo](https://docs.github.com/en/github/getting-started-with-github/fork-a-repo) and clone to your machine.
 2. Create a new branch with your contribution.
-3. Install [npm](https://docs.npmjs.com/downloading-and-installing-node-js-and-npm) on your machine.
+3. Use the Node.js version in `.nvmrc` and the pnpm version in `package.json`.
 4. In the repo, install dependencies via:
    ```sh
    pnpm i
