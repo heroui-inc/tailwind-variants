@@ -1,5 +1,9 @@
 saveExact: true
 
+overrides:
+  # Replace the legacy c12/giget chain that pulls vulnerable braces and tar releases.
+  "changelogithub@15.0.5>changelogen": "0.6.2"
+
 allowBuilds:
   "@swc/core": false
   esbuild: true
