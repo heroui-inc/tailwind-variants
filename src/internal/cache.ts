@@ -59,24 +59,17 @@ const serializeFingerprintValue = (value: unknown): string | null => {
   return null;
 };
 
-const appendSignatureValue = (out: string, value: unknown): string => {
-  if (value === undefined) return out;
-  if (value === null) return out + "null";
-
-  const type = typeof value;
-
-  if (type === "string" || type === "number" || type === "boolean" || type === "bigint") {
-    return out + String(value);
-  }
+const snapshotCompoundValue = (value: unknown): unknown => {
+  if (value === null || typeof value !== "object") return value;
 
   if (Array.isArray(value)) {
-    return out + value.join("\0");
+    return value.join("\0");
   }
 
   try {
-    return out + JSON.stringify(value);
+    return JSON.stringify(value);
   } catch {
-    return out + "?";
+    return "?";
   }
 };
 
@@ -152,54 +145,62 @@ export const buildPropsFingerprint = (
   return fingerprint;
 };
 
-/** Invalidates cache when compound metadata mutates. */
-export const buildCompoundsSignature = (
+const visitCompoundValues = (
   compoundVariants: CompiledCompoundVariant[],
   compoundSlots: CompiledCompoundSlot[],
-): string => {
-  let signature = "";
-
+  visit: (value: unknown) => void,
+): void => {
   for (let i = 0; i < compoundVariants.length; i++) {
     const {conditionKeys, source} = compoundVariants[i];
 
-    for (let j = 0; j < conditionKeys.length; j++) {
-      const key = conditionKeys[j];
+    for (let j = 0; j < conditionKeys.length; j++) visit(source[conditionKeys[j]]);
 
-      signature += key + "=";
-      signature = appendSignatureValue(signature, source[key]);
-      signature += ",";
-    }
-
-    signature += "c=";
-    signature = appendSignatureValue(signature, source.class);
-    signature += "|cn=";
-    signature = appendSignatureValue(signature, source.className);
-    signature += ";";
+    visit(source.class);
+    visit(source.className);
   }
 
   for (let i = 0; i < compoundSlots.length; i++) {
     const {conditionKeys, source} = compoundSlots[i];
 
-    for (let j = 0; j < conditionKeys.length; j++) {
-      const key = conditionKeys[j];
+    for (let j = 0; j < conditionKeys.length; j++) visit(source[conditionKeys[j]]);
 
-      signature += key + "=";
-      signature = appendSignatureValue(signature, source[key]);
-      signature += ",";
-    }
-
-    if (Array.isArray(source.slots)) {
-      signature += "slots=" + source.slots.join(",") + ",";
-    }
-
-    signature += "c=";
-    signature = appendSignatureValue(signature, source.class);
-    signature += "|cn=";
-    signature = appendSignatureValue(signature, source.className);
-    signature += ";";
+    visit(Array.isArray(source.slots) ? source.slots.join(",") : undefined);
+    visit(source.class);
+    visit(source.className);
   }
+};
 
-  return signature;
+/** Reports whether compound metadata changed in place since the previous call. */
+export const createCompoundsGuard = () => {
+  let snapshot: unknown[] | null = null;
+  let index = 0;
+  let changed = false;
+
+  const take = (value: unknown) => {
+    snapshot!.push(snapshotCompoundValue(value));
+  };
+  const compare = (value: unknown) => {
+    if (!changed && !Object.is(snapshot![index], snapshotCompoundValue(value))) changed = true;
+    index++;
+  };
+
+  return (
+    compoundVariants: CompiledCompoundVariant[],
+    compoundSlots: CompiledCompoundSlot[],
+  ): boolean => {
+    if (snapshot !== null) {
+      index = 0;
+      changed = false;
+      visitCompoundValues(compoundVariants, compoundSlots, compare);
+
+      if (!changed && index === snapshot.length) return false;
+    }
+
+    snapshot = [];
+    visitCompoundValues(compoundVariants, compoundSlots, take);
+
+    return true;
+  };
 };
 
 type BoundedCache<T> = {

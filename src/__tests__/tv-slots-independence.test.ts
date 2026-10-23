@@ -312,4 +312,28 @@ describe.each(runtimes)("%s slots independence (#304)", (_label, createTv) => {
     expect(menu().title()).toHaveClass(["title-base", "line-clamp-2"]);
     expect(menu().title()).not.toHaveClass(["truncate"]);
   });
+
+  test("invalidates parent cache after in-place compound class object mutation", () => {
+    const menu = createTv({
+      slots: {
+        root: "root",
+        title: "title",
+      },
+      variants: {
+        color: {
+          primary: {root: "root-p", title: "title-p"},
+          secondary: {root: "root-s", title: "title-s"},
+        },
+      },
+      compoundVariants: [{color: "primary", class: {title: "compound-old"}}],
+      defaultVariants: {color: "primary"},
+    });
+
+    expect(menu().title()).toHaveClass(["title", "title-p", "compound-old"]);
+    expect(menu().title()).toHaveClass(["title", "title-p", "compound-old"]);
+
+    (menu.compoundVariants[0].class as Record<string, string>).title = "compound-new";
+
+    expect(menu().title()).toHaveClass(["title", "title-p", "compound-new"]);
+  });
 });

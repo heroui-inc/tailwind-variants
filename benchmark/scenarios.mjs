@@ -9,6 +9,8 @@ import {
   classInputs,
   customButtonConfig,
   customMergeConfig,
+  manyCompoundsConfig,
+  manyCompoundsProps,
   slotsConfig,
   slotsProps,
 } from "./workloads.mjs";
@@ -41,6 +43,12 @@ const callSlotsBatch = (component) => {
     consume(slots.base());
     consume(slots.icon());
     consume(slots.label());
+  }
+};
+
+const callManyCompoundsBatch = (adapter, component) => {
+  for (let i = 0; i < manyCompoundsProps.length; i++) {
+    consume(adapter.invoke(component, manyCompoundsProps[i]));
   }
 };
 
@@ -87,6 +95,14 @@ export const scenarios = [
       const component = adapter.prepare(buttonConfig, {twMerge: false})();
 
       return () => callButtonBatch(adapter, component);
+    },
+  },
+  {
+    ...metadata("invocation/many-compounds"),
+    createTask(adapter) {
+      const component = adapter.prepare(manyCompoundsConfig)();
+
+      return () => callManyCompoundsBatch(adapter, component);
     },
   },
   {
@@ -202,6 +218,12 @@ const slotOutputsFor = (adapter, options) => {
   });
 };
 
+const manyCompoundsOutputsFor = (adapter, options) => {
+  const component = adapter.prepare(manyCompoundsConfig, options)();
+
+  return manyCompoundsProps.map((props) => adapter.invoke(component, props));
+};
+
 const extendOutputFor = (adapter) => {
   const parent = adapter.create(buttonConfig, {twMerge: false});
   const child = adapter.create(
@@ -246,6 +268,16 @@ export const assertEquivalentOutputs = (adapters) => {
     slotOutputsFor(tv, {twMerge: false}),
     slotOutputsFor(released, {twMerge: false}),
     "TV no-merge slots outputs differ.",
+  );
+  assert.deepEqual(
+    manyCompoundsOutputsFor(tv),
+    manyCompoundsOutputsFor(released),
+    "TV and released TV many-compound outputs differ.",
+  );
+  assert.deepEqual(
+    manyCompoundsOutputsFor(tv),
+    manyCompoundsOutputsFor(cva),
+    "TV and CVA many-compound outputs differ.",
   );
   assert.equal(extendOutputFor(tv), extendOutputFor(released), "TV extend outputs differ.");
   assert.equal(

@@ -1,9 +1,9 @@
 import {falsyToString} from "../utils.js";
 import {
-  buildCompoundsSignature,
   buildPropsFingerprint,
   CACHE_MISS,
   createBoundedCache,
+  createCompoundsGuard,
   createLazyOverrideMerge,
   createResultCache,
   type ResultCache,
@@ -238,6 +238,7 @@ const createVariantResolver = (resolved: ResolvedOptions, cn: CnAdapter): Runtim
   let compiledVariants = resolved.compiledVariants;
   let compiledCompoundSlots: CompiledCompoundSlot[] = EMPTY_ARRAY;
   let cache: ResultCache | null = null;
+  const compoundsChanged = createCompoundsGuard();
   const mergeOverride = createLazyOverrideMerge(cn, config);
   // First invoke skips cache.
   let coldInvokesRemaining = 1;
@@ -274,23 +275,25 @@ const createVariantResolver = (resolved: ResolvedOptions, cn: CnAdapter): Runtim
       coldInvokesRemaining--;
       core = computeCore(props);
     } else {
+      if (
+        (compiledCompoundVariants.length > 0 || compiledCompoundSlots.length > 0) &&
+        compoundsChanged(compiledCompoundVariants, compiledCompoundSlots)
+      ) {
+        cache = null;
+      }
+
       cache ??= createResultCache();
 
       const propsFingerprint = buildPropsFingerprint(variantKeys, defaultVariants, props);
 
       if (propsFingerprint !== null) {
-        const compoundsSig =
-          compiledCompoundVariants.length > 0 || compiledCompoundSlots.length > 0
-            ? buildCompoundsSignature(compiledCompoundVariants, compiledCompoundSlots)
-            : "";
-        const cacheKey = propsFingerprint + "#" + compoundsSig;
-        const cached = cache.get(cacheKey);
+        const cached = cache.get(propsFingerprint);
 
         if (cached !== CACHE_MISS) {
           core = cached;
         } else {
           core = computeCore(props);
-          cache.set(cacheKey, core);
+          cache.set(propsFingerprint, core);
         }
       } else {
         core = computeCore(props);
@@ -314,6 +317,7 @@ const createSlotsResolver = (resolved: ResolvedOptions, cn: CnAdapter): RuntimeC
   let hasCompounds = false;
   let mergeOverride: ReturnType<typeof createLazyOverrideMerge> | null = null;
   let parentCache: ReturnType<typeof createBoundedCache<SlotsResult>> | null = null;
+  const compoundsChanged = createCompoundsGuard();
   // First parent invoke skips fingerprint/cache setup (lifecycle create+call once).
   let coldParentInvokesRemaining = 1;
 
@@ -409,7 +413,7 @@ const createSlotsResolver = (resolved: ResolvedOptions, cn: CnAdapter): RuntimeC
 
     ensureCompiled();
 
-    // Cold path: avoid fingerprint/compoundsSig/Map overhead on first invoke.
+    // Cold path: avoid fingerprint/Map overhead on first invoke.
     if (coldParentInvokesRemaining > 0) {
       coldParentInvokesRemaining--;
 
@@ -422,22 +426,19 @@ const createSlotsResolver = (resolved: ResolvedOptions, cn: CnAdapter): RuntimeC
       return createSlotsResult(props);
     }
 
-    // Recompute each call so in-place compound metadata mutations invalidate cache keys
-    // (aligned with createVariantResolver / tv-default mutation coverage).
-    const compoundsSig = hasCompounds
-      ? buildCompoundsSignature(compoundVariants!, compoundSlots!)
-      : "";
-    const cacheKey = propsFingerprint + "#" + compoundsSig;
+    if (hasCompounds && compoundsChanged(compoundVariants!, compoundSlots!)) {
+      parentCache = null;
+    }
 
     parentCache ??= createBoundedCache<SlotsResult>();
 
-    const cached = parentCache.get(cacheKey);
+    const cached = parentCache.get(propsFingerprint);
 
     if (cached !== CACHE_MISS) return cached;
 
     const next = createSlotsResult(props);
 
-    parentCache.set(cacheKey, next);
+    parentCache.set(propsFingerprint, next);
 
     return next;
   }) as RuntimeComponent;
