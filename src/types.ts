@@ -1,5 +1,5 @@
 import type {TVConfig} from "./config.js";
-import type {ClassNameValue as ClassValue} from "./internal/merge/types.js";
+import type {ClassNameValue as ClassValue, NoInfer} from "./internal/merge/types.js";
 
 export type {ClassValue};
 
@@ -242,7 +242,7 @@ export type TV = <
     /**
      * Compound slots allow you to apply classes to multiple slots at once.
      */
-    compoundSlots?: TVCompoundSlots<V, S, B>;
+    compoundSlots?: TVCompoundSlots<NoInfer<V>, S, B>;
     /**
      * Default variants allow you to set default variants for a component.
      * @see https://www.tailwind-variants.org/docs/variants#default-variants
@@ -293,7 +293,7 @@ export type TVLite = <
   /**
    * Compound slots allow you to apply classes to multiple slots at once.
    */
-  compoundSlots?: TVCompoundSlots<V, S, B>;
+  compoundSlots?: TVCompoundSlots<NoInfer<V>, S, B>;
   /**
    * Default variants allow you to set default variants for a component.
    * @see https://www.tailwind-variants.org/docs/variants#default-variants

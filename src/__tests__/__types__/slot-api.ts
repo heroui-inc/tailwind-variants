@@ -1,4 +1,5 @@
 import {tv, type VariantProps} from "../../index.js";
+import {tv as liteTV} from "../../lite.js";
 
 // Case: infer slot functions, slot props, compounds, and boolean conditions.
 const card = tv({
@@ -122,5 +123,23 @@ tv({
   compoundSlots: [
     // @ts-expect-error class and className remain mutually exclusive
     {slots: ["base"], size: "sm", class: "text-sm", className: "font-medium"},
+  ],
+});
+
+// Case: accept compoundSlots without variants, targeting different slots with different classes.
+tv({
+  slots: {base: "", header: "", body: "", footer: ""},
+  compoundSlots: [
+    {slots: ["base", "header"], class: "flex"},
+    {slots: ["body", "footer"], class: "p-4"},
+  ],
+});
+
+// Case: accept compoundSlots without variants in the lite entrypoint.
+liteTV({
+  slots: {base: "", header: "", body: "", footer: ""},
+  compoundSlots: [
+    {slots: ["base", "header"], class: "flex"},
+    {slots: ["body", "footer"], class: "p-4"},
   ],
 });
