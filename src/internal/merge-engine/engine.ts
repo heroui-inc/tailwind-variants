@@ -2,8 +2,9 @@
  * Compiled-table merge engine, vendored from shadcn-ui/cn (MIT). Conflict
  * rules follow tailwind-merge; the argument cache follows cnfast.
  *
- * Pinned at cn@0.2.5. The merge grammar and the literal-set table encoding
- * also carry cn@0.2.6 #74. Local deltas: an unlabeled `font-[Inter]` is a
+ * Based on cn@0.2.5, synced through cn@0.5.0: the merge grammar and the
+ * literal-set table encoding carry cn#74 (0.2.6), and `wrapClsx` carries the
+ * churn-resistant argument cache from cn#152 (0.3.3). Local deltas: an unlabeled `font-[Inter]` is a
  * font family and `font-[700]` a weight (Tailwind v4, cn#23), and `cn(0)`
  * keeps "0" like `cx`. Copied as a unit: scan/classify/claim/emit, the join
  * layer, and `wrapClsx` are upstream code, not rewrites.
@@ -1173,6 +1174,27 @@ interface ArgEntry {
   n: ArgEntry | null;
 }
 
+// One base string's tuples. `miss` counts bucket walks that found nothing
+// since the last hit; past BUCKET_MISS_CAP the bucket is churning (a fresh
+// string instance per call, e.g. an interpolated arbitrary value), so walk
+// and insert are skipped for BUCKET_SKIP calls before probing again.
+interface ArgBucket {
+  e: ArgEntry[];
+  miss: number;
+  skip: number;
+  /** next overwrite slot once the bucket is full (ring, no shift) */
+  at: number;
+}
+const BUCKET_CAP = 256;
+const BUCKET_MISS_CAP = 16;
+const BUCKET_SKIP = 1024;
+// churn front: a joined string built from a fresh arg can't be found by
+// identity, and looking it up in the dictionary makes V8 hash every char
+// (~110 ns at 45 chars). This 2-way table keys on the O(1) positional hash
+// and verifies with one string compare instead. Allocated on first churn,
+// so apps without interpolated args never carry it.
+const CHURN_SIZE = 4096;
+
 export const wrapClsx = (
   mergeString: (input: string) => string,
   fresh?: FreshMerge,
@@ -1189,10 +1211,36 @@ export const wrapClsx = (
   // Render loops replay call *sequences*, not just calls, so each entry also
   // remembers which entry came next last time. When the prediction verifies
   // (pure identity compares), the call skips even the bucket lookup.
-  let argCache = new Map<string, ArgEntry[]>();
-  let prevArgCache = new Map<string, ArgEntry[]>();
+  let argCache = new Map<string, ArgBucket>();
+  let prevArgCache = new Map<string, ArgBucket>();
   let argCount = 0;
   let lastHit: ArgEntry | null = null;
+  // churn front slots: `key` is the string hashed and value-compared (the
+  // fresh arg on the arity-2 path, the whole joined string otherwise),
+  // `own` the identity-compared base that goes with it ('' for joined).
+  let churnKey: string[] | null = null;
+  let churnOwn: string[] = [];
+  let churnVal: string[] = [];
+  let churnTick = 0;
+
+  const churnLookup = (key: string, own: string, join: boolean): string => {
+    if (churnKey === null) {
+      churnKey = new Array<string>(CHURN_SIZE).fill("");
+      churnOwn = new Array<string>(CHURN_SIZE).fill("");
+      churnVal = new Array<string>(CHURN_SIZE).fill("");
+    }
+    const way0 = spanHash(key, 0, key.length) & (CHURN_SIZE - 2);
+    if (churnKey[way0] === key && churnOwn[way0] === own) return churnVal[way0]!;
+    if (churnKey[way0 | 1] === key && churnOwn[way0 | 1] === own) return churnVal[way0 | 1]!;
+    const merged = mergeString(join ? own + " " + key : key);
+    // fill the empty way first, then round-robin
+    const slot =
+      churnKey[way0] === "" ? way0 : way0 | (churnKey[way0 | 1] === "" ? 1 : churnTick++ & 1);
+    churnKey[slot] = key;
+    churnOwn[slot] = own;
+    churnVal[slot] = merged;
+    return merged;
+  };
 
   // unrolled truthy-sequence verify for arity ≤ 3, against the entry's
   // monomorphic fields. Arity-2 calls pass '' as v2: a falsy pad skips the
@@ -1280,8 +1328,23 @@ export const wrapClsx = (
     }
     let hit: ArgEntry | null = null;
     if (bucket !== undefined) {
-      outer: for (let b = 0; b < bucket.length; b++) {
-        const e = bucket[b]!;
+      if (bucket.skip > 0) {
+        // churning: the tuples here never repeat by identity, so the walk
+        // and the insert are wasted. Join and go through the churn front;
+        // the misses that got us here were all admitted strings, so the
+        // doorkeeper pass is skipped (mergeString keeps its own on a miss).
+        bucket.skip--;
+        lastHit = null; // no chain to learn here; skip the probes next call
+        let joined = first;
+        for (let i = firstIdx + 1; i < nArgs; i++) {
+          const v = vals[i];
+          if (v) joined += " " + (v as string);
+        }
+        return churnLookup(joined, "", false);
+      }
+      const entries = bucket.e;
+      outer: for (let b = 0; b < entries.length; b++) {
+        const e = entries[b]!;
         if (e.t !== truthy) continue;
         const ea = e.a;
         let k = 1;
@@ -1292,6 +1355,7 @@ export const wrapClsx = (
         hit = e;
         break;
       }
+      if (hit !== null) bucket.miss = 0;
     }
     if (hit === null) {
       let joined = first;
@@ -1315,13 +1379,28 @@ export const wrapClsx = (
         a,
         n: null,
       };
-      if (bucket === undefined) argCache.set(first, (bucket = []));
+      if (bucket === undefined) {
+        argCache.set(first, (bucket = {e: [], miss: 0, skip: 0, at: 0}));
+      } else if (++bucket.miss > BUCKET_MISS_CAP) {
+        // the walk keeps coming up empty: skip it for a while. The stale
+        // tuples go too, so the re-probe walks a short bucket, and one more
+        // miss there re-arms the skip; a hit resets the count. The entry
+        // still goes in so a site that turns stable is found on re-probe.
+        bucket.miss = BUCKET_MISS_CAP;
+        bucket.skip = BUCKET_SKIP;
+        bucket.e.length = 0;
+        bucket.at = 0;
+      }
       // a component's base string is the first arg at every usage site, so
       // one key can carry dozens of tuples (54 in the largest corpus repo,
       // more once per-site className props count); a tight cap evicts them
       // faster than the sequence chain can learn them, at ~40x per call
-      if (bucket.length >= 256) bucket.shift();
-      bucket.push(hit);
+      const entries = bucket.e;
+      if (entries.length < BUCKET_CAP) entries.push(hit);
+      else {
+        entries[bucket.at] = hit;
+        bucket.at = (bucket.at + 1) & (BUCKET_CAP - 1);
+      }
       // two-generation rotation: a full generation ages out wholesale
       // instead of clearing everything; hot buckets get promoted on use,
       // so replayed sequences survive rotation and the chain stays warm
@@ -1371,6 +1450,19 @@ export const wrapClsx = (
         // (A, A, B) predicts all three calls: A→B via .n, the
         // repeat via this probe.
         if (lh !== pred && match3(lh, v0, v1, v2)) return lh.r;
+      }
+      // arity-2 churn: cn(base, fresh) where the base's bucket has given
+      // up on identity. Hash the fresh arg alone and identity-check the
+      // base: no array, no join, no walk (the shape of an interpolated
+      // arbitrary value or a className prop built per render). Buckets
+      // are keyed by truthy strings only, so a non-string v0 finds none.
+      if (nArgs === 2 && typeof v1 === "string" && v1 !== "") {
+        const bucket = argCache.get(v0 as string);
+        if (bucket !== undefined && bucket.skip > 0) {
+          bucket.skip--;
+          lastHit = null;
+          return churnLookup(v1, v0 as string, true);
+        }
       }
       return resolveArgs([v0, v1, v2], true);
     }

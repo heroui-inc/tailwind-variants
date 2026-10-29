@@ -710,3 +710,54 @@ describe("cn and numeric zero (clsx parity)", () => {
     expect(cnMergeCustom("a", 0)({twMerge: false})).toBe("a 0");
   });
 });
+
+/*
+ * shadcn-ui/cn#152: once a base string's argument bucket keeps missing (a
+ * fresh string per call, e.g. an interpolated arbitrary value), calls skip
+ * the bucket and go through the churn front. Results must stay identical to
+ * a fresh merge, including the local numeric-zero rule.
+ */
+describe("cn argument cache under churning arguments (shadcn-ui/cn#152)", () => {
+  const base = "inline-flex items-center rounded-md px-4 py-2 text-sm";
+
+  test("interpolated args merge correctly before and after the bucket starts skipping", () => {
+    for (let round = 0; round < 3; round++) {
+      for (let i = 0; i < 200; i++) {
+        const fresh = `px-[${i}px]`;
+        expect(cn(base, fresh)).toBe(
+          `inline-flex items-center rounded-md py-2 text-sm px-[${i}px]`,
+        );
+        expect(cn(base, "text-lg", `w-[${i}px]`)).toBe(
+          `inline-flex items-center rounded-md px-4 py-2 text-lg w-[${i}px]`,
+        );
+        expect(cn(base, `mt-[${i}px]`, "px-1", "py-1")).toBe(
+          `inline-flex items-center rounded-md text-sm mt-[${i}px] px-1 py-1`,
+        );
+      }
+    }
+  });
+
+  test("a churning base still serves stable and falsy arguments", () => {
+    for (let i = 0; i < 100; i++) cn(base, `px-[${i}px]`);
+    expect(cn(base, "px-1")).toBe("inline-flex items-center rounded-md py-2 text-sm px-1");
+    expect(cn(base, "")).toBe(base);
+    expect(cn(base, false)).toBe(base);
+    expect(cn(base, 0)).toBe(base);
+    expect(cn(base, 0, "px-2")).toBe("inline-flex items-center rounded-md py-2 text-sm px-2");
+    expect(cn(base, {"px-3": true})).toBe("inline-flex items-center rounded-md py-2 text-sm px-3");
+    expect(cn(base, ["px-[7px]", 0])).toBe(
+      "inline-flex items-center rounded-md py-2 text-sm px-[7px]",
+    );
+  });
+
+  test("numeric zero keeps the local rule while the bucket churns", () => {
+    for (let i = 0; i < 100; i++) cn(base, `px-[${i}px]`);
+    expect(cn(0)).toBe("0");
+    expect(cn([0])).toBe("");
+    expect(cn(0, base)).toBe(base);
+    expect(cn(0, `px-[${3}px]`)).toBe("px-[3px]");
+    expect(cn(base, 0, `px-[${5}px]`)).toBe(
+      "inline-flex items-center rounded-md py-2 text-sm px-[5px]",
+    );
+  });
+});

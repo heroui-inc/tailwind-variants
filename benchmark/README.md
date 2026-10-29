@@ -43,16 +43,17 @@ temporary directory, and runs two suites in order:
 
 Compares equivalent class-utility APIs:
 
-| Scenario (id)                                          | TV / released                          | shadcn-ui/cn |
-| ------------------------------------------------------ | -------------------------------------- | ------------ |
-| cx / clsx (mixed) (`utilities/join-mixed`)             | `cx` (normalizing join)                | `clsx`       |
-| cx / twJoin (strings) (`utilities/join-tokens`)        | `cx` (normalizing join)                | `twJoin`     |
-| twJoin / twJoin (`utilities/tw-join`)                  | `twJoin`                               | `twJoin`     |
-| cn / cn (`utilities/merge`)                            | `cn`                                   | `cn`         |
-| cn / cn (stable args) (`utilities/cn-stable-args`)     | `cn(base, cond && extra, className)`   | same         |
-| cn / cn (new arbitrary) (`utilities/cn-arbitrary-arg`) | `cn(base, cond && extra, "w-[<n>px]")` | same         |
-| cnMerge (`utilities/cn-merge`)                         | `cnMerge`                              | —            |
-| twMerge / twMerge (`utilities/tw-merge`)               | `twMerge`                              | `twMerge`    |
+| Scenario (id)                                                | TV / released                                     | shadcn-ui/cn |
+| ------------------------------------------------------------ | ------------------------------------------------- | ------------ |
+| cx / clsx (mixed) (`utilities/join-mixed`)                   | `cx` (normalizing join)                           | `clsx`       |
+| cx / twJoin (strings) (`utilities/join-tokens`)              | `cx` (normalizing join)                           | `twJoin`     |
+| twJoin / twJoin (`utilities/tw-join`)                        | `twJoin`                                          | `twJoin`     |
+| cn / cn (`utilities/merge`)                                  | `cn`                                              | `cn`         |
+| cn / cn (stable args) (`utilities/cn-stable-args`)           | `cn(base, cond && extra, className)`              | same         |
+| cn / cn (new arbitrary) (`utilities/cn-arbitrary-arg`)       | `cn(base, cond && extra, "w-[<n>px]")`            | same         |
+| cn / cn (interpolated arg) (`utilities/cn-interpolated-arg`) | `cn(base, "translate-x-[<n>px]")`, n cycles 0–511 | same         |
+| cnMerge (`utilities/cn-merge`)                               | `cnMerge`                                         | —            |
+| twMerge / twMerge (`utilities/tw-merge`)                     | `twMerge`                                         | `twMerge`    |
 
 The two `cx` rows measure a different API shape: `cx` normalizes whitespace, keeps a numeric
 `0`, and accepts objects. The `cn` column is the published shadcn-ui/cn package. The `twJoin`

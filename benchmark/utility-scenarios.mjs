@@ -73,6 +73,18 @@ export const utilityScenarios = [
     },
   },
   {
+    ...metadata("utilities/cn-interpolated-arg"),
+    createTask(adapter) {
+      const {base} = cnStableInputs;
+      let counter = 0;
+
+      return () => {
+        // arity 2, the shape `cn(base, className)` takes
+        consume(adapter.merge([base, `translate-x-[${counter++ & 511}px]`]));
+      };
+    },
+  },
+  {
     ...metadata("utilities/cn-merge"),
     createTask(adapter) {
       const run = adapter.mergeCurried(classInputs, {twMerge: true});
@@ -154,6 +166,12 @@ export const assertEquivalentUtilityOutputs = (adapters) => {
       cn.mergeArgs(...args),
       "TV cn and cn cn argument outputs differ.",
     );
+  }
+
+  for (const x of [0, 1, 511]) {
+    const args = [base, `translate-x-[${x}px]`];
+
+    assert.equal(tv.merge(args), cn.merge(args), "TV cn and cn cn interpolated outputs differ.");
   }
 
   assert.equal(

@@ -47,6 +47,14 @@ const utilityScenarioMetadata = [
     implementations: ["tv-utils", "cn"],
   },
   {
+    id: "utilities/cn-interpolated-arg",
+    category: "merge",
+    name: "cn / cn (interpolated arg)",
+    description:
+      "cn(base, `translate-x-[${x}px]`) with x cycling through 512 values: each call builds a fresh string instance whose text repeats, the shape of a className interpolated per render.",
+    implementations: ["tv-utils", "cn"],
+  },
+  {
     id: "utilities/cn-merge",
     category: "merge",
     name: "cnMerge",
