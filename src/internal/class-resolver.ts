@@ -13,8 +13,11 @@ import type {
 import {falsyToString} from "../utils.js";
 
 import {
-  buildCompoundsSignature,
   CACHE_MISS,
+  COMPOUNDS_UNCHANGED,
+  COMPOUNDS_UNSAFE,
+  type CompoundsGuard,
+  createCompoundsGuard,
   createLazyOverrideMerge,
   createPropsCache,
   UNCACHEABLE,
@@ -455,7 +458,8 @@ const createVariantResolver = (
   let hasCompounds = false;
   let conditionKeys: ConditionKeys | null = null;
   let cache: ReturnType<typeof createPropsCache<string>> | null = null;
-  let lastCompoundsSig: string | null = null;
+  // Created on the first warm call; cold-only components never allocate it.
+  let compoundsGuard: CompoundsGuard | null = null;
   const mergeOverride = createLazyOverrideMerge(merge);
   // First invoke skips cache.
   let coldInvokesRemaining = 1;
@@ -496,24 +500,23 @@ const createVariantResolver = (
     return merge.parts(list, count);
   };
 
-  // Rebuilt each call so in-place compound metadata mutations are detected.
-  // Returns false when the metadata cannot be serialized; nothing may be
-  // cached then, and normalized compound classes are rebuilt from the source.
+  // Checked each call so in-place compound metadata mutations are detected.
+  // Returns false when the metadata cannot be compared losslessly; nothing may
+  // be cached then, and normalized compound classes are rebuilt from the source.
   const syncCompounds = (): boolean => {
-    const compoundsSig = buildCompoundsSignature(compiledCompoundVariants!, compiledCompoundSlots);
+    const state = (compoundsGuard ??= createCompoundsGuard())(
+      compiledCompoundVariants!,
+      compiledCompoundSlots,
+    );
 
-    if (compoundsSig === null) {
-      invalidateCompoundClasses(compiledCompoundVariants!, compiledCompoundSlots);
+    if (state === COMPOUNDS_UNCHANGED) return true;
 
-      return false;
-    }
+    invalidateCompoundClasses(compiledCompoundVariants!, compiledCompoundSlots);
 
-    if (compoundsSig !== lastCompoundsSig) {
-      lastCompoundsSig = compoundsSig;
-      invalidateCompoundClasses(compiledCompoundVariants!, compiledCompoundSlots);
-      cache = null;
-      staticCore = null;
-    }
+    if (state === COMPOUNDS_UNSAFE) return false;
+
+    cache = null;
+    staticCore = null;
 
     return true;
   };
@@ -598,7 +601,8 @@ const createSlotsResolver = (resolved: ResolvedOptions, merge: MergeAdapter): Ru
   let conditionKeys: ConditionKeys | null = null;
   let mergeOverride: ReturnType<typeof createLazyOverrideMerge> | null = null;
   let parentCache: ReturnType<typeof createPropsCache<SlotsResult>> | null = null;
-  let lastCompoundsSig: string | null = null;
+  // Created on the first warm call; cold-only components never allocate it.
+  let compoundsGuard: CompoundsGuard | null = null;
   // First parent invoke skips fingerprint/cache setup (lifecycle create+call once).
   let coldParentInvokesRemaining = 1;
   // Slot functions over each slot's pre-merged default core, returned by reference.
@@ -722,20 +726,16 @@ const createSlotsResolver = (resolved: ResolvedOptions, merge: MergeAdapter): Ru
   };
 
   const syncCompounds = (): boolean => {
-    const compoundsSig = buildCompoundsSignature(compoundVariants!, compoundSlots!);
+    const state = (compoundsGuard ??= createCompoundsGuard())(compoundVariants!, compoundSlots!);
 
-    if (compoundsSig === null) {
-      invalidateCompoundClasses(compoundVariants!, compoundSlots!);
+    if (state === COMPOUNDS_UNCHANGED) return true;
 
-      return false;
-    }
+    invalidateCompoundClasses(compoundVariants!, compoundSlots!);
 
-    if (compoundsSig !== lastCompoundsSig) {
-      lastCompoundsSig = compoundsSig;
-      invalidateCompoundClasses(compoundVariants!, compoundSlots!);
-      parentCache = null;
-      staticResult = null;
-    }
+    if (state === COMPOUNDS_UNSAFE) return false;
+
+    parentCache = null;
+    staticResult = null;
 
     return true;
   };
@@ -796,7 +796,7 @@ const createSlotsResolver = (resolved: ResolvedOptions, merge: MergeAdapter): Ru
       return getStaticResult();
     }
 
-    // Cold path: avoid fingerprint/compoundsSig/Map overhead on first invoke.
+    // Cold path: avoid fingerprint/compound guard/Map overhead on first invoke.
     if (coldParentInvokesRemaining > 0) {
       coldParentInvokesRemaining--;
 

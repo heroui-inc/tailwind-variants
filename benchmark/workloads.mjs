@@ -250,3 +250,90 @@ export const multiExtendProps = [
   {focus: "visible", motion: "normal", tone: "neutral", size: "lg"},
   {focus: "none", tone: "muted", size: "md"},
 ];
+
+// Ported from #317: 36 overlapping compound variants across four axes.
+const manyCompoundIntents = ["primary", "secondary", "warning", "danger"];
+const manyCompoundSizes = ["sm", "md", "lg"];
+const manyCompoundRounded = ["none", "sm", "md", "lg", "full"];
+
+const manyCompoundIntentClass = {
+  primary: "border-blue-600",
+  secondary: "border-gray-500",
+  warning: "border-yellow-600",
+  danger: "border-red-600",
+};
+const manyCompoundSizeClass = {
+  sm: "leading-4",
+  md: "leading-5",
+  lg: "leading-6",
+};
+const manyCompoundRoundedClass = {
+  none: "rounded-none",
+  sm: "rounded-sm",
+  md: "rounded-md",
+  lg: "rounded-lg",
+  full: "rounded-full",
+};
+
+export const manyCompoundsConfig = {
+  base: "inline-flex items-center rounded border font-semibold",
+  variants: {
+    intent: {
+      primary: "bg-blue-500 text-white",
+      secondary: "bg-white text-gray-800",
+      warning: "bg-yellow-500 text-black",
+      danger: "bg-red-500 text-white",
+    },
+    size: {
+      sm: "h-8 px-2 text-sm",
+      md: "h-10 px-4 text-base",
+      lg: "h-12 px-6 text-lg",
+    },
+    disabled: {
+      true: "cursor-not-allowed opacity-50",
+      false: "cursor-pointer opacity-100",
+    },
+    rounded: {
+      none: "rounded-none",
+      sm: "rounded-sm",
+      md: "rounded-md",
+      lg: "rounded-lg",
+      full: "rounded-full",
+    },
+  },
+  compoundVariants: [
+    ...manyCompoundIntents.flatMap((intent) =>
+      manyCompoundSizes.map((size) => ({
+        intent,
+        size,
+        className: `${manyCompoundIntentClass[intent]} ${manyCompoundSizeClass[size]}`,
+      })),
+    ),
+    ...manyCompoundIntents.map((intent) => ({
+      intent,
+      disabled: true,
+      className: `${manyCompoundIntentClass[intent]} opacity-75`,
+    })),
+    ...manyCompoundIntents.flatMap((intent) =>
+      manyCompoundRounded.map((rounded) => ({
+        intent,
+        rounded,
+        className: `${manyCompoundIntentClass[intent]} ${manyCompoundRoundedClass[rounded]}`,
+      })),
+    ),
+  ],
+  defaultVariants: {
+    disabled: false,
+    intent: "primary",
+    rounded: "md",
+    size: "md",
+  },
+};
+
+export const manyCompoundsProps = [
+  {},
+  {intent: "primary", size: "sm", disabled: true},
+  {intent: "secondary", size: "md", rounded: "full"},
+  {intent: "warning", size: "lg", disabled: true, rounded: "none"},
+  {intent: "danger", size: "sm", rounded: "lg"},
+];
