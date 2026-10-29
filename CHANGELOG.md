@@ -1,4 +1,4 @@
-## Unreleased
+# [4.0.0](https://github.com/heroui-inc/tailwind-variants/compare/v3.3.1...v4.0.0) (2026-10-30)
 
 ### ✨ Features
 
@@ -15,14 +15,16 @@
 ### ⚡ Performance
 
 - hot `tv()` about 1.6×–2× vs 3.3.1
-- `cn()` about 3× vs 3.3.1 on join-and-merge, about 2× on unique arbitrary values
+- `cn()` about 3× vs 3.3.1 on join-and-merge, about 10× on interpolated arguments, about 2× on unique arbitrary values
 - pre-merged static core; `class` / `className` cached by text
+- compound variants kept out of cache keys ([#317](https://github.com/heroui-inc/tailwind-variants/pull/317))
 
 ### 🐛 Fixes
 
 - unlabeled `font-[Inter]` is family, `font-[700]` is weight
 - `contain-*`, `bg-gradient-to-*`, `bg-conic`, `columns-auto`, `max-h-none`, extra size scales
 - debug reporter stripped when `NODE_ENV` is production
+- `compoundSlots` no longer widens variant inference ([#316](https://github.com/heroui-inc/tailwind-variants/pull/316))
 
 ### 🚨 Breaking Changes
 
@@ -40,6 +42,7 @@
 - `pnpm compile-tables`
 - isolated benchmark suites
 - pkg.pr.new
+- toolchain on Vitest 5, tsup 9, Biome 2.6, pnpm 12; audit clean ([#315](https://github.com/heroui-inc/tailwind-variants/pull/315))
 
 See [.docs/migrations/v3-to-v4.md](./.docs/migrations/v3-to-v4.md).
 
