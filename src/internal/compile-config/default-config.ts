@@ -3,7 +3,8 @@
  * tailwind-merge's default config (MIT). HeroUI's conflict-group patches
  * (axis shorthands overriding logical sides, `shadow-inner` kept apart from
  * shadow colors, `leading-none` with an overridden theme scale) and the cn#74
- * grammar additions live here, never in `../merge-engine/engine.ts`;
+ * grammar additions (minus the open-ended `animate` scale, reverted in cn#147)
+ * live here, never in `../merge-engine/engine.ts`;
  * `pnpm compile-tables` bakes them into `tables.generated.ts`.
  *
  * @see https://github.com/dcastil/tailwind-merge/blob/main/src/lib/default-config.ts
@@ -246,8 +247,11 @@ export const getDefaultConfig = () => {
   return {
     cacheSize: 8192,
     theme: {
-      // Open-ended: Tailwind v4 themes and plugins define their own animation names (cn#74).
-      animate: [isAny],
+      // tailwind-merge's default scale: only the built-in animations share the
+      // `animate` group, so plugin classes (`animate-in`, `animate-once`,
+      // `animate-duration-500`) are never dropped (cn#147). Custom theme
+      // animations opt in via `extend.theme.animate`.
+      animate: ["spin", "ping", "pulse", "bounce"],
       aspect: ["video"],
       blur: [isTshirtSize],
       breakpoint: [isTshirtSize],

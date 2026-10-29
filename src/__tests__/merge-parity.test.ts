@@ -602,26 +602,89 @@ describe("custom config outputs", () => {
 });
 
 /*
- * Grammar gaps filled from shadcn-ui/cn#74 (cn@0.2.6): open-ended animation
- * names, containment flags that compose, Tailwind v3 gradient directions,
- * and v4 utilities tailwind-merge 3.6.0 does not know. These are recorded
- * additions over 3.6.0, so they are pinned as text.
+ * Animation names follow tailwind-merge (shadcn-ui/cn#147, cn@0.3.2): only the
+ * default theme animations, `animate-none`, and arbitrary values share the
+ * `animate` group. Plugin and custom names (tailwindcss-animate, tw-animate-css)
+ * are unknown and never dropped. Cases ported from cn's conformance suite.
  */
-describe("grammar additions from shadcn-ui/cn#74", () => {
-  test.each([
-    ["animate-spin animate-wiggle", "animate-wiggle"],
-    ["animate-accordion-down animate-spin", "animate-spin"],
-    [
-      "animate-wiggle animate-[wiggle_1s_ease-in-out_infinite]",
-      "animate-[wiggle_1s_ease-in-out_infinite]",
-    ],
-    ["animate-(--animation) animate-none", "animate-none"],
-    ["motion-safe:animate-spin motion-safe:animate-in", "motion-safe:animate-in"],
-    ["animate-spin hover:animate-in", "animate-spin hover:animate-in"],
-  ])("custom animation names share the animate group: %s", (input, expected) => {
+describe("animate group parity (shadcn-ui/cn#147)", () => {
+  const animations = [
+    "animate-spin",
+    "animate-ping",
+    "animate-pulse",
+    "animate-bounce",
+    "animate-none",
+    "animate-[wiggle_1s_ease-in-out_infinite]",
+    "animate-(--animation)",
+  ];
+  const customAnimations = [
+    "animate-in",
+    "animate-out",
+    "animate-shimmer",
+    "animate-accordion-down",
+    "animate-caret-blink",
+    "animate-fade-up",
+    "animate-once",
+    "animate-infinite",
+    "animate-ease-out",
+    "animate-duration-500",
+    "animate-delay-300",
+    "animate-fill-both",
+  ];
+  const cases: [string, string][] = [];
+  const replace = (first: string, last: string) => cases.push([`${first} ${last}`, last]);
+  const coexist = (first: string, last: string) => {
+    cases.push([`${first} ${last}`, `${first} ${last}`]);
+    cases.push([`${last} ${first}`, `${last} ${first}`]);
+  };
+
+  for (const token of animations) {
+    replace("animate-spin", token);
+    replace(token, "animate-bounce");
+  }
+  replace("motion-safe:animate-spin", "motion-safe:animate-pulse");
+  replace("!animate-spin", "animate-pulse!");
+  coexist("animate-spin", "hover:animate-pulse");
+  coexist("animate-spin", "animate-pulse!");
+  for (const token of customAnimations) {
+    for (const known of animations) coexist(token, known);
+    for (const other of customAnimations) {
+      if (other !== token) cases.push([`${token} ${other}`, `${token} ${other}`]);
+    }
+  }
+  coexist("motion-safe:animate-spin", "motion-safe:animate-in");
+
+  test.each(cases)("%s", (input, expected) => {
     expect(cn(input)).toBe(expected);
+    expect(defaultTwMerge(input)).toBe(expected);
+    expect(twMerge(input)).toBe(expected);
   });
 
+  test("custom theme animations opt in through extend.theme.animate", () => {
+    const config = {extend: {theme: {animate: ["wiggle", "accordion-down"]}}} as const;
+    const merge = createTwMerge(config);
+    const twm = extendTailwindMerge(config);
+
+    for (const input of [
+      "animate-spin animate-wiggle",
+      "animate-wiggle animate-accordion-down",
+      "animate-accordion-down animate-in",
+    ]) {
+      expect(merge(input)).toBe(twm(input));
+    }
+    expect(merge("animate-spin animate-wiggle")).toBe("animate-wiggle");
+    expect(merge("animate-wiggle animate-in")).toBe("animate-wiggle animate-in");
+  });
+});
+
+/*
+ * Grammar gaps filled from shadcn-ui/cn#74 (cn@0.2.6): containment flags that
+ * compose, Tailwind v3 gradient directions, and v4 utilities tailwind-merge
+ * 3.6.0 does not know. These are recorded additions over tailwind-merge, so
+ * they are pinned as text. (#74's open-ended animation names were reverted
+ * upstream in cn#147; see the animate group parity block above.)
+ */
+describe("grammar additions from shadcn-ui/cn#74", () => {
   test.each([
     ["contain-none contain-strict", "contain-strict"],
     ["contain-content contain-[layout_paint]", "contain-[layout_paint]"],
