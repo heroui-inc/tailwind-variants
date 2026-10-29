@@ -93,12 +93,12 @@ is first used. `"px-2  px-4"` becomes `"px-2 px-4"`.
 Do not ship a second merger next to this package's default tables. Alias everything here, or
 keep the merger you have and inject it through the lite entry.
 
-| Entry                      | Ships                                                   | min+gzip      |
-| -------------------------- | ------------------------------------------------------- | ------------- |
-| `tailwind-variants`        | engine + default tables + `tv` runtime                  | about 16.6 KB |
-| `tailwind-variants/merge`  | engine + default tables, no `tv`                        | about 10.8 KB |
-| `tailwind-variants/config` | default entry + table compiler                          | about 26.6 KB |
-| `tailwind-variants/lite`   | `tv` runtime only, joins or calls an injected `twMerge` | about 5.3 KB  |
+| Entry                      | Ships                                                                       |
+| -------------------------- | --------------------------------------------------------------------------- |
+| `tailwind-variants`        | engine + default tables + `tv` runtime                                      |
+| `tailwind-variants/merge`  | engine + default tables, no `tv`                                            |
+| `tailwind-variants/config` | default entry + table compiler, the largest entry                           |
+| `tailwind-variants/lite`   | `tv` runtime only, joins or calls an injected `twMerge`, the smallest entry |
 
 ## New entries and aliases
 

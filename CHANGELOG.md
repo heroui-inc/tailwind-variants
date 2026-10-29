@@ -21,7 +21,7 @@
 ### 🐛 Fixes
 
 - unlabeled `font-[Inter]` is family, `font-[700]` is weight
-- animation names, `contain-*`, `bg-gradient-to-*`, `bg-conic`, `columns-auto`, `max-h-none`, extra size scales
+- `contain-*`, `bg-gradient-to-*`, `bg-conic`, `columns-auto`, `max-h-none`, extra size scales
 - debug reporter stripped when `NODE_ENV` is production
 
 ### 🚨 Breaking Changes
