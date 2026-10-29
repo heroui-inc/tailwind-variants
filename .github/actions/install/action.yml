@@ -11,7 +11,7 @@ runs:
         echo "version=$(tr -d '[:space:]' < .nvmrc)" >> "$GITHUB_OUTPUT"
 
     - name: Setup pnpm and Node.js
-      uses: pnpm/setup@v2
+      uses: pnpm/setup@v3
       with:
         cache: true
         install: false

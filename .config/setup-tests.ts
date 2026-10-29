@@ -26,8 +26,8 @@ expect.extend({
 });
 
 declare module "vitest" {
-  interface Assertion<T = any> {
-    toHaveClass(expected: string | string[]): T;
+  interface Assertion<R extends void | Promise<void> = void, T = unknown> {
+    toHaveClass(expected: string | string[]): R;
   }
 
   interface AsymmetricMatchersContaining {
