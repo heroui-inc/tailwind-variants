@@ -1,5 +1,6 @@
 /*
- * Engine types, vendored from shadcn-ui/cn (MIT), pinned at cn@0.2.5.
+ * Engine types, vendored from shadcn-ui/cn (MIT), based on cn@0.2.5;
+ * unchanged in substance through cn@0.5.0.
  * Optional fields carry `| undefined` for this repo's `exactOptionalPropertyTypes`.
  *
  * @see https://github.com/shadcn-ui/cn

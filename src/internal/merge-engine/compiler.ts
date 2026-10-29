@@ -1,6 +1,7 @@
 /*
- * Table compiler, vendored from shadcn-ui/cn (MIT), pinned at cn@0.2.5 with
- * the literal-set prefix encoding from cn@0.2.6 #74. Turns a tailwind-merge
+ * Table compiler, vendored from shadcn-ui/cn (MIT), based on cn@0.2.5 with
+ * the literal-set prefix encoding from cn@0.2.6 #74; checked against cn@0.5.0
+ * (later upstream changes are `cn build` output typing only, cn#150). Turns a tailwind-merge
  * shaped config into the flat packed tables the engine consumes.
  *
  *   compileToTables(config)  → in-memory Tables (runtime custom configs)

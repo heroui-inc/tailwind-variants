@@ -1,5 +1,6 @@
 /*
- * Validator predicates, vendored from shadcn-ui/cn (MIT), pinned at cn@0.2.5.
+ * Validator predicates, vendored from shadcn-ui/cn (MIT), based on cn@0.2.5;
+ * unchanged in substance through cn@0.5.0.
  * Semantics follow tailwind-merge's validators. The engine compiles these to
  * span opcodes; the function forms serve the compiler's classifier, custom
  * configs, and the `validators` export of `tailwind-variants/config`.
