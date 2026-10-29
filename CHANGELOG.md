@@ -1,3 +1,48 @@
+## Unreleased
+
+### ✨ Features
+
+- compiled merge tables; default entry exports `twMerge`, `twJoin`, and `clsx`
+- `tailwind-variants/merge`: merger without `tv`
+- `tailwind-variants/config`: `twMergeConfig` and `extendTailwindMerge` / `createTailwindMerge` / `createTwMerge` / `fromTheme` / `validators` / `mergeConfigs` / `getDefaultConfig`
+- multi-extend via `extend: [a, b, c]` ([#297](https://github.com/heroui-inc/tailwind-variants/issues/297))
+- empty class lists return `""` ([#289](https://github.com/heroui-inc/tailwind-variants/issues/289))
+- array compound / variant classes apply to the base slot ([#263](https://github.com/heroui-inc/tailwind-variants/pull/263))
+- experimental `debug` mode
+- inject `twMerge` from `tailwind-variants/lite` ([#307](https://github.com/heroui-inc/tailwind-variants/issues/307))
+- `cacheSize` and `prefix` on the default tables
+
+### ⚡ Performance
+
+- hot `tv()` about 1.6×–2× vs 3.3.1
+- `cn()` about 3× vs 3.3.1 on join-and-merge, about 2× on unique arbitrary values
+- pre-merged static core; `class` / `className` cached by text
+
+### 🐛 Fixes
+
+- unlabeled `font-[Inter]` is family, `font-[700]` is weight
+- animation names, `contain-*`, `bg-gradient-to-*`, `bg-conic`, `columns-auto`, `max-h-none`, extra size scales
+- debug reporter stripped when `NODE_ENV` is production
+
+### 🚨 Breaking Changes
+
+- **twMergeConfig:** `tailwind-variants/config` only; default entry throws
+- **experimentalParseClassName:** removed
+- **cn:** `cn("a", 0)` → `"a"`; `cn(0)` → `"0"`
+- **empty lists:** `""` instead of `undefined`
+- **types:** unknown variant / slot keys error
+- **peers:** `tailwind-merge` and `tailwindcss` removed
+- **lite:** function `twMerge` is called (3.3.1 treated it as `true`)
+- **twMerge: false:** `cx` join; whitespace normalized at compile
+
+### 🛠 Chores
+
+- `pnpm compile-tables`
+- isolated benchmark suites
+- pkg.pr.new
+
+See [.docs/migrations/v3-to-v4.md](./.docs/migrations/v3-to-v4.md).
+
 ## [3.3.1](https://github.com/heroui-inc/tailwind-variants/compare/v3.3.0...v3.3.1) (2026-08-03)
 
 ### Bug Fixes

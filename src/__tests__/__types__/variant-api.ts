@@ -1,4 +1,6 @@
-import {tv, type VariantProps} from "../../index.js";
+import type {VariantProps} from "../../index.js";
+
+import {tv} from "../../index.js";
 
 // Case: infer optional defaulted variants, booleans, arrays, and VariantProps.
 const button = tv({
@@ -27,21 +29,22 @@ const explicitProps: ButtonProps = {size: "lg", disabled: true};
 button(defaultableProps);
 button(explicitProps);
 
-// Case: reject default variant keys that are not declared.
 tv({
   variants: {size: {sm: "", lg: ""}},
-  // @ts-expect-error defaultVariants reject unknown keys
-  defaultVariants: {tone: "neutral"},
+  defaultVariants: {
+    // @ts-expect-error defaultVariants reject unknown keys
+    tone: "neutral",
+  },
 });
 
-// Case: reject default variant values outside the declared option union.
 tv({
   variants: {size: {sm: "", lg: ""}},
-  // @ts-expect-error defaultVariants reject invalid values
-  defaultVariants: {size: "xl"},
+  defaultVariants: {
+    // @ts-expect-error defaultVariants reject invalid values
+    size: "xl",
+  },
 });
 
-// Case: reject compound variant values outside the declared option union.
 tv({
   variants: {size: {sm: "", lg: ""}},
   compoundVariants: [
@@ -50,7 +53,7 @@ tv({
   ],
 });
 
-// Case: require compoundVariants to use its runtime-supported array shape.
+// Case: compoundVariants must be an array, the only shape the runtime supports.
 tv({
   variants: {size: {sm: "", lg: ""}},
   // @ts-expect-error compoundVariants must be an array

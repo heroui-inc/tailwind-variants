@@ -1,7 +1,12 @@
-import assert from "node:assert/strict";
-
 import {utilityScenarioMetadataById} from "./utility-metadata.mjs";
-import {classInputs, mergeClassInputs, mergeTokenInputs, tokenInputs} from "./workloads.mjs";
+import {
+  classInputs,
+  cnStableInputs,
+  mergeClassInputs,
+  mergeTokenInputs,
+  tokenInputs,
+} from "./workloads.mjs";
+import assert from "node:assert/strict";
 
 const metadata = (id) => {
   const value = utilityScenarioMetadataById.get(id);
@@ -31,9 +36,40 @@ export const utilityScenarios = [
     },
   },
   {
+    ...metadata("utilities/tw-join"),
+    createTask(adapter) {
+      return () => consume(adapter.joinDirect(tokenInputs));
+    },
+  },
+  {
     ...metadata("utilities/merge"),
     createTask(adapter) {
       return () => consume(adapter.merge(mergeClassInputs));
+    },
+  },
+  {
+    ...metadata("utilities/cn-stable-args"),
+    createTask(adapter) {
+      const {base, extra, className} = cnStableInputs;
+      let on = false;
+
+      return () => {
+        on = !on;
+        consume(adapter.mergeArgs(base, on && extra, className));
+      };
+    },
+  },
+  {
+    ...metadata("utilities/cn-arbitrary-arg"),
+    createTask(adapter) {
+      const {base, extra} = cnStableInputs;
+      let on = false;
+      let counter = 0;
+
+      return () => {
+        on = !on;
+        consume(adapter.mergeArgs(base, on && extra, `w-[${counter++}px]`));
+      };
     },
   },
   {
@@ -55,11 +91,11 @@ export const utilityScenarios = [
 export const assertEquivalentUtilityOutputs = (adapters) => {
   const tv = adapters.find((adapter) => adapter.id === "tv");
   const released = adapters.find((adapter) => adapter.id === "released");
-  const cnfast = adapters.find((adapter) => adapter.id === "cnfast");
+  const cn = adapters.find((adapter) => adapter.id === "cn");
 
   assert(tv, "TV utility implementation is required.");
   assert(released, "Released TV utility implementation is required.");
-  assert(cnfast, "cnfast implementation is required.");
+  assert(cn, "shadcn-ui/cn implementation is required.");
 
   assert.equal(
     tv.joinMixed(classInputs),
@@ -68,8 +104,8 @@ export const assertEquivalentUtilityOutputs = (adapters) => {
   );
   assert.equal(
     tv.joinMixed(classInputs),
-    cnfast.joinMixed(classInputs),
-    "TV cx and cnfast clsx outputs differ.",
+    cn.joinMixed(classInputs),
+    "TV cx and cn clsx outputs differ.",
   );
   assert.equal(
     tv.joinTokens(tokenInputs),
@@ -78,8 +114,8 @@ export const assertEquivalentUtilityOutputs = (adapters) => {
   );
   assert.equal(
     tv.joinTokens(tokenInputs),
-    cnfast.joinTokens(tokenInputs),
-    "TV cx and cnfast twJoin outputs differ.",
+    cn.joinTokens(tokenInputs),
+    "TV cx and cn twJoin outputs differ.",
   );
   assert.equal(
     tv.merge(mergeClassInputs),
@@ -87,10 +123,39 @@ export const assertEquivalentUtilityOutputs = (adapters) => {
     "TV and released cn outputs differ.",
   );
   assert.equal(
-    tv.merge(mergeClassInputs),
-    cnfast.merge(mergeClassInputs),
-    "TV cn and cnfast cn outputs differ.",
+    tv.joinDirect(tokenInputs),
+    cn.joinDirect(tokenInputs),
+    "TV twJoin and cn twJoin outputs differ.",
   );
+  assert.equal(
+    tv.mergeDirect(mergeTokenInputs),
+    cn.mergeDirect(mergeTokenInputs),
+    "TV twMerge and cn twMerge outputs differ.",
+  );
+  assert.equal(
+    tv.merge(mergeClassInputs),
+    cn.merge(mergeClassInputs),
+    "TV cn and cn cn outputs differ.",
+  );
+  const {base, extra, className} = cnStableInputs;
+
+  for (const args of [
+    [base, extra, className],
+    [base, false, className],
+    [base, extra, "w-[1px]"],
+  ]) {
+    assert.equal(
+      tv.mergeArgs(...args),
+      released.mergeArgs(...args),
+      "TV and released cn argument outputs differ.",
+    );
+    assert.equal(
+      tv.mergeArgs(...args),
+      cn.mergeArgs(...args),
+      "TV cn and cn cn argument outputs differ.",
+    );
+  }
+
   assert.equal(
     tv.mergeCurried(classInputs, {twMerge: true})(),
     released.mergeCurried(classInputs, {twMerge: true})(),

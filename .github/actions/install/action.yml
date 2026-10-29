@@ -1,34 +1,21 @@
 name: "Install"
-description: "Sets up Node.js and runs install"
+description: "Sets up pnpm, Node.js and runs install"
 
 runs:
   using: composite
   steps:
-    - name: Setup pnpm
-      uses: pnpm/action-setup@v6
-      with:
-        cache: true
-        run_install: false
-
-    - name: Setup node
-      uses: actions/setup-node@v7
-      with:
-        cache: "pnpm"
-        check-latest: true
-        node-version-file: ".nvmrc"
-
-    - name: Get pnpm store directory
+    - name: Read Node.js version
+      id: nvmrc
       shell: bash
       run: |
-        echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
+        echo "version=$(tr -d '[:space:]' < .nvmrc)" >> "$GITHUB_OUTPUT"
 
-    - name: Setup pnpm cache
-      uses: actions/cache@v6
+    - name: Setup pnpm and Node.js
+      uses: pnpm/setup@v2
       with:
-        path: ${{ env.STORE_PATH }}
-        key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
-        restore-keys: |
-          ${{ runner.os }}-pnpm-store-
+        cache: true
+        install: false
+        runtime: node@${{ steps.nvmrc.outputs.version }}
 
     - name: Install dependencies
       shell: bash
