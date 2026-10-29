@@ -14,8 +14,8 @@
 
 ### ⚡ Performance
 
-- hot `tv()` about 1.6×–2× vs 3.3.1
-- `cn()` about 3× vs 3.3.1 on join-and-merge, about 10× on interpolated arguments, about 2× on unique arbitrary values
+- hot `tv()` about 3.5× vs 3.3.1, over 6× with compound variants
+- `cn()` about 2× vs 3.3.1 on join-and-merge, over 7× on interpolated arguments, about 2× on unique arbitrary values
 - pre-merged static core; `class` / `className` cached by text
 - compound variants kept out of cache keys ([#317](https://github.com/heroui-inc/tailwind-variants/pull/317))
 
