@@ -14,6 +14,8 @@ import {
   hotButtonProps,
   hotClassNameText,
   hotSlotsProps,
+  manyCompoundsConfig,
+  manyCompoundsProps,
   multiExtendChildConfig,
   multiExtendProps,
   slotsConfig,
@@ -195,6 +197,18 @@ export const scenarios = [
     },
   },
   {
+    ...metadata("invocation/many-compounds"),
+    createTask(adapter) {
+      const component = adapter.prepare(manyCompoundsConfig)();
+
+      return () => {
+        for (let i = 0; i < manyCompoundsProps.length; i++) {
+          consume(adapter.invoke(component, manyCompoundsProps[i]));
+        }
+      };
+    },
+  },
+  {
     ...metadata("invocation/lite-inject"),
     createTask(adapter) {
       const component = adapter.createLite(buttonConfig);
@@ -368,6 +382,12 @@ const compoundHeavyOutputsFor = (adapter) => {
   return compoundHeavyProps.map((props) => adapter.invoke(component, props));
 };
 
+const manyCompoundsOutputsFor = (adapter) => {
+  const component = adapter.prepare(manyCompoundsConfig)();
+
+  return manyCompoundsProps.map((props) => adapter.invoke(component, props));
+};
+
 const slotOutputsFor = (adapter, options) => {
   const component = adapter.createSlots(slotsConfig, options);
 
@@ -442,6 +462,16 @@ export const assertEquivalentOutputs = (adapters) => {
     compoundHeavyOutputsFor(tv),
     compoundHeavyOutputsFor(cva),
     "TV and CVA compound-heavy outputs differ.",
+  );
+  assert.deepEqual(
+    manyCompoundsOutputsFor(tv),
+    manyCompoundsOutputsFor(released),
+    "TV and released many-compound outputs differ.",
+  );
+  assert.deepEqual(
+    manyCompoundsOutputsFor(tv),
+    manyCompoundsOutputsFor(cva),
+    "TV and CVA many-compound outputs differ.",
   );
   if (tv.createLite) {
     assert.deepEqual(

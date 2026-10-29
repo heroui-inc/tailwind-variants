@@ -1,16 +1,25 @@
-import type {MergeAdapter} from "../internal/types.js";
+import type {AnyRecord, MergeAdapter} from "../internal/types.js";
 
 import {describe, expect, test} from "vitest";
 
 import {cnMerge, createTV, tv} from "../index";
 import {
-  buildCompoundsSignature,
   buildPropsFingerprint,
   CACHE_MISS,
+  COMPOUNDS_CHANGED,
+  COMPOUNDS_UNCHANGED,
+  COMPOUNDS_UNSAFE,
   createBoundedCache,
+  createCompoundsGuard,
   createLazyOverrideMerge,
 } from "../internal/cache.js";
 import {cx} from "../utils.js";
+
+type GuardInput = Parameters<ReturnType<typeof createCompoundsGuard>>[0];
+
+// First guard call on fresh metadata: CHANGED when it can be snapshotted, UNSAFE otherwise.
+const guardOnce = (compoundVariants: GuardInput): number =>
+  createCompoundsGuard()(compoundVariants, []);
 
 const joinAdapter: MergeAdapter = {
   parts: (list, count) => cx(...list.slice(0, count)),
@@ -214,81 +223,78 @@ describe("non-finite number serialization", () => {
     expect(a).not.toBe(b);
   });
 
-  test("compounds signature bails out for non-finite condition values", () => {
+  test("compounds guard bails out for non-finite condition values", () => {
     const nan = [{conditionKeys: ["size"], source: {size: {level: NaN}}}];
     const finite = [{conditionKeys: ["size"], source: {size: {level: 2}}}];
 
-    expect(buildCompoundsSignature(nan, [])).toBeNull();
-    expect(buildCompoundsSignature(finite, [])).not.toBeNull();
+    expect(guardOnce(nan)).toBe(COMPOUNDS_UNSAFE);
+    expect(guardOnce(finite)).toBe(COMPOUNDS_CHANGED);
   });
 
-  test("compounds signature bails out for non-finite class values", () => {
+  test("compounds guard bails out for non-finite class values", () => {
     const nanClass = [{conditionKeys: [], source: {class: {width: NaN}}}];
     const nullClass = [{conditionKeys: [], source: {class: {width: null}}}];
 
-    expect(buildCompoundsSignature(nanClass, [])).toBeNull();
-    expect(buildCompoundsSignature(nullClass, [])).not.toBeNull();
+    expect(guardOnce(nanClass)).toBe(COMPOUNDS_UNSAFE);
+    expect(guardOnce(nullClass)).toBe(COMPOUNDS_CHANGED);
   });
 
-  test("compounds signature bails out for circular objects", () => {
+  test("compounds guard bails out for circular objects", () => {
     const circular: Record<string, unknown> = {};
 
     circular.self = circular;
 
     const source = [{conditionKeys: [], source: {class: circular}}];
 
-    expect(buildCompoundsSignature(source, [])).toBeNull();
+    expect(guardOnce(source)).toBe(COMPOUNDS_UNSAFE);
   });
 });
 
-describe("appendSignatureValue fast paths", () => {
+describe("compounds guard fast paths", () => {
   test("serializes primitive-array conditions deterministically", () => {
     const compounds = [{conditionKeys: ["s"], source: {s: ["a", "b"], class: "x"}}];
-    const first = buildCompoundsSignature(compounds, []);
-    const second = buildCompoundsSignature(compounds, []);
+    const guard = createCompoundsGuard();
 
-    expect(first).not.toBeNull();
-    expect(first).toBe(second);
+    expect(guard(compounds, [])).toBe(COMPOUNDS_CHANGED);
+    expect(guard(compounds, [])).toBe(COMPOUNDS_UNCHANGED);
   });
 
   test("tolerates empty and falsy-filled arrays", () => {
     const empty = [{conditionKeys: ["s"], source: {s: [], class: "x"}}];
     const falsy = [{conditionKeys: ["s"], source: {s: ["a", null, undefined, false], class: "x"}}];
 
-    expect(buildCompoundsSignature(empty, [])).not.toBeNull();
-    expect(buildCompoundsSignature(falsy, [])).not.toBeNull();
+    expect(guardOnce(empty)).toBe(COMPOUNDS_CHANGED);
+    expect(guardOnce(falsy)).toBe(COMPOUNDS_CHANGED);
   });
 
   test("keeps the full shape of arrays containing objects", () => {
     const withObjectA = [{conditionKeys: ["s"], source: {s: ["a", {x: 1}], class: "x"}}];
     const withObjectB = [{conditionKeys: ["s"], source: {s: ["a", {y: 2}], class: "x"}}];
 
-    const sigA = buildCompoundsSignature(withObjectA, []);
-    const sigB = buildCompoundsSignature(withObjectB, []);
+    const guard = createCompoundsGuard();
 
-    expect(sigA).not.toBeNull();
-    expect(sigB).not.toBeNull();
-    expect(sigA).not.toBe(sigB);
+    expect(guard(withObjectA, [])).toBe(COMPOUNDS_CHANGED);
+    expect(guard(withObjectA, [])).toBe(COMPOUNDS_UNCHANGED);
+    expect(guard(withObjectB, [])).toBe(COMPOUNDS_CHANGED);
   });
 
   test("bails out for non-finite numbers inside arrays", () => {
     const nan = [{conditionKeys: ["s"], source: {s: [NaN, "a"], class: "x"}}];
     const infinity = [{conditionKeys: ["s"], source: {s: [Infinity, "a"], class: "x"}}];
 
-    expect(buildCompoundsSignature(nan, [])).toBeNull();
-    expect(buildCompoundsSignature(infinity, [])).toBeNull();
+    expect(guardOnce(nan)).toBe(COMPOUNDS_UNSAFE);
+    expect(guardOnce(infinity)).toBe(COMPOUNDS_UNSAFE);
   });
 
   test("serializes flat objects of primitives without collapsing them", () => {
     const classValue = [{conditionKeys: [], source: {class: {base: "r", label: "m"}}}];
     const otherClassValue = [{conditionKeys: [], source: {class: {base: "r", label: "n"}}}];
 
-    const sigA = buildCompoundsSignature(classValue, []);
-    const sigB = buildCompoundsSignature(otherClassValue, []);
+    const guard = createCompoundsGuard();
 
-    expect(sigA).not.toBeNull();
-    expect(sigB).not.toBeNull();
-    expect(sigA).not.toBe(sigB);
+    expect(guard(classValue, [])).toBe(COMPOUNDS_CHANGED);
+    expect(guard(classValue, [])).toBe(COMPOUNDS_UNCHANGED);
+    expect(guard(otherClassValue, [])).toBe(COMPOUNDS_CHANGED);
   });
 
   test("bails out for non-finite numbers inside objects", () => {
@@ -296,9 +302,9 @@ describe("appendSignatureValue fast paths", () => {
     const infinity = [{conditionKeys: [], source: {class: {base: Infinity}}}];
     const nested = [{conditionKeys: [], source: {class: {base: {inner: NaN}}}}];
 
-    expect(buildCompoundsSignature(nan, [])).toBeNull();
-    expect(buildCompoundsSignature(infinity, [])).toBeNull();
-    expect(buildCompoundsSignature(nested, [])).toBeNull();
+    expect(guardOnce(nan)).toBe(COMPOUNDS_UNSAFE);
+    expect(guardOnce(infinity)).toBe(COMPOUNDS_UNSAFE);
+    expect(guardOnce(nested)).toBe(COMPOUNDS_UNSAFE);
   });
 
   test("bails out for BigInt and circular values without throwing", () => {
@@ -309,10 +315,10 @@ describe("appendSignatureValue fast paths", () => {
 
     const circularSource = [{conditionKeys: [], source: {class: circular}}];
 
-    expect(() => buildCompoundsSignature(bigint, [])).not.toThrow();
-    expect(buildCompoundsSignature(bigint, [])).toBeNull();
-    expect(() => buildCompoundsSignature(circularSource, [])).not.toThrow();
-    expect(buildCompoundsSignature(circularSource, [])).toBeNull();
+    expect(() => guardOnce(bigint)).not.toThrow();
+    expect(guardOnce(bigint)).toBe(COMPOUNDS_UNSAFE);
+    expect(() => guardOnce(circularSource)).not.toThrow();
+    expect(guardOnce(circularSource)).toBe(COMPOUNDS_UNSAFE);
   });
 });
 
@@ -640,6 +646,173 @@ const createCounting = () => {
 
   return {tv: createTV({twMerge: merge}), calls: () => calls};
 };
+
+describe("compounds guard (snapshot and fallbacks)", () => {
+  const compound = (source: AnyRecord) =>
+    [
+      {
+        conditionKeys: Object.keys(source).filter((k) => k !== "class" && k !== "className"),
+        source,
+      },
+    ] as unknown as GuardInput;
+
+  test("reports unchanged until a snapshotted value changes in place", () => {
+    const source: AnyRecord = {color: ["red", "blue"], size: "sm", class: "font-bold"};
+    const compounds = compound(source);
+    const guard = createCompoundsGuard();
+
+    expect(guard(compounds, [])).toBe(COMPOUNDS_CHANGED);
+    expect(guard(compounds, [])).toBe(COMPOUNDS_UNCHANGED);
+
+    (source.color as string[])[1] = "green";
+    expect(guard(compounds, [])).toBe(COMPOUNDS_CHANGED);
+    expect(guard(compounds, [])).toBe(COMPOUNDS_UNCHANGED);
+
+    (source.color as string[]).push("blue");
+    expect(guard(compounds, [])).toBe(COMPOUNDS_CHANGED);
+
+    source.class = "font-normal";
+    expect(guard(compounds, [])).toBe(COMPOUNDS_CHANGED);
+    expect(guard(compounds, [])).toBe(COMPOUNDS_UNCHANGED);
+  });
+
+  test("compares functions by identity", () => {
+    const first = () => "a";
+    const second = () => "a";
+    const source: AnyRecord = {color: first, class: "x"};
+    const compounds = compound(source);
+    const guard = createCompoundsGuard();
+
+    expect(guard(compounds, [])).toBe(COMPOUNDS_CHANGED);
+    expect(guard(compounds, [])).toBe(COMPOUNDS_UNCHANGED);
+
+    source.color = second;
+    expect(guard(compounds, [])).toBe(COMPOUNDS_CHANGED);
+    expect(guard(compounds, [])).toBe(COMPOUNDS_UNCHANGED);
+  });
+
+  test("treats NaN as unsafe on every call until it is gone", () => {
+    const source: AnyRecord = {size: ["sm", Number.NaN], class: "x"};
+    const compounds = compound(source);
+    const guard = createCompoundsGuard();
+
+    expect(guard(compounds, [])).toBe(COMPOUNDS_UNSAFE);
+    expect(guard(compounds, [])).toBe(COMPOUNDS_UNSAFE);
+
+    (source.size as unknown[])[1] = "lg";
+    expect(guard(compounds, [])).toBe(COMPOUNDS_CHANGED);
+    expect(guard(compounds, [])).toBe(COMPOUNDS_UNCHANGED);
+
+    source.class = {title: Number.POSITIVE_INFINITY};
+    expect(guard(compounds, [])).toBe(COMPOUNDS_UNSAFE);
+  });
+
+  test("a value turning unsafe after a safe snapshot is reported unsafe", () => {
+    const nested: AnyRecord = {title: ["a"]};
+    const source: AnyRecord = {color: "red", class: nested};
+    const compounds = compound(source);
+    const guard = createCompoundsGuard();
+
+    expect(guard(compounds, [])).toBe(COMPOUNDS_CHANGED);
+    nested.self = nested;
+    expect(guard(compounds, [])).toBe(COMPOUNDS_UNSAFE);
+    delete nested.self;
+    expect(guard(compounds, [])).toBe(COMPOUNDS_CHANGED);
+    expect(guard(compounds, [])).toBe(COMPOUNDS_UNCHANGED);
+  });
+
+  test("detects nested object mutation", () => {
+    const nested: AnyRecord = {title: ["a", "b"]};
+    const source: AnyRecord = {color: "red", class: nested};
+    const compounds = compound(source);
+    const guard = createCompoundsGuard();
+
+    expect(guard(compounds, [])).toBe(COMPOUNDS_CHANGED);
+    expect(guard(compounds, [])).toBe(COMPOUNDS_UNCHANGED);
+
+    (nested.title as string[])[1] = "c";
+    expect(guard(compounds, [])).toBe(COMPOUNDS_CHANGED);
+    expect(guard(compounds, [])).toBe(COMPOUNDS_UNCHANGED);
+  });
+
+  test("detects added, removed and reordered keys of flat class objects", () => {
+    const classes: AnyRecord = {title: "a", root: "b"};
+    const source: AnyRecord = {color: "red", class: classes};
+    const compounds = compound(source);
+    const guard = createCompoundsGuard();
+
+    expect(guard(compounds, [])).toBe(COMPOUNDS_CHANGED);
+    classes.extra = "c";
+    expect(guard(compounds, [])).toBe(COMPOUNDS_CHANGED);
+    delete classes.extra;
+    expect(guard(compounds, [])).toBe(COMPOUNDS_CHANGED);
+    delete classes.title;
+    classes.title = "a";
+    expect(guard(compounds, [])).toBe(COMPOUNDS_CHANGED);
+    expect(guard(compounds, [])).toBe(COMPOUNDS_UNCHANGED);
+  });
+
+  test("tracks compound slot lists and compound counts", () => {
+    const slotSource: AnyRecord = {slots: ["title"], color: "red", class: "x"};
+    const slots = [{conditionKeys: ["color"], source: slotSource}] as unknown as Parameters<
+      ReturnType<typeof createCompoundsGuard>
+    >[1];
+    const variants: AnyRecord[] = [];
+    const guard = createCompoundsGuard();
+
+    expect(guard(variants as unknown as GuardInput, slots)).toBe(COMPOUNDS_CHANGED);
+    expect(guard(variants as unknown as GuardInput, slots)).toBe(COMPOUNDS_UNCHANGED);
+
+    (slotSource.slots as string[]).push("root");
+    expect(guard(variants as unknown as GuardInput, slots)).toBe(COMPOUNDS_CHANGED);
+
+    variants.push({conditionKeys: [], source: {class: "y"}});
+    expect(guard(variants as unknown as GuardInput, slots)).toBe(COMPOUNDS_CHANGED);
+    expect(guard(variants as unknown as GuardInput, slots)).toBe(COMPOUNDS_UNCHANGED);
+  });
+
+  test("unsafe compound metadata is resolved uncached but correctly", () => {
+    const {tv: countingTV, calls} = createCounting();
+    const button = countingTV({
+      variants: {
+        size: {sm: "text-sm", lg: "text-lg"},
+      },
+      compoundVariants: [{size: ["sm", Number.NaN] as unknown as "sm", class: "font-bold"}],
+    });
+
+    expect(button({size: "sm"})).toBe("text-sm font-bold");
+    const afterFirst = calls();
+
+    expect(button({size: "sm"})).toBe("text-sm font-bold");
+    expect(calls()).toBeGreaterThan(afterFirst);
+    expect(button({size: "lg"})).toBe("text-lg");
+
+    (button.compoundVariants[0].size as unknown as unknown[])[1] = "lg";
+
+    expect(button({size: "lg"})).toBe("text-lg font-bold");
+    const cached = calls();
+
+    expect(button({size: "lg"})).toBe("text-lg font-bold");
+    expect(calls()).toBe(cached);
+  });
+
+  test("nested compound class mutation reaches slot output", () => {
+    const menu = tv({
+      slots: {root: "root", title: "title"},
+      variants: {color: {primary: {title: "title-p"}}},
+      compoundVariants: [{color: "primary", class: {title: ["c-a", "c-b"]}}],
+      defaultVariants: {color: "primary"},
+    });
+
+    expect(menu().title()).toHaveClass(["title", "title-p", "c-a", "c-b"]);
+    expect(menu().title()).toHaveClass(["title", "title-p", "c-a", "c-b"]);
+
+    ((menu.compoundVariants[0].class as Record<string, string[]>).title as string[])[1] = "c-z";
+
+    expect(menu().title()).toHaveClass(["title", "title-p", "c-a", "c-z"]);
+    expect(menu().title()).not.toHaveClass(["c-b"]);
+  });
+});
 
 describe("definition-time static core", () => {
   test("default-only calls merge once and then return the same string", () => {

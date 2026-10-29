@@ -60,6 +60,13 @@ const scenarioMetadata = [
     implementations: ["tv", "cva"],
   },
   {
+    id: "invocation/many-compounds",
+    category: "invocation",
+    name: "Call with many compound variants",
+    description: "A batch of five calls across 36 overlapping compound variants.",
+    implementations: ["tv", "cva"],
+  },
+  {
     id: "invocation/lite-inject",
     category: "invocation",
     name: "Invoke lite + injected twMerge",

@@ -52,69 +52,6 @@ const serializeFingerprintValue = (value: unknown): string | null => {
   return null;
 };
 
-const appendSignatureValue = (out: string, value: unknown): string | null => {
-  if (value === undefined) return out;
-  if (value === null) return out + "null";
-
-  const type = typeof value;
-
-  if (type === "string" || type === "number" || type === "boolean" || type === "bigint") {
-    // `String(NaN)` is "NaN", distinct from "null", so only the object and
-    // array branches need the finite check.
-    return out + String(value);
-  }
-
-  if (Array.isArray(value)) {
-    // Primitive arrays serialize through `join`. Arrays with objects keep their
-    // full shape via the replacer; non-finite numbers bail to the uncached path.
-    for (let i = 0; i < value.length; i++) {
-      const item = value[i];
-
-      if (item !== null && typeof item === "object") {
-        try {
-          return out + JSON.stringify(value, stringifyFiniteOrThrow);
-        } catch {
-          return null;
-        }
-      }
-      if (typeof item === "number" && !Number.isFinite(item)) return null;
-    }
-
-    return out + value.join("\0");
-  }
-
-  if (value !== null && type === "object") {
-    // Flat objects of primitives (the common compound-class shape) stringify
-    // without the replacer; nested structures or non-finite values fall back to
-    // the replacer or the uncached path.
-    let allPrimitive = true;
-
-    for (const key in value as AnyRecord) {
-      const item = (value as AnyRecord)[key];
-
-      if (typeof item === "number" && !Number.isFinite(item)) return null;
-      if (item !== null && typeof item === "object") {
-        allPrimitive = false;
-        break;
-      }
-    }
-
-    if (allPrimitive) {
-      try {
-        return out + JSON.stringify(value);
-      } catch {
-        return null;
-      }
-    }
-  }
-
-  try {
-    return out + JSON.stringify(value, stringifyFiniteOrThrow);
-  } catch {
-    return null;
-  }
-};
-
 // Result-cache key; omits class/className.
 export const buildPropsFingerprint = (
   variantKeys: string[],
@@ -187,72 +124,277 @@ export const buildPropsFingerprint = (
   return fingerprint;
 };
 
-// Invalidates cache when compound metadata mutates.
+// Detects in-place compound metadata mutation without serializing it.
 //
-// Returns `null` when a value cannot be serialized losslessly (non-finite
-// numbers, circular objects), so callers skip the cache instead of keying two
-// different configs alike.
-export const buildCompoundsSignature = (
-  compoundVariants: readonly Pick<CompiledCompoundVariant, "conditionKeys" | "source">[],
-  compoundSlots: readonly Pick<CompiledCompoundSlot, "conditionKeys" | "source">[],
-): string | null => {
-  let signature = "";
+// Each resolver keeps one guard. The first call records every compound
+// condition value, `class`, `className`, and compound-slot `slots` list into a
+// flat snapshot; later calls compare the live values item by item with
+// `Object.is` and allocate nothing while they match. Only a mismatch (or a
+// value that needs JSON) rebuilds or re-serializes.
+//
+// Safety mirrors the old signature: any value the signature could not
+// serialize losslessly (non-finite numbers inside arrays or objects, BigInt
+// inside objects, circular structures) reports `COMPOUNDS_UNSAFE`, so callers
+// skip the cache exactly as before. Objects nested in arrays or objects are
+// compared through their JSON text, as the signature did.
+export const COMPOUNDS_UNCHANGED = 0;
+export const COMPOUNDS_CHANGED = 1;
+export const COMPOUNDS_UNSAFE = 2;
+
+export type CompoundsGuard = ReturnType<typeof createCompoundsGuard>;
+
+export type CompoundsState =
+  | typeof COMPOUNDS_UNCHANGED
+  | typeof COMPOUNDS_CHANGED
+  | typeof COMPOUNDS_UNSAFE;
+
+type CompoundSources = {
+  compoundVariants: readonly Pick<CompiledCompoundVariant, "conditionKeys" | "source">[];
+  compoundSlots: readonly Pick<CompiledCompoundSlot, "conditionKeys" | "source">[];
+};
+
+// Snapshot kinds: the live value is compared against the stored token.
+const KIND_PRIMITIVE = 0; // token is the value itself (identity)
+const KIND_ARRAY = 1; // token is a shallow copy of a primitive array
+const KIND_OBJECT = 2; // token is [key0, value0, key1, value1, ...] of a flat plain object
+const KIND_JSON = 3; // token is the JSON text (nested structures)
+
+const MATCH = 0;
+const MISMATCH = 1;
+const UNSAFE = 2;
+
+type Snapshot = {kinds: number[]; tokens: unknown[]};
+
+const isPlainObject = (value: object): boolean => {
+  const proto = Object.getPrototypeOf(value);
+
+  return proto === Object.prototype || proto === null;
+};
+
+const isNonFiniteNumber = (value: unknown): boolean =>
+  typeof value === "number" && !Number.isFinite(value);
+
+const recordJson = (snapshot: Snapshot, index: number, value: unknown): boolean => {
+  try {
+    snapshot.kinds[index] = KIND_JSON;
+    snapshot.tokens[index] = JSON.stringify(value, stringifyFiniteOrThrow);
+
+    return true;
+  } catch {
+    return false;
+  }
+};
+
+// Records one value. Returns false when it cannot be compared losslessly.
+const recordValue = (snapshot: Snapshot, index: number, value: unknown): boolean => {
+  if (value === null || typeof value !== "object") {
+    snapshot.kinds[index] = KIND_PRIMITIVE;
+    snapshot.tokens[index] = value;
+
+    return true;
+  }
+
+  if (Array.isArray(value)) {
+    for (let i = 0; i < value.length; i++) {
+      const item = value[i];
+
+      if (item !== null && typeof item === "object") return recordJson(snapshot, index, value);
+      if (isNonFiniteNumber(item)) return false;
+    }
+
+    snapshot.kinds[index] = KIND_ARRAY;
+    snapshot.tokens[index] = value.slice();
+
+    return true;
+  }
+
+  if (isPlainObject(value)) {
+    const flat: unknown[] = [];
+
+    for (const key in value as AnyRecord) {
+      const item = (value as AnyRecord)[key];
+
+      if (isNonFiniteNumber(item)) return false;
+      if (item !== null && typeof item === "object") return recordJson(snapshot, index, value);
+      // The signature's `JSON.stringify` threw on BigInt members.
+      if (typeof item === "bigint") return false;
+      flat.push(key, item);
+    }
+
+    snapshot.kinds[index] = KIND_OBJECT;
+    snapshot.tokens[index] = flat;
+
+    return true;
+  }
+
+  return recordJson(snapshot, index, value);
+};
+
+const matchValue = (kind: number, token: unknown, value: unknown): number => {
+  if (kind === KIND_PRIMITIVE) return Object.is(token, value) ? MATCH : MISMATCH;
+
+  if (value === null || typeof value !== "object") return MISMATCH;
+
+  if (kind === KIND_ARRAY) {
+    const items = token as unknown[];
+
+    if (!Array.isArray(value) || value.length !== items.length) return MISMATCH;
+    for (let i = 0; i < items.length; i++) {
+      if (!Object.is(items[i], value[i])) return MISMATCH;
+    }
+
+    return MATCH;
+  }
+
+  if (kind === KIND_OBJECT) {
+    if (Array.isArray(value) || !isPlainObject(value)) return MISMATCH;
+
+    const flat = token as unknown[];
+    let j = 0;
+
+    for (const key in value as AnyRecord) {
+      if (j >= flat.length || flat[j] !== key) return MISMATCH;
+      if (!Object.is(flat[j + 1], (value as AnyRecord)[key])) return MISMATCH;
+      j += 2;
+    }
+
+    return j === flat.length ? MATCH : MISMATCH;
+  }
+
+  try {
+    return JSON.stringify(value, stringifyFiniteOrThrow) === token ? MATCH : MISMATCH;
+  } catch {
+    return UNSAFE;
+  }
+};
+
+// Compound-slot `slots` lists were only ever joined; anything else is ignored.
+const slotsValue = (slots: unknown): unknown => (Array.isArray(slots) ? slots : undefined);
+
+const recordSlots = (snapshot: Snapshot, index: number, slots: unknown): void => {
+  const value = slotsValue(slots) as unknown[] | undefined;
+
+  snapshot.kinds[index] = value === undefined ? KIND_PRIMITIVE : KIND_ARRAY;
+  snapshot.tokens[index] = value === undefined ? undefined : value.slice();
+};
+
+// Fills a fresh snapshot. Returns false when any value is unsafe.
+const takeSnapshot = (
+  snapshot: Snapshot,
+  compoundVariants: CompoundSources["compoundVariants"],
+  compoundSlots: CompoundSources["compoundSlots"],
+) => {
+  let index = 0;
 
   for (let i = 0; i < compoundVariants.length; i++) {
     const {conditionKeys, source} = compoundVariants[i];
 
     for (let j = 0; j < conditionKeys.length; j++) {
-      const key = conditionKeys[j];
-      const appended = appendSignatureValue(signature + key + "=", source[key]);
-
-      if (appended === null) return null;
-
-      signature = appended + ",";
+      if (!recordValue(snapshot, index++, source[conditionKeys[j]])) return false;
     }
-
-    signature += "c=";
-    const withClass = appendSignatureValue(signature, source.class);
-
-    if (withClass === null) return null;
-
-    signature = withClass + "|cn=";
-    const withClassName = appendSignatureValue(signature, source.className);
-
-    if (withClassName === null) return null;
-
-    signature = withClassName + ";";
+    if (!recordValue(snapshot, index++, source.class)) return false;
+    if (!recordValue(snapshot, index++, source.className)) return false;
   }
 
   for (let i = 0; i < compoundSlots.length; i++) {
     const {conditionKeys, source} = compoundSlots[i];
 
     for (let j = 0; j < conditionKeys.length; j++) {
-      const key = conditionKeys[j];
-      const appended = appendSignatureValue(signature + key + "=", source[key]);
-
-      if (appended === null) return null;
-
-      signature = appended + ",";
+      if (!recordValue(snapshot, index++, source[conditionKeys[j]])) return false;
     }
-
-    if (Array.isArray(source.slots)) {
-      signature += "slots=" + source.slots.join(",") + ",";
-    }
-
-    signature += "c=";
-    const withClass = appendSignatureValue(signature, source.class);
-
-    if (withClass === null) return null;
-
-    signature = withClass + "|cn=";
-    const withClassName = appendSignatureValue(signature, source.className);
-
-    if (withClassName === null) return null;
-
-    signature = withClassName + ";";
+    recordSlots(snapshot, index++, source.slots);
+    if (!recordValue(snapshot, index++, source.class)) return false;
+    if (!recordValue(snapshot, index++, source.className)) return false;
   }
 
-  return signature;
+  snapshot.kinds.length = index;
+  snapshot.tokens.length = index;
+
+  return true;
+};
+
+const compareSnapshot = (
+  {kinds, tokens}: Snapshot,
+  compoundVariants: CompoundSources["compoundVariants"],
+  compoundSlots: CompoundSources["compoundSlots"],
+): number => {
+  const size = kinds.length;
+  let index = 0;
+  let state: number;
+
+  for (let i = 0; i < compoundVariants.length; i++) {
+    const {conditionKeys, source} = compoundVariants[i];
+
+    if (index + conditionKeys.length + 2 > size) return MISMATCH;
+    for (let j = 0; j < conditionKeys.length; j++, index++) {
+      state = matchValue(kinds[index], tokens[index], source[conditionKeys[j]]);
+      if (state !== MATCH) return state;
+    }
+    state = matchValue(kinds[index], tokens[index], source.class);
+    if (state !== MATCH) return state;
+    index++;
+    state = matchValue(kinds[index], tokens[index], source.className);
+    if (state !== MATCH) return state;
+    index++;
+  }
+
+  for (let i = 0; i < compoundSlots.length; i++) {
+    const {conditionKeys, source} = compoundSlots[i];
+
+    if (index + conditionKeys.length + 3 > size) return MISMATCH;
+    for (let j = 0; j < conditionKeys.length; j++, index++) {
+      state = matchValue(kinds[index], tokens[index], source[conditionKeys[j]]);
+      if (state !== MATCH) return state;
+    }
+    state = matchValue(kinds[index], tokens[index], slotsValue(source.slots));
+    if (state !== MATCH) return state;
+    index++;
+    state = matchValue(kinds[index], tokens[index], source.class);
+    if (state !== MATCH) return state;
+    index++;
+    state = matchValue(kinds[index], tokens[index], source.className);
+    if (state !== MATCH) return state;
+    index++;
+  }
+
+  return index === size ? MATCH : MISMATCH;
+};
+
+/**
+ * One guard per resolver. Each call reports whether the compound metadata is
+ * unchanged since the previous call, changed (snapshot refreshed), or unsafe
+ * to cache against (nothing may be cached for this call).
+ */
+export const createCompoundsGuard = () => {
+  let snapshot: Snapshot | null = null;
+
+  return (
+    compoundVariants: CompoundSources["compoundVariants"],
+    compoundSlots: CompoundSources["compoundSlots"],
+  ): CompoundsState => {
+    if (snapshot !== null) {
+      const state = compareSnapshot(snapshot, compoundVariants, compoundSlots);
+
+      if (state === MATCH) return COMPOUNDS_UNCHANGED;
+      if (state === UNSAFE) {
+        snapshot = null;
+
+        return COMPOUNDS_UNSAFE;
+      }
+    }
+
+    const next: Snapshot = {kinds: [], tokens: []};
+
+    if (!takeSnapshot(next, compoundVariants, compoundSlots)) {
+      snapshot = null;
+
+      return COMPOUNDS_UNSAFE;
+    }
+
+    snapshot = next;
+
+    return COMPOUNDS_CHANGED;
+  };
 };
 
 type BoundedCache<T> = {

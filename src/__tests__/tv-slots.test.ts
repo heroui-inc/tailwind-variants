@@ -1087,6 +1087,31 @@ describe("tv (slots independence)", () => {
       expect(menu({color: "secondary"}).title()).toHaveClass(["title", "title-s", "compound-new"]);
     });
 
+    test("invalidates parent cache after in-place compound class object mutation", () => {
+      const menu = createTv({
+        slots: {
+          root: "root",
+          title: "title",
+        },
+        variants: {
+          color: {
+            primary: {root: "root-p", title: "title-p"},
+            secondary: {root: "root-s", title: "title-s"},
+          },
+        },
+        compoundVariants: [{color: "primary", class: {title: "compound-old"}}],
+        defaultVariants: {color: "primary"},
+      });
+
+      expect(menu().title()).toHaveClass(["title", "title-p", "compound-old"]);
+      expect(menu().title()).toHaveClass(["title", "title-p", "compound-old"]);
+
+      (menu.compoundVariants[0].class as Record<string, string>).title = "compound-new";
+
+      expect(menu().title()).toHaveClass(["title", "title-p", "compound-new"]);
+      expect(menu().title()).not.toHaveClass(["compound-old"]);
+    });
+
     test("invalidates parent cache after in-place compoundSlots mutation", () => {
       const menu = createTv({
         slots: {

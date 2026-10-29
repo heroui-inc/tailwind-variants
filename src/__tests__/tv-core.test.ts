@@ -508,6 +508,43 @@ describe("tv", () => {
     expect(button({color: "red"})).toBe("text-red-500");
     expect(button({color: "blue"})).toBe("text-blue-500 font-bold");
   });
+
+  test("preserves in-place mutations to compound array conditions", () => {
+    const button = tv({
+      variants: {
+        color: {
+          red: "text-red-500",
+          blue: "text-blue-500",
+        },
+        size: {
+          sm: "text-sm",
+          lg: "text-lg",
+        },
+      },
+      compoundVariants: [{color: ["red", "blue"], size: "sm", className: "font-normal"}],
+    });
+
+    expect(button({color: "blue", size: "sm"})).toHaveClass([
+      "text-blue-500",
+      "text-sm",
+      "font-normal",
+    ]);
+    expect(button({color: "blue", size: "sm"})).toHaveClass([
+      "text-blue-500",
+      "text-sm",
+      "font-normal",
+    ]);
+
+    (button.compoundVariants[0].color as string[])[1] = "red";
+
+    expect(button({color: "blue", size: "sm"})).toHaveClass(["text-blue-500", "text-sm"]);
+    expect(button({color: "blue", size: "sm"})).not.toHaveClass(["font-normal"]);
+    expect(button({color: "red", size: "sm"})).toHaveClass([
+      "text-red-500",
+      "text-sm",
+      "font-normal",
+    ]);
+  });
 });
 
 describe("tv (array variant value targeting base slot)", () => {
