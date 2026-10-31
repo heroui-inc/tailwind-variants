@@ -74,6 +74,8 @@ const scenarioMetadata = [
       "The lite entry with this build's own twMerge injected, five-call batch. Skipped for builds whose lite entry does not call the injected function.",
     implementations: ["tv"],
     requiresCapabilities: ["liteInject"],
+    // The adapter builds createLite only when it also has a merge module.
+    requiresMethod: "createLite",
   },
   {
     id: "invocation/variants-no-merge",

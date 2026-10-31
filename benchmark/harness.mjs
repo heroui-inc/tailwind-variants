@@ -64,6 +64,10 @@ export const loadImplementations = async () => {
   const releasedLiteModule = await importOptionalDist(
     path.join(path.dirname(released.distPath), "lite.js"),
   );
+  // Releases from 4.0.0 ship a standalone merge entry for lite injection.
+  const releasedMergeModule = await importOptionalDist(
+    path.join(path.dirname(released.distPath), "merge-entry.js"),
+  );
   const cvaModule = await importDist(cva.entryPath);
   const cnModule = await importDist(cn.entryPath);
 
@@ -103,7 +107,7 @@ export const loadImplementations = async () => {
       module: releasedModule,
       configModule: releasedConfigModule,
       liteModule: releasedLiteModule,
-      mergeModule: undefined,
+      mergeModule: releasedMergeModule,
       entrySize: measureEntrySize(released.distPath),
     },
     {
