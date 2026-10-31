@@ -89,13 +89,14 @@ export interface TVReturnTypeLike<V extends TVVariantsShape, S extends TVSlots> 
 export type OmitUndefined<T> = T extends undefined ? never : T;
 export type StringToBoolean<T> = T extends "true" | "false" | true | false ? boolean : T;
 
-// Normalize one option key to a string literal, mapping boolean `true`/`false`
-// keys to `"true"`/`"false"` so StringToBoolean can turn them into `boolean`.
+// Normalize one option key, mapping boolean `true`/`false` keys to
+// `"true"`/`"false"` so StringToBoolean can turn them into `boolean`. Numeric
+// keys (e.g. spacing scales `{0: "", 2: ""}`) stay number literals.
 type NormalizeVariantOptionKey<K> = K extends true | "true"
   ? "true"
   : K extends false | "false"
     ? "false"
-    : K extends string
+    : K extends string | number
       ? K
       : never;
 

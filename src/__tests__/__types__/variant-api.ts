@@ -59,3 +59,28 @@ tv({
   // @ts-expect-error compoundVariants must be an array
   compoundVariants: {},
 });
+
+// Case: numeric option keys accept number literals in props and VariantProps.
+const box = tv({
+  variants: {
+    gap: {px: "gap-px", 0: "gap-0", 2: "gap-2"},
+  },
+  defaultVariants: {gap: 0},
+  compoundVariants: [{gap: [0, 2], class: "flex"}],
+});
+
+type BoxProps = VariantProps<typeof box>;
+
+const numericProps: BoxProps = {gap: 0};
+const numericGap: BoxProps["gap"] = 2;
+
+box(numericProps);
+box({gap: 2});
+box({gap: "px"});
+box({gap: numericGap});
+
+// @ts-expect-error numeric option keys reject unknown numbers
+box({gap: 3});
+
+// @ts-expect-error numeric option keys reject unknown strings
+box({gap: "3"});
