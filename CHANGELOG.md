@@ -1,3 +1,10 @@
+# [4.0.1](https://github.com/heroui-inc/tailwind-variants/compare/v4.0.0...v4.0.1) (2026-10-31)
+
+### 🐛 Fixes
+
+- numeric variant keys accepted as numbers in props and `VariantProps` ([#318](https://github.com/heroui-inc/tailwind-variants/issues/318))
+- benchmark: released lite-inject comparison
+
 # [4.0.0](https://github.com/heroui-inc/tailwind-variants/compare/v3.3.1...v4.0.0) (2026-10-30)
 
 ### ✨ Features
