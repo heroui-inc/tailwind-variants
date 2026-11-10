@@ -1,5 +1,5 @@
 import type {JoinClassValue} from "./internal/join-class-value.js";
-import type {CnOptions, CnReturn} from "./types.js";
+import type {CnOptions, CnReturn, TVDefineVariants} from "./types.js";
 
 import {joinClassValue} from "./internal/join-class-value.js";
 
@@ -197,3 +197,14 @@ export const mergeObjects = <T extends object, U extends object>(
 
   return result;
 };
+
+/**
+ * Returns `tv()` options unchanged, checking them where they are written.
+ * Use it for options kept apart from the `tv()` call: `satisfies` cannot do
+ * this, because it widens `compoundVariants` and `defaultVariants` values to
+ * `string`, which `tv()` then rejects.
+ * @example
+ * const buttonVariants = defineVariants({ base: "font-semibold", variants: { size: { sm: "text-sm" } } });
+ * const button = tv(buttonVariants);
+ */
+export const defineVariants = ((options: unknown) => options) as TVDefineVariants;

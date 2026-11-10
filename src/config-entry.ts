@@ -26,7 +26,7 @@ import {clsx, twJoin, twMerge} from "./internal/engine-instance.js";
 import {cn} from "./internal/merge-adapter.js";
 import * as validatorFunctions from "./internal/merge-engine/validators.js";
 import {getTailwindVariants} from "./internal/tv.js";
-import {cx as runtimeCx} from "./utils.js";
+import {defineVariants, cx as runtimeCx} from "./utils.js";
 
 export type {
   TVConfig,
@@ -96,6 +96,15 @@ export const validators = validatorFunctions;
 export {getDefaultConfig} from "./internal/compile-config/default-config.js";
 export {fromTheme} from "./internal/compile-config/from-theme.js";
 export {mergeConfigs} from "./internal/compile-config/merge-configs.js";
-export {clsx, cn, createTailwindMerge, createTwMerge, extendTailwindMerge, twJoin, twMerge};
+export {
+  clsx,
+  cn,
+  createTailwindMerge,
+  createTwMerge,
+  defineVariants,
+  extendTailwindMerge,
+  twJoin,
+  twMerge,
+};
 
 export default clsx;

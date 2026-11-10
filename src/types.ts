@@ -572,6 +572,94 @@ type TVOptionsFields<
   defaultVariants?: ExactShape<TVDefaultVariants<V, S, EV, ES>, DV>;
 };
 
+type TVCompoundSlotsOption<
+  V extends TVVariantsShape,
+  B extends ClassValue,
+  S extends TVSlots,
+  E extends TVReturnTypeLike<any, any> | TVExtendList | undefined,
+  EV extends TVVariantsShape,
+> = ReadonlyArray<
+  TVCompoundSlot<
+    NoInfer<V>,
+    TVMergedSlots<NoInfer<S>, NoInfer<SlotsOfExtend<E>>>,
+    NoInfer<B>,
+    NoInfer<EV>,
+    true
+  >
+>;
+
+/**
+ * The options object `tv()` accepts, validated against its own variants and slots.
+ * `compoundSlots` is validation-only: every type parameter it mentions is wrapped
+ * in `NoInfer`, so `extend`, `variants`, `slots`, and `base` stay the only
+ * inference sites.
+ */
+export type TVOptions<
+  V extends TVVariantsShape,
+  DV,
+  CV extends readonly object[],
+  B extends ClassValue,
+  S extends TVSlots,
+  E extends TVReturnTypeLike<any, any> | TVExtendList | undefined,
+  EV extends TVVariantsShape = VariantsOfExtend<E>,
+  ES extends TVSlots = SlotsOfExtend<E>,
+> = TVOptionsFields<V, DV, CV, B, S, EV, ES> & {
+  // Extend merges parent recipes into this definition; child options win.
+  // Accepts a single {@link TVReturnTypeLike} or a non-empty list, merged
+  // left-to-right (`[]` is rejected at the type level).
+  // @example tv({ extend: baseButton, base: "gap-2" })
+  // @example tv({ extend: [focusable, animated], base: "inline-flex" })
+  // @see https://www.tailwind-variants.org/docs/composing-components
+  extend?: E;
+  // Classes applied to multiple slots at once.
+  compoundSlots?: TVCompoundSlotsOption<V, B, S, E, EV>;
+};
+
+/**
+ * What {@link TVDefineVariants} returns: the options exactly as written, with
+ * their literal types kept, so passing them to `tv()` infers the same recipe as
+ * writing them inline.
+ */
+export type TVDefinedVariants<
+  V extends TVVariantsShape,
+  CV extends readonly object[],
+  B extends ClassValue,
+  S extends TVSlots,
+  E extends TVReturnTypeLike<any, any> | TVExtendList | undefined,
+  EV extends TVVariantsShape = VariantsOfExtend<E>,
+  ES extends TVSlots = SlotsOfExtend<E>,
+> = {
+  base?: B;
+  slots?: S;
+  variants?: V;
+  compoundVariants?: CV;
+  // Typed from the variants, not from `DV`: `DV` is inferred widened (`string`),
+  // and `tv()` would reject it on the way back in.
+  defaultVariants?: TVDefaultVariants<V, S, EV, ES>;
+  extend?: E;
+  compoundSlots?: TVCompoundSlotsOption<V, B, S, E, EV>;
+};
+
+/**
+ * Identity helper that checks a `tv()` options object where it is written, for
+ * options kept apart from the `tv()` call (a theme file, a shared preset, an
+ * object an app overrides). Same generics and checks as `tv()`.
+ */
+export interface TVDefineVariants {
+  <
+    V extends TVVariantsConstraint = {},
+    DV = {},
+    const CV extends readonly object[] = [],
+    B extends ClassValue = undefined,
+    S extends TVSlots = undefined,
+    E extends TVReturnTypeLike<any, any> | TVExtendList | undefined = undefined,
+    EV extends TVVariantsShape = VariantsOfExtend<E>,
+    ES extends TVSlots = SlotsOfExtend<E>,
+  >(
+    options: TVOptions<V, DV, CV, B, S, E, EV, ES>,
+  ): TVDefinedVariants<V, CV, B, S, E, EV, ES>;
+}
+
 // One call signature, not overloads: `E` covers no extend, one parent, or a
 // parent list, and `VariantsOfExtend` / `SlotsOfExtend` derive `EV` / `ES`.
 // That keeps contextual typing for wrappers and one error per failed call.
@@ -598,25 +686,7 @@ export interface TV<Config extends TVConfig = TVConfig> {
     EV extends TVVariantsShape = VariantsOfExtend<E>,
     ES extends TVSlots = SlotsOfExtend<E>,
   >(
-    options: TVOptionsFields<V, DV, CV, B, S, EV, ES> & {
-      // Extend merges parent recipes into this definition; child options win.
-      // Accepts a single {@link TVReturnTypeLike} or a non-empty list, merged
-      // left-to-right (`[]` is rejected at the type level).
-      // @example tv({ extend: baseButton, base: "gap-2" })
-      // @example tv({ extend: [focusable, animated], base: "inline-flex" })
-      // @see https://www.tailwind-variants.org/docs/composing-components
-      extend?: E;
-      // Classes applied to multiple slots at once.
-      compoundSlots?: ReadonlyArray<
-        TVCompoundSlot<
-          NoInfer<V>,
-          TVMergedSlots<NoInfer<S>, NoInfer<SlotsOfExtend<E>>>,
-          NoInfer<B>,
-          NoInfer<EV>,
-          true
-        >
-      >;
-    },
+    options: TVOptions<V, DV, CV, B, S, E, EV, ES>,
     config?: Config,
   ): TVReturnType<V, S, B, EV, ES, E>;
 }
@@ -633,24 +703,7 @@ export interface TVLite {
     EV extends TVVariantsShape = VariantsOfExtend<E>,
     ES extends TVSlots = SlotsOfExtend<E>,
   >(
-    options: TVOptionsFields<V, DV, CV, B, S, EV, ES> & {
-      // Extend merges parent recipes into this definition; child options win.
-      // Accepts a single {@link TVReturnTypeLike} or a non-empty list, merged
-      // left-to-right (`[]` is rejected at the type level).
-      // @example tv({ extend: baseButton, base: "gap-2" })
-      // @example tv({ extend: [focusable, animated], base: "inline-flex" })
-      // @see https://www.tailwind-variants.org/docs/composing-components
-      extend?: E;
-      compoundSlots?: ReadonlyArray<
-        TVCompoundSlot<
-          NoInfer<V>,
-          TVMergedSlots<NoInfer<S>, NoInfer<SlotsOfExtend<E>>>,
-          NoInfer<B>,
-          NoInfer<EV>,
-          true
-        >
-      >;
-    },
+    options: TVOptions<V, DV, CV, B, S, E, EV, ES>,
     config?: TVLiteConfig,
   ): TVReturnType<V, S, B, EV, ES, E>;
 }
@@ -663,7 +716,27 @@ export type TVFactory = {
   (options: Record<string, any>, config?: TVConfig): any;
 };
 
-export type VariantProps<Component extends (...args: any) => any> = Omit<
-  OmitUndefined<Parameters<Component>[0]>,
-  "class" | "className"
->;
+// The recipe `tv()` would build from options returned by `defineVariants`, so
+// `VariantProps` reads both through the same call signature.
+type TVRecipeOf<T> = T extends (...args: any) => any
+  ? T
+  : T extends TVDefinedVariants<
+        infer V,
+        any,
+        infer B,
+        infer S,
+        infer E extends TVReturnTypeLike<any, any> | TVExtendList | undefined
+      >
+    ? TVReturnType<V, S, B, VariantsOfExtend<E>, SlotsOfExtend<E>, E>
+    : never;
+
+/**
+ * Variant props of a recipe returned by `tv()`, or of options returned by
+ * `defineVariants`, without calling `tv()` on them first.
+ * @example
+ * type ButtonProps = VariantProps<typeof button>;
+ * type ButtonProps = VariantProps<typeof buttonVariants>; // same type
+ */
+export type VariantProps<
+  Component extends ((...args: any) => any) | TVDefinedVariants<any, any, any, any, any>,
+> = Omit<OmitUndefined<Parameters<TVRecipeOf<Component>>[0]>, "class" | "className">;

@@ -4,7 +4,7 @@ import type {CnOptions, CnReturn, TVLite} from "./types.js";
 
 import {defaultConfig as runtimeDefaultConfig} from "./internal/default-config.js";
 import {getTailwindVariants} from "./internal/tv.js";
-import {cx, normalizeClassString} from "./utils.js";
+import {cx, defineVariants, normalizeClassString} from "./utils.js";
 
 export type {TVConfig, TVLiteConfig, TWMConfig, TWMergeConfig, TwMergeFn} from "./config.js";
 export type * from "./types.js";
@@ -119,6 +119,6 @@ export const clsx = function (): string {
   return str;
 } as (...inputs: unknown[]) => string;
 
-export {cx};
+export {cx, defineVariants};
 
 export default clsx;
