@@ -49,7 +49,7 @@ type ExactKeys<Shape, Actual> = Record<Exclude<keyof Actual, keyof Shape>, never
 
 // Soft Exact applied to a value position: the leading `Actual &` keeps the
 // value inferrable, `Shape` validates known keys, `ExactKeys` rejects excess.
-// Shared by `defaultVariants` and (per element) `compoundVariants`.
+// Used by `defaultVariants`.
 type ExactShape<Shape, Actual> = Actual & Shape & ExactKeys<Shape, Actual>;
 
 // Right (child) wins for an overlapping axis unless both sides are option
@@ -181,18 +181,6 @@ type ExactVariantSlots<Slots extends PropertyKey, Actual> = {
   };
 };
 
-// Soft Exact applied to the `class` / `className` of one compoundVariants entry.
-//
-// The `?` is required, not cosmetic. Mixing `class` and `className` across
-// entries widens the array's element type to a union, and `keyof` a union keeps
-// only the keys common to every member — which is *both* `class` and
-// `className`, since {@link ClassProp} gives each entry the other one as
-// `never`. Without `?` this mapped type would then demand both on every entry
-// and reject an ordinary mixed array.
-type ExactSlotClassProp<Slots extends PropertyKey, Actual> = {
-  [K in Extract<keyof Actual, "class" | "className">]?: ExactSlotClass<Slots, Actual[K]>;
-};
-
 type SlotsClassValue<S extends TVSlots, B extends ClassValue> = {
   [K in TVSlotsWithBase<S, B>]?: ClassValue;
 };
@@ -256,7 +244,7 @@ type TVResolvedVariants<V extends TVVariantsShape, EV extends TVVariantsShape> =
  * to own slots only.
  *
  * Keep the slot set here in sync with the {@link TVSlotClassKeys} passed to
- * {@link ExactSlotClassProp} at the `compoundVariants` option: this type decides
+ * {@link ExactCompoundClass} at the `compoundVariants` option: this type decides
  * what the IDE *suggests*, that one decides what is *rejected*. When they drift,
  * valid slots stop being suggested (inherited slots did, before `ES` was
  * threaded through).
@@ -267,17 +255,27 @@ export type TVCompoundVariant<
   B extends ClassValue,
   EV extends TVVariantsShape,
   ES extends TVSlots = undefined,
-> = TVCompoundVariantAxes<V, EV> & ClassProp<SlotsClassValue<TVMergedSlots<S, ES>, B> | ClassValue>;
+> = TVCompoundVariantAxes<V, EV> & ClassProp<VariantClassValue<TVMergedSlots<S, ES>, B>>;
 
 // Axis conditions of one compoundVariants entry, without the class props.
 // `ExactCompoundArray` validates against `TVCompoundVariantAxes & ClassProp<unknown>`:
 // `unknown` keeps `class` / `className` as known keys without adding members,
 // so the IDE suggests slot names at `class: {` instead of the `String` prototype.
-type TVCompoundVariantAxes<V extends TVVariantsShape, EV extends TVVariantsShape> = {
-  [K in keyof TVResolvedVariants<V, EV> & string]?:
-    | VariantValueWithBooleanUndefined<TVResolvedVariants<V, EV>, K>
-    | Array<VariantValueWithBooleanUndefined<TVResolvedVariants<V, EV>, K>>;
+type TVCompoundVariantAxes<
+  V extends TVVariantsShape,
+  EV extends TVVariantsShape,
+  Input extends boolean = false,
+> = {
+  [K in keyof TVResolvedVariants<V, EV> & string]?: CompoundCondition<
+    VariantValueWithBooleanUndefined<TVResolvedVariants<V, EV>, K>,
+    Input
+  >;
 };
+
+// `tv()` input also takes readonly lists; exported types stay mutable.
+type CompoundCondition<T, Input extends boolean> =
+  | T
+  | (Input extends true ? ReadonlyArray<T> : Array<T>);
 
 export type TVCompoundVariants<
   V extends TVVariantsShape,
@@ -287,16 +285,61 @@ export type TVCompoundVariants<
   ES extends TVSlots = undefined,
 > = Array<TVCompoundVariant<V, S, B, EV, ES>>;
 
-// Per-element Soft Exact for `compoundVariants`: {@link ExactShape} rejects
-// renamed or typo axes, {@link ExactSlotClassProp} rejects unknown slot names
-// inside that entry's `class` / `className`. Both survive the array being held
-// in a variable. Reuse for future array options instead of adding a parallel
-// implementation.
-type ExactCompoundArray<Shape, Slots extends PropertyKey, Actual extends readonly object[]> = {
-  [I in keyof Actual]: Actual[I] extends object
-    ? ExactShape<Shape, Actual[I]> & ExactSlotClassProp<Slots, Actual[I]>
-    : Actual[I];
+// Keys of every union member; plain `keyof` keeps only the shared ones.
+type KeysOfUnion<T> = T extends unknown ? keyof T : never;
+
+type ValuesOfUnion<T, K extends PropertyKey> = T extends unknown
+  ? K extends keyof T
+    ? T[K]
+    : never
+  : never;
+
+// Unknown slot names become `never`, collected across all entries.
+type ExactCompoundClass<Slots extends PropertyKey, Actual> =
+  | ClassValue
+  | (Partial<Record<Slots, ClassValue>> & {
+      [K in Exclude<
+        KeysOfUnion<Exclude<Extract<Actual, object>, readonly unknown[]>>,
+        Slots
+      >]?: never;
+    });
+
+type ExactCompoundItem<Shape, Slots extends PropertyKey, Item> = Shape & {
+  [K in Exclude<KeysOfUnion<Item>, keyof Shape>]?: never;
+} & {
+  [K in "class" | "className"]?: ExactCompoundClass<Slots, ValuesOfUnion<Item, K>>;
 };
+
+// `any` entries (from a spread) are skipped so they do not widen the check.
+type CompoundEntries<Actual extends readonly object[]> = {
+  [I in keyof Actual]: 0 extends 1 & Actual[I] ? never : Actual[I];
+}[number];
+
+// Keys that are present (not optional) in at least one union member.
+type RequiredKeysOfUnion<T> = T extends unknown
+  ? {[K in keyof T]-?: {} extends Pick<T, K> ? never : K}[keyof T]
+  : never;
+
+// With `exactOptionalPropertyTypes` off, `?: never` still admits `key: undefined`.
+type UnknownCompoundKeys<Shape, Item> = Exclude<RequiredKeysOfUnion<Item>, keyof Shape>;
+
+// One shared target: per-entry targets make each element a union, which is quadratic.
+type ExactCompoundArray<
+  Shape,
+  Slots extends PropertyKey,
+  Actual extends readonly object[],
+  Item = ExactCompoundItem<Shape, Slots, CompoundEntries<Actual>>,
+> = [CompoundEntries<Actual>] extends [Item]
+  ? [UnknownCompoundKeys<Shape, CompoundEntries<Actual>>] extends [never]
+    ? // `Actual` infers `CV`; the array arm keeps union members that inference dropped.
+      Actual | ReadonlyArray<Item>
+    : ReadonlyArray<Item> & {
+        [K in UnknownCompoundKeys<
+          Shape,
+          CompoundEntries<Actual>
+        > as `unknown key: ${K & string}`]: never;
+      }
+  : ReadonlyArray<Item>;
 
 // Variants of one parent recipe. Shared by the single-parent `EV` default and
 // the multi-parent fold.
@@ -346,15 +389,22 @@ export type TVCompoundSlots<
   S extends TVSlots,
   B extends ClassValue,
   EV extends TVVariantsShape = undefined,
-> = Array<
-  {
-    slots: Array<TVSlotsWithBase<S, B>>;
-  } & {
-    [K in TVCompoundSlotVariantKeys<V, EV>]?:
-      | VariantValueWithBooleanUndefined<TVResolvedVariants<V, EV>, K>
-      | Array<VariantValueWithBooleanUndefined<TVResolvedVariants<V, EV>, K>>;
-  } & ClassProp
->;
+> = Array<TVCompoundSlot<V, S, B, EV, false>>;
+
+type TVCompoundSlot<
+  V extends TVVariantsShape,
+  S extends TVSlots,
+  B extends ClassValue,
+  EV extends TVVariantsShape,
+  Input extends boolean,
+> = {
+  slots: Input extends true ? ReadonlyArray<TVSlotsWithBase<S, B>> : Array<TVSlotsWithBase<S, B>>;
+} & {
+  [K in TVCompoundSlotVariantKeys<V, EV>]?: CompoundCondition<
+    VariantValueWithBooleanUndefined<TVResolvedVariants<V, EV>, K>,
+    Input
+  >;
+} & ClassProp;
 
 export type TVDefaultVariants<
   V extends TVVariantsShape,
@@ -511,12 +561,11 @@ type TVOptionsFields<
   // The {@link SuggestSlotClass} arm mirrors `variants`: validation-neutral, it
   // only makes the IDE suggest slot names inside `class` / `className`.
   // @see https://www.tailwind-variants.org/docs/variants#compound-variants
-  compoundVariants?: CV &
-    ExactCompoundArray<
-      TVCompoundVariantAxes<V, EV> & ClassProp<unknown>,
-      TVSlotClassKeys<S, ES>,
-      CV
-    >;
+  compoundVariants?: ExactCompoundArray<
+    TVCompoundVariantAxes<V, EV, true> & ClassProp<unknown>,
+    TVSlotClassKeys<S, ES>,
+    CV
+  >;
   // Default value for each variant axis.
   // Soft Exact: `DV` stays inferrable from the value; renamed or typo axes are rejected.
   // @see https://www.tailwind-variants.org/docs/variants#default-variants
@@ -558,11 +607,14 @@ export interface TV<Config extends TVConfig = TVConfig> {
       // @see https://www.tailwind-variants.org/docs/composing-components
       extend?: E;
       // Classes applied to multiple slots at once.
-      compoundSlots?: TVCompoundSlots<
-        NoInfer<V>,
-        TVMergedSlots<NoInfer<S>, NoInfer<SlotsOfExtend<E>>>,
-        NoInfer<B>,
-        NoInfer<EV>
+      compoundSlots?: ReadonlyArray<
+        TVCompoundSlot<
+          NoInfer<V>,
+          TVMergedSlots<NoInfer<S>, NoInfer<SlotsOfExtend<E>>>,
+          NoInfer<B>,
+          NoInfer<EV>,
+          true
+        >
       >;
     },
     config?: Config,
@@ -589,11 +641,14 @@ export interface TVLite {
       // @example tv({ extend: [focusable, animated], base: "inline-flex" })
       // @see https://www.tailwind-variants.org/docs/composing-components
       extend?: E;
-      compoundSlots?: TVCompoundSlots<
-        NoInfer<V>,
-        TVMergedSlots<NoInfer<S>, NoInfer<SlotsOfExtend<E>>>,
-        NoInfer<B>,
-        NoInfer<EV>
+      compoundSlots?: ReadonlyArray<
+        TVCompoundSlot<
+          NoInfer<V>,
+          TVMergedSlots<NoInfer<S>, NoInfer<SlotsOfExtend<E>>>,
+          NoInfer<B>,
+          NoInfer<EV>,
+          true
+        >
       >;
     },
     config?: TVLiteConfig,
