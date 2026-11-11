@@ -218,6 +218,21 @@ type BaseOnlyOptionsMatch = Assert<
 // @ts-expect-error VariantProps takes a recipe or defineVariants options
 type NotARecipe = VariantProps<string>;
 
+// Case: written fields come back as required keys, defaults typed as any value of their variant.
+const readable = defineVariants({
+  slots: {base: "", icon: ""},
+  variants: {size: {sm: "", lg: ""}, disabled: {true: ""}},
+  defaultVariants: {size: "sm", disabled: false},
+});
+type ReadableSize = Assert<IsEqual<typeof readable.defaultVariants.size, "sm" | "lg">>;
+type ReadableDisabled = Assert<IsEqual<typeof readable.defaultVariants.disabled, boolean>>;
+type ReadableSlots = Assert<IsEqual<keyof typeof readable.slots, "base" | "icon">>;
+const readableSize: "sm" | "lg" = readable.defaultVariants.size;
+// @ts-expect-error base was not written, so it is not on the returned options
+readable.base;
+// @ts-expect-error a default that was not written is not on the returned defaults
+readable.defaultVariants.tone;
+
 export type {
   BadgeOptionsMatch,
   BadgeTone,
@@ -231,4 +246,9 @@ export type {
   LiteAndCustomMatch,
   NotARecipe,
   PropsFromOptions,
+  ReadableDisabled,
+  ReadableSize,
+  ReadableSlots,
 };
+
+export {readableSize};
