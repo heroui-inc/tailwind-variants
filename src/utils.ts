@@ -204,7 +204,7 @@ export const mergeObjects = <T extends object, U extends object>(
  * this, because it widens `compoundVariants` and `defaultVariants` values to
  * `string`, which `tv()` then rejects.
  * @example
- * const buttonVariants = defineVariants({ base: "font-semibold", variants: { size: { sm: "text-sm" } } });
- * const button = tv(buttonVariants);
+ * const buttonTheme = defineVariants({ base: "font-semibold", variants: { size: { sm: "text-sm" } } });
+ * const button = tv(buttonTheme);
  */
 export const defineVariants = ((options: unknown) => options) as TVDefineVariants;

@@ -6,7 +6,7 @@ import {defineVariants, tv} from "../../index.js";
 import {defineVariants as liteDefineVariants, tv as liteTV} from "../../lite.js";
 
 // Case: defined options infer the same recipe as the same options written inline.
-const buttonVariants = defineVariants({
+const buttonTheme = defineVariants({
   slots: {base: "inline-flex", icon: "shrink-0"},
   variants: {
     size: {sm: {base: "h-8", icon: "size-3"}, lg: {base: "h-12"}},
@@ -19,7 +19,7 @@ const buttonVariants = defineVariants({
   ],
   defaultVariants: {size: "sm"},
 });
-const definedButton = tv(buttonVariants);
+const definedButton = tv(buttonTheme);
 const inlineButton = tv({
   slots: {base: "inline-flex", icon: "shrink-0"},
   variants: {
@@ -44,7 +44,7 @@ type DefinedSlots = Assert<IsEqual<keyof ReturnType<typeof definedButton>, "base
 
 // Case: VariantProps reads defined options directly, identical to the recipe's props.
 type PropsFromOptions = Assert<
-  IsEqual<VariantProps<typeof buttonVariants>, VariantProps<typeof definedButton>>
+  IsEqual<VariantProps<typeof buttonTheme>, VariantProps<typeof definedButton>>
 >;
 
 // Case: base-only, no-slot options with bare-class variant values.

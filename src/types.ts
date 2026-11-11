@@ -775,7 +775,7 @@ type TVRecipeOf<T> = T extends (...args: any) => any
  * `defineVariants`, without calling `tv()` on them first.
  * @example
  * type ButtonProps = VariantProps<typeof button>;
- * type ButtonProps = VariantProps<typeof buttonVariants>; // same type
+ * type ButtonProps = VariantProps<typeof buttonTheme>; // same type
  */
 export type VariantProps<Component extends ((...args: any) => any) | TVDefinedVariantsLike> = Omit<
   OmitUndefined<Parameters<TVRecipeOf<Component>>[0]>,
