@@ -14,7 +14,7 @@ import {defaultConfig as runtimeDefaultConfig} from "./internal/default-config.j
 import {clsx, twJoin, twMerge} from "./internal/engine-instance.js";
 import {cn, cnMerge, createMergeAdapter} from "./internal/merge-adapter.js";
 import {getTailwindVariants} from "./internal/tv.js";
-import {cx as runtimeCx} from "./utils.js";
+import {defineVariants, cx as runtimeCx} from "./utils.js";
 
 export type {
   ClassArray,
@@ -59,7 +59,7 @@ export const defaultConfig: TVConfig = runtimeDefaultConfig;
  */
 export const cx = runtimeCx;
 
-export {clsx, cn, cnMerge, twJoin, twMerge};
+export {clsx, cn, cnMerge, defineVariants, twJoin, twMerge};
 
 /** `clsx` as the default export, so `import clsx from "clsx"` can alias to this package. */
 export default clsx;
