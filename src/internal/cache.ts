@@ -507,11 +507,7 @@ export const createPropsCache = <T>(
   let size = 0;
 
   // Built once; extras are prop keys outside the recipe's variant axes.
-  const variantKeySet: Record<string, 1> = Object.create(null);
-
-  for (let i = 0; i < variantKeys.length; i++) {
-    variantKeySet[variantKeys[i]] = 1;
-  }
+  const variantKeySet = new Set(variantKeys);
 
   // Keys beyond `variantKeys` that feed the cache key. `null` when there are
   // none (the common case), so nothing is allocated per lookup.
@@ -524,7 +520,7 @@ export const createPropsCache = <T>(
     let seen: Record<string, 1> | null = null;
 
     for (const key in defaultVariants) {
-      if (key === "class" || key === "className" || variantKeySet[key]) continue;
+      if (key === "class" || key === "className" || variantKeySet.has(key)) continue;
       (seen ??= Object.create(null))[key] = 1;
       (extras ??= []).push(key);
     }
@@ -534,7 +530,7 @@ export const createPropsCache = <T>(
         if (
           key === "class" ||
           key === "className" ||
-          variantKeySet[key] ||
+          variantKeySet.has(key) ||
           seen?.[key] ||
           props[key] === undefined
         ) {
@@ -550,7 +546,7 @@ export const createPropsCache = <T>(
         if (
           key === "class" ||
           key === "className" ||
-          variantKeySet[key] ||
+          variantKeySet.has(key) ||
           seen?.[key] ||
           slotProps[key] === undefined
         ) {
