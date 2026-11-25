@@ -52,6 +52,32 @@ const serializeFingerprintValue = (value: unknown): string | null => {
   return null;
 };
 
+// `record[key]`, with inherited Object.prototype methods read as unset (all but
+// `__proto__` are functions). Only function values pay the own check.
+export const readOwn = (record: AnyRecord | undefined, key: string): any => {
+  if (record == null) return undefined;
+
+  const value = record[key];
+
+  return typeof value === "function" && !Object.hasOwn(record, key) ? undefined : value;
+};
+
+// Effective value of one prop: defaults, then props, then slot props.
+export const resolvePropValue = (
+  key: string,
+  defaultVariants: AnyRecord,
+  props?: AnyRecord,
+  slotProps?: AnyRecord,
+): unknown => {
+  const slotValue = readOwn(slotProps, key);
+
+  if (slotValue !== undefined) return slotValue;
+
+  const propValue = readOwn(props, key);
+
+  return propValue !== undefined ? propValue : readOwn(defaultVariants, key);
+};
+
 // Result-cache key; omits class/className.
 export const buildPropsFingerprint = (
   variantKeys: string[],
@@ -67,12 +93,9 @@ export const buildPropsFingerprint = (
 
     seen[key] = 1;
 
-    let value = defaultVariants[key];
-
-    if (props && props[key] !== undefined) value = props[key];
-    if (slotProps && slotProps[key] !== undefined) value = slotProps[key];
-
-    const serialized = serializeFingerprintValue(value);
+    const serialized = serializeFingerprintValue(
+      resolvePropValue(key, defaultVariants, props, slotProps),
+    );
 
     if (serialized === null) return null;
 
@@ -109,12 +132,9 @@ export const buildPropsFingerprint = (
 
   for (let i = 0; i < extras.length; i++) {
     const key = extras[i];
-    let value = defaultVariants[key];
-
-    if (props && props[key] !== undefined) value = props[key];
-    if (slotProps && slotProps[key] !== undefined) value = slotProps[key];
-
-    const serialized = serializeFingerprintValue(value);
+    const serialized = serializeFingerprintValue(
+      resolvePropValue(key, defaultVariants, props, slotProps),
+    );
 
     if (serialized === null) return null;
 
@@ -450,20 +470,6 @@ const createPropsNode = <T>(): PropsNode<T> => ({
   hasLeaf: false,
   leaf: undefined,
 });
-
-const resolvePropValue = (
-  key: string,
-  defaultVariants: AnyRecord,
-  props?: AnyRecord,
-  slotProps?: AnyRecord,
-): unknown => {
-  let value = defaultVariants[key];
-
-  if (props && props[key] !== undefined) value = props[key];
-  if (slotProps && slotProps[key] !== undefined) value = slotProps[key];
-
-  return value;
-};
 
 const walkKey = <T>(
   node: PropsNode<T>,

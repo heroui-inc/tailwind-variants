@@ -13,6 +13,7 @@ import {
   createCompoundsGuard,
   createLazyOverrideMerge,
 } from "../internal/cache.js";
+import {tv as liteTV} from "../lite";
 import {cx} from "../utils.js";
 
 type GuardInput = Parameters<ReturnType<typeof createCompoundsGuard>>[0];
@@ -1037,5 +1038,141 @@ describe("static slot cores", () => {
     menu.compoundSlots[0].class = "line-clamp-2";
 
     expect(menu().title()).toBe("title-base line-clamp-2");
+  });
+});
+
+const entryFactories: [string, (options: AnyRecord) => any][] = [
+  ["tv", tv as any],
+  ["lite tv", liteTV as any],
+  ["createTV", createTV({}) as any],
+];
+
+describe.each(entryFactories)("cold and warm compound matching agree (%s)", (_, factory) => {
+  test("a boolean prop meets a string compound condition", () => {
+    const c = factory({
+      base: "b",
+      variants: {s: {false: "f", sm: "x"}},
+      defaultVariants: {s: "false"},
+      compoundVariants: [{s: "false", class: "cv"}],
+    });
+
+    expect(c({s: false})).toBe("b f cv");
+    expect(c({s: false})).toBe("b f cv");
+    expect(c()).toBe("b f cv");
+  });
+
+  test("a string prop meets a boolean compound condition", () => {
+    const c = factory({
+      base: "b",
+      variants: {s: {true: "t", false: "f"}},
+      defaultVariants: {s: false},
+      compoundVariants: [{s: false, class: "cv"}],
+    });
+
+    expect(c({s: "false"})).toBe("b f cv");
+    expect(c({s: "false"})).toBe("b f cv");
+  });
+
+  test("true, numeric and empty-string props meet their option-key conditions", () => {
+    const yes = factory({
+      variants: {s: {true: "t", false: "f"}},
+      defaultVariants: {s: "true"},
+      compoundVariants: [{s: "true", class: "cv"}],
+    });
+    const level = factory({
+      variants: {level: {"1": "l1", "2": "l2"}},
+      defaultVariants: {level: "1"},
+      compoundVariants: [{level: "1", class: "cv"}],
+    });
+    const empty = factory({
+      variants: {s: {true: "t", false: "f"}},
+      compoundVariants: [{s: false, class: "cv"}],
+    });
+
+    expect(yes({s: true})).toBe("t cv");
+    expect(yes({s: true})).toBe("t cv");
+    expect(level({level: 1})).toBe("l1 cv");
+    expect(level({level: 1})).toBe("l1 cv");
+    expect(empty({s: ""})).toBe("f cv");
+    expect(empty({s: ""})).toBe("f cv");
+  });
+
+  test("dynamic calls agree whichever spelling fills the cache", () => {
+    const c = factory({
+      base: "b",
+      variants: {s: {false: "f", sm: "x"}, z: {a: "za", b: "zb"}},
+      defaultVariants: {s: "false", z: "a"},
+      compoundVariants: [{s: "false", class: "cv"}],
+    });
+
+    expect(c({s: false, z: "b"})).toBe("b f zb cv");
+    expect(c({s: "false", z: "b"})).toBe("b f zb cv");
+    expect(c({s: false, z: "b"})).toBe("b f zb cv");
+  });
+
+  test("compound slots and slot compound variants agree", () => {
+    const c = factory({
+      slots: {base: "b", label: "l"},
+      variants: {s: {false: {base: "f"}, sm: {base: "x"}}},
+      defaultVariants: {s: "false"},
+      compoundVariants: [{s: false, class: {label: "cv"}}],
+      compoundSlots: [{slots: ["base"], s: "false", class: "cs"}],
+    });
+
+    for (let i = 0; i < 2; i++) {
+      const slots = c({s: false});
+
+      expect(slots.base()).toBe("b f cs");
+      expect(slots.label()).toBe("l cv");
+    }
+    expect(c().base()).toBe("b f cs");
+    expect(c({s: "sm"}).base({s: false})).toBe("b f cs");
+  });
+});
+
+describe.each(entryFactories)("Object.prototype-named variant axes (%s)", (_, factory) => {
+  test("slot recipes ignore inherited members of a plain props object", () => {
+    const c = factory({
+      slots: {base: "b"},
+      variants: {constructor: {false: "f", true: "t"}},
+      defaultVariants: {constructor: "false"},
+      compoundSlots: [{slots: ["base"], constructor: "false", class: "cs"}],
+    });
+
+    expect(c({}).base()).toBe("b f cs");
+    expect(c({}).base()).toBe("b f cs");
+    expect(c().base()).toBe("b f cs");
+    expect(c().base({})).toBe("b f cs");
+    expect(c({constructor: true}).base()).toBe("b t");
+  });
+
+  test("variant recipes ignore inherited members of props and defaults", () => {
+    const c = factory({
+      base: "b",
+      variants: {toString: {false: "f", true: "t"}, valueOf: {false: "vf", x: "vx"}},
+      defaultVariants: {valueOf: "x"},
+      compoundVariants: [
+        {toString: false, class: "cv"},
+        {valueOf: "x", class: "cx"},
+      ],
+    });
+
+    expect(c({})).toBe("b f vx cv cx");
+    expect(c({})).toBe("b f vx cv cx");
+    expect(c()).toBe("b f vx cv cx");
+    expect(c({toString: true, valueOf: "x"})).toBe("b t vx cx");
+  });
+
+  test("dynamic calls ignore inherited members too", () => {
+    const c = factory({
+      slots: {base: "b"},
+      variants: {hasOwnProperty: {false: "f", true: "t"}, size: {sm: "s", lg: "l"}},
+      defaultVariants: {size: "sm"},
+      compoundSlots: [{slots: ["base"], hasOwnProperty: false, size: "lg", class: "cs"}],
+    });
+
+    for (let i = 0; i < 3; i++) {
+      expect(c({size: "lg"}).base()).toBe("b f l cs");
+    }
   });
 });

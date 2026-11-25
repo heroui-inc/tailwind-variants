@@ -20,6 +20,8 @@ import {
   createCompoundsGuard,
   createLazyOverrideMerge,
   createPropsCache,
+  readOwn,
+  resolvePropValue,
   UNCACHEABLE,
 } from "./cache.js";
 import {
@@ -64,45 +66,38 @@ export const getCompleteProps = (
   return result;
 };
 
-// Effective value of one prop: defaults, then props, then slot props.
-const resolvePropValue = (
-  key: string,
-  defaultVariants: AnyRecord,
-  props?: AnyRecord,
-  slotProps?: AnyRecord,
-): unknown => {
-  let value = defaultVariants[key];
+// Option key a variant value selects: false / "false" / "" / unset -> "false",
+// true -> "true", 1 -> "1". Static props and the props cache compare by it.
+const toOptionKey = (value: unknown): string => `${falsyToString(value) || "false"}`;
 
-  if (props && props[key] !== undefined) value = props[key];
-  if (slotProps && slotProps[key] !== undefined) value = slotProps[key];
+const isOptionValue = (value: unknown): boolean => {
+  if (value == null) return true;
 
-  return value;
+  const type = typeof value;
+
+  return type === "string" || type === "boolean" || type === "number";
 };
 
-const isNullishOrFalse = (value: any): boolean => value == null || value === false;
+// Compound conditions compare primitives by option key, like variant lookup.
+const matchesOptionValue = (expected: unknown, actual: unknown): boolean =>
+  expected === actual ||
+  (isOptionValue(expected) &&
+    isOptionValue(actual) &&
+    toOptionKey(expected) === toOptionKey(actual));
 
 const matchesCompoundValue = (expected: any, actual: any): boolean => {
-  if (!Array.isArray(expected)) {
-    return expected === actual || (isNullishOrFalse(expected) && isNullishOrFalse(actual));
-  }
+  if (!Array.isArray(expected)) return matchesOptionValue(expected, actual);
 
   for (let i = 0; i < expected.length; i++) {
-    const expectedValue = expected[i];
-
-    if (expectedValue === actual || (isNullishOrFalse(expectedValue) && isNullishOrFalse(actual))) {
-      return true;
-    }
+    if (matchesOptionValue(expected[i], actual)) return true;
   }
 
   return false;
 };
 
 // Option key a variant resolves to when its prop is unset (its default).
-const defaultOptionKey = (defaultVariants: AnyRecord, key: string): string => {
-  const option = falsyToString(defaultVariants[key]);
-
-  return `${option || "false"}`;
-};
+const defaultOptionKey = (defaultVariants: AnyRecord, key: string): string =>
+  toOptionKey(readOwn(defaultVariants, key));
 
 // Normalized classes of the option a variant resolves to, or "" when nothing
 // applies. Slot mode may return a per-slot map.
@@ -115,7 +110,7 @@ const getVariantValue = (
 ): NormalizedOption => {
   if (variant.isEmpty) return "";
 
-  const variantProp = slotProps?.[variant.key] ?? props?.[variant.key];
+  const variantProp = readOwn(slotProps, variant.key) ?? readOwn(props, variant.key);
 
   if (variantProp === null) return "";
 
@@ -123,8 +118,8 @@ const getVariantValue = (
 
   if (typeof variantKey === "object") return "";
 
-  const defaultVariantProp = defaultVariants?.[variant.key];
-  const key = variantKey != null ? variantKey : falsyToString(defaultVariantProp);
+  const key =
+    variantKey != null ? variantKey : falsyToString(readOwn(defaultVariants, variant.key));
   const optionKey = (key || "false") as string;
   const raw = variant.values[optionKey];
 
@@ -357,12 +352,12 @@ const classifyProps = (
       continue;
     }
     if (value === undefined) continue;
-    if (variants[key] === undefined) {
+    if (readOwn(variants, key) === undefined) {
       if (getConditions()[key]) return DYNAMIC;
       continue;
     }
 
-    const fallback = defaultVariants[key];
+    const fallback = readOwn(defaultVariants, key);
 
     if (value === fallback) continue;
     if (value === null) return DYNAMIC;
@@ -375,10 +370,8 @@ const classifyProps = (
       if (value !== "" && fallback !== "") return DYNAMIC;
     }
 
-    const option = falsyToString(value);
-
-    if (typeof option === "object") return DYNAMIC;
-    if (`${option || "false"}` !== defaultOptionKey(defaultVariants, key)) return DYNAMIC;
+    if (typeof value === "object") return DYNAMIC;
+    if (toOptionKey(value) !== toOptionKey(fallback)) return DYNAMIC;
   }
 
   return kind;
