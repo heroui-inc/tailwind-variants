@@ -186,21 +186,18 @@ const recordValue = (snapshot: Snapshot, index: number, value: unknown): boolean
   return recordJson(snapshot, index, value);
 };
 
-const matchValue = (kind: number, token: unknown, value: unknown): number => {
-  if (kind === KIND_PRIMITIVE) return Object.is(token, value) ? MATCH : MISMATCH;
-
-  if (value === null || typeof value !== "object") return MISMATCH;
-
-  if (kind === KIND_ARRAY) {
-    const items = token as unknown[];
-
-    if (!Array.isArray(value) || value.length !== items.length) return MISMATCH;
-    for (let i = 0; i < items.length; i++) {
-      if (!Object.is(items[i], value[i])) return MISMATCH;
-    }
-
-    return MATCH;
+const matchArray = (items: unknown[], value: unknown): number => {
+  if (!Array.isArray(value) || value.length !== items.length) return MISMATCH;
+  for (let i = 0; i < items.length; i++) {
+    if (!Object.is(items[i], value[i])) return MISMATCH;
   }
+
+  return MATCH;
+};
+
+// Objects and JSON text, the rare kinds.
+const matchStructured = (kind: number, token: unknown, value: unknown): number => {
+  if (value === null || typeof value !== "object") return MISMATCH;
 
   if (kind === KIND_OBJECT) {
     if (Array.isArray(value) || !isPlainObject(value)) return MISMATCH;
@@ -222,6 +219,14 @@ const matchValue = (kind: number, token: unknown, value: unknown): number => {
   } catch {
     return UNSAFE;
   }
+};
+
+// Fast path for primitives and primitive arrays, nearly every compound value.
+const matchValue = (kind: number, token: unknown, value: unknown): number => {
+  if (kind === KIND_PRIMITIVE) return Object.is(token, value) ? MATCH : MISMATCH;
+  if (kind === KIND_ARRAY) return matchArray(token as unknown[], value);
+
+  return matchStructured(kind, token, value);
 };
 
 // Compound-slot `slots` lists were only ever joined; anything else is ignored.
