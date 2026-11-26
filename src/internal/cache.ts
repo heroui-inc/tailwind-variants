@@ -18,8 +18,8 @@ const hasClassOverride = (props?: AnyRecord): boolean =>
   (props?.className != null && props.className !== "");
 
 // `JSON.stringify` turns NaN/Infinity into `null`, which would make two
-// different variant values share one cache key and serve the wrong classes.
-// Rejecting them bails to the uncached path instead of colliding.
+// different compound values compare equal. Rejecting them reports the
+// compound metadata as unsafe instead of colliding.
 const NON_FINITE = Symbol("tv-non-finite");
 
 const stringifyFiniteOrThrow = (_key: string, value: unknown): unknown => {
@@ -28,28 +28,30 @@ const stringifyFiniteOrThrow = (_key: string, value: unknown): unknown => {
   return value;
 };
 
-const serializeFingerprintValue = (value: unknown): string | null => {
+export const UNCACHEABLE = Symbol("tv-uncacheable");
+
+// An explicit `null` drops the variant's classes; the string "null" selects
+// the option named "null". They must never share a token.
+const NULL_TOKEN = Symbol("tv-null");
+
+// Cache token of one prop value, or UNCACHEABLE. Two values share a token only
+// when they select the same variant option and meet the same compound
+// conditions: booleans and numbers share their string spelling's token
+// (`true` / "true", `1` / "1"), and NaN resolves like `false`. Objects match
+// compound conditions by identity only (and their JSON text could equal a
+// string option), and BigInt `0n` resolves like `false` while `"0"` does not,
+// so those, functions and symbols are never cached.
+const toPropsToken = (value: unknown): string | symbol => {
   if (value === undefined) return "";
-  if (value === null) return "null";
+  if (value === null) return NULL_TOKEN;
 
   const type = typeof value;
 
   if (type === "string") return value as string;
   if (type === "boolean") return value ? "true" : "false";
-  // `String(NaN)` / `String(Infinity)` stay distinct from "null", so top-level
-  // numbers never need the finite check.
-  if (type === "number" || type === "bigint") return String(value);
+  if (type === "number") return Number.isNaN(value) ? "false" : String(value);
 
-  if (type === "object") {
-    try {
-      return JSON.stringify(value, stringifyFiniteOrThrow);
-    } catch {
-      return null;
-    }
-  }
-
-  // Functions and symbols cannot be serialized losslessly.
-  return null;
+  return UNCACHEABLE;
 };
 
 // `record[key]`, with inherited Object.prototype methods read as unset (all but
@@ -76,72 +78,6 @@ export const resolvePropValue = (
   const propValue = readOwn(props, key);
 
   return propValue !== undefined ? propValue : readOwn(defaultVariants, key);
-};
-
-// Result-cache key; omits class/className.
-export const buildPropsFingerprint = (
-  variantKeys: string[],
-  defaultVariants: AnyRecord,
-  props?: AnyRecord,
-  slotProps?: AnyRecord,
-): string | null => {
-  let fingerprint = "";
-  const seen: Record<string, 1> = Object.create(null);
-
-  for (let i = 0; i < variantKeys.length; i++) {
-    const key = variantKeys[i];
-
-    seen[key] = 1;
-
-    const serialized = serializeFingerprintValue(
-      resolvePropValue(key, defaultVariants, props, slotProps),
-    );
-
-    if (serialized === null) return null;
-
-    fingerprint += key + ":" + serialized + ";";
-  }
-
-  const extras: string[] = [];
-
-  for (const key in defaultVariants) {
-    if (key === "class" || key === "className" || seen[key]) continue;
-    seen[key] = 1;
-    extras.push(key);
-  }
-
-  if (props) {
-    for (const key in props) {
-      if (key === "class" || key === "className" || seen[key] || props[key] === undefined) continue;
-      seen[key] = 1;
-      extras.push(key);
-    }
-  }
-
-  if (slotProps) {
-    for (const key in slotProps) {
-      if (key === "class" || key === "className" || seen[key] || slotProps[key] === undefined) {
-        continue;
-      }
-      seen[key] = 1;
-      extras.push(key);
-    }
-  }
-
-  if (extras.length > 1) extras.sort();
-
-  for (let i = 0; i < extras.length; i++) {
-    const key = extras[i];
-    const serialized = serializeFingerprintValue(
-      resolvePropValue(key, defaultVariants, props, slotProps),
-    );
-
-    if (serialized === null) return null;
-
-    fingerprint += key + ":" + serialized + ";";
-  }
-
-  return fingerprint;
 };
 
 // Detects in-place compound metadata mutation without serializing it.
@@ -457,173 +393,106 @@ export const createBoundedCache = <T>(limit = VARIANT_CACHE_LIMIT): BoundedCache
   };
 };
 
-export const UNCACHEABLE = Symbol("tv-uncacheable");
+type PropsToken = string | symbol;
 
 type PropsNode<T> = {
-  children: Map<string, PropsNode<T>>;
+  // Values passed in props.
+  children: Map<PropsToken, PropsNode<T>>;
+  // Values taken from `defaultVariants` because the prop is unset. A held slot
+  // result re-reads the defaults live for slot overrides, so it must not be
+  // shared with calls that passed the same value explicitly.
+  defaults: Map<PropsToken, PropsNode<T>> | null;
   hasLeaf: boolean;
   leaf: T | undefined;
 };
 
 const createPropsNode = <T>(): PropsNode<T> => ({
   children: new Map(),
+  defaults: null,
   hasLeaf: false,
   leaf: undefined,
 });
 
 const walkKey = <T>(
   node: PropsNode<T>,
-  token: string,
+  token: PropsToken,
+  fromDefaults: boolean,
   create: boolean,
 ): PropsNode<T> | undefined => {
-  let next = node.children.get(token);
+  let next = fromDefaults ? node.defaults?.get(token) : node.children.get(token);
 
   if (!next) {
     if (!create) return undefined;
     next = createPropsNode<T>();
-    node.children.set(token, next);
+    (fromDefaults ? (node.defaults ??= new Map()) : node.children).set(token, next);
   }
 
   return next;
 };
 
 type PropsCache<T> = {
-  get(
-    defaultVariants: AnyRecord,
-    props?: AnyRecord,
-    slotProps?: AnyRecord,
-  ): T | CacheMiss | typeof UNCACHEABLE;
-  set(
-    defaultVariants: AnyRecord,
-    props: AnyRecord | undefined,
-    slotProps: AnyRecord | undefined,
-    value: T,
-  ): void;
-  clear(): void;
+  get(defaultVariants: AnyRecord, props?: AnyRecord): T | CacheMiss | typeof UNCACHEABLE;
+  set(defaultVariants: AnyRecord, props: AnyRecord | undefined, value: T): void;
 };
 
-// Nested props cache. Same key space as `buildPropsFingerprint`, but the hot
-// path walks Maps instead of concatenating one string.
+// Nested props cache: one Map level per key, so the hot path walks Maps
+// instead of concatenating one key string.
+//
+// `keys` must hold every prop key the cached value depends on: the variant
+// axes plus the compound condition keys outside them. Any other prop (`id`,
+// `onClick`, `children`, ...) cannot change the classes and is never read, so
+// it neither misses nor bypasses the cache. Callers build a new cache when the
+// key set can change (compound metadata edits).
 export const createPropsCache = <T>(
-  variantKeys: string[],
+  keys: readonly string[],
   limit = VARIANT_CACHE_LIMIT,
 ): PropsCache<T> => {
   let primary = createPropsNode<T>();
   let secondary: PropsNode<T> | null = null;
   let size = 0;
 
-  // Built once; extras are prop keys outside the recipe's variant axes.
-  const variantKeySet = new Set(variantKeys);
-
-  // Keys beyond `variantKeys` that feed the cache key. `null` when there are
-  // none (the common case), so nothing is allocated per lookup.
-  const collectExtraKeys = (
-    defaultVariants: AnyRecord,
-    props?: AnyRecord,
-    slotProps?: AnyRecord,
-  ): string[] | null => {
-    let extras: string[] | null = null;
-    let seen: Record<string, 1> | null = null;
-
-    for (const key in defaultVariants) {
-      if (key === "class" || key === "className" || variantKeySet.has(key)) continue;
-      (seen ??= Object.create(null))[key] = 1;
-      (extras ??= []).push(key);
-    }
-
-    if (props) {
-      for (const key in props) {
-        if (
-          key === "class" ||
-          key === "className" ||
-          variantKeySet.has(key) ||
-          seen?.[key] ||
-          props[key] === undefined
-        ) {
-          continue;
-        }
-        (seen ??= Object.create(null))[key] = 1;
-        (extras ??= []).push(key);
-      }
-    }
-
-    if (slotProps) {
-      for (const key in slotProps) {
-        if (
-          key === "class" ||
-          key === "className" ||
-          variantKeySet.has(key) ||
-          seen?.[key] ||
-          slotProps[key] === undefined
-        ) {
-          continue;
-        }
-        (seen ??= Object.create(null))[key] = 1;
-        (extras ??= []).push(key);
-      }
-    }
-
-    if (extras && extras.length > 1) extras.sort();
-
-    return extras;
-  };
-
   const lookup = (
     root: PropsNode<T>,
     defaultVariants: AnyRecord,
     props: AnyRecord | undefined,
-    slotProps: AnyRecord | undefined,
-    extras: string[] | null,
     create: boolean,
   ): PropsNode<T> | typeof UNCACHEABLE | undefined => {
     let node: PropsNode<T> | undefined = root;
 
-    for (let i = 0; i < variantKeys.length; i++) {
-      const serialized = serializeFingerprintValue(
-        resolvePropValue(variantKeys[i], defaultVariants, props, slotProps),
-      );
+    for (let i = 0; i < keys.length; i++) {
+      const key = keys[i];
+      let value = readOwn(props, key);
+      const fromDefaults = value === undefined;
 
-      if (serialized === null) return UNCACHEABLE;
+      if (fromDefaults) value = readOwn(defaultVariants, key);
 
-      node = walkKey(node, serialized, create);
+      const token = toPropsToken(value);
+
+      if (token === UNCACHEABLE) return UNCACHEABLE;
+
+      node = walkKey(node, token, fromDefaults, create);
 
       if (!node) return undefined;
-    }
-
-    if (extras) {
-      for (let i = 0; i < extras.length; i++) {
-        const key = extras[i];
-        const serialized = serializeFingerprintValue(
-          resolvePropValue(key, defaultVariants, props, slotProps),
-        );
-
-        if (serialized === null) return UNCACHEABLE;
-
-        node = walkKey(node, key + "\0" + serialized, create);
-
-        if (!node) return undefined;
-      }
     }
 
     return node;
   };
 
   return {
-    get(defaultVariants, props, slotProps) {
-      const extras = collectExtraKeys(defaultVariants, props, slotProps);
-      const node = lookup(primary, defaultVariants, props, slotProps, extras, false);
+    get(defaultVariants, props) {
+      const node = lookup(primary, defaultVariants, props, false);
 
       if (node === UNCACHEABLE) return UNCACHEABLE;
 
       if (node && node.hasLeaf) return node.leaf as T;
 
       if (secondary) {
-        const fallback = lookup(secondary, defaultVariants, props, slotProps, extras, false);
+        const fallback = lookup(secondary, defaultVariants, props, false);
 
         if (fallback === UNCACHEABLE) return UNCACHEABLE;
 
         if (fallback && fallback.hasLeaf) {
-          const promoted = lookup(primary, defaultVariants, props, slotProps, extras, true);
+          const promoted = lookup(primary, defaultVariants, props, true);
 
           if (promoted !== UNCACHEABLE && promoted) {
             if (!promoted.hasLeaf) size++;
@@ -637,26 +506,20 @@ export const createPropsCache = <T>(
 
       return CACHE_MISS;
     },
-    set(defaultVariants, props, slotProps, value) {
+    set(defaultVariants, props, value) {
       if (size >= limit) {
         secondary = primary;
         primary = createPropsNode<T>();
         size = 0;
       }
 
-      const extras = collectExtraKeys(defaultVariants, props, slotProps);
-      const node = lookup(primary, defaultVariants, props, slotProps, extras, true);
+      const node = lookup(primary, defaultVariants, props, true);
 
       if (node === UNCACHEABLE || !node) return;
 
       if (!node.hasLeaf) size++;
       node.hasLeaf = true;
       node.leaf = value;
-    },
-    clear() {
-      primary = createPropsNode<T>();
-      secondary = null;
-      size = 0;
     },
   };
 };

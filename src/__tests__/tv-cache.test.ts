@@ -4,7 +4,6 @@ import {describe, expect, test} from "vitest";
 
 import {cnMerge, createTV, tv} from "../index";
 import {
-  buildPropsFingerprint,
   CACHE_MISS,
   COMPOUNDS_CHANGED,
   COMPOUNDS_UNCHANGED,
@@ -12,6 +11,8 @@ import {
   createBoundedCache,
   createCompoundsGuard,
   createLazyOverrideMerge,
+  createPropsCache,
+  UNCACHEABLE,
 } from "../internal/cache.js";
 import {tv as liteTV} from "../lite";
 import {cx} from "../utils.js";
@@ -130,100 +131,96 @@ describe("createLazyOverrideMerge", () => {
   });
 });
 
-describe("buildPropsFingerprint", () => {
+// Stores a value for `fill` in a fresh props cache and reports what `probe`
+// reads back: "hit" (same entry), "miss" (another entry) or "uncacheable".
+const readBack = (
+  keys: string[],
+  fill: AnyRecord,
+  probe: AnyRecord,
+  defaultVariants: AnyRecord = {},
+) => {
+  const cache = createPropsCache<string>(keys);
+
+  cache.set(defaultVariants, fill, "stored");
+
+  const value = cache.get(defaultVariants, probe);
+
+  if (value === "stored") return "hit";
+  if (value === CACHE_MISS) return "miss";
+  if (value === UNCACHEABLE) return "uncacheable";
+
+  return value;
+};
+
+describe("createPropsCache", () => {
   const variantKeys = ["size", "color"];
 
   test("is insensitive to prop insertion order", () => {
-    const forward = buildPropsFingerprint(variantKeys, {}, {size: "sm", color: "red"});
-    const reversed = buildPropsFingerprint(variantKeys, {}, {color: "red", size: "sm"});
-
-    expect(forward).not.toBeNull();
-    expect(forward).toBe(reversed);
+    expect(readBack(variantKeys, {size: "sm", color: "red"}, {color: "red", size: "sm"})).toBe(
+      "hit",
+    );
   });
 
-  test("sorts extra keys outside the declared variant axes", () => {
-    const forward = buildPropsFingerprint(variantKeys, {}, {size: "sm", alpha: 1, beta: 2});
-    const reversed = buildPropsFingerprint(variantKeys, {}, {beta: 2, alpha: 1, size: "sm"});
-
-    expect(forward).not.toBeNull();
-    expect(forward).toBe(reversed);
-  });
-
-  test("distinguishes different values and ignores explicit undefined", () => {
-    const sm = buildPropsFingerprint(variantKeys, {}, {size: "sm"});
-    const lg = buildPropsFingerprint(variantKeys, {}, {size: "lg"});
-    const withUndefined = buildPropsFingerprint(variantKeys, {}, {size: "sm", color: undefined});
-
-    expect(sm).not.toBe(lg);
-    expect(withUndefined).toBe(sm);
-  });
-
-  test("bails out for function-valued props", () => {
-    expect(buildPropsFingerprint(variantKeys, {}, {size: "sm", onClick: () => {}})).toBeNull();
-  });
-
-  test("bails out for symbol-valued props", () => {
-    expect(buildPropsFingerprint(variantKeys, {}, {size: "sm", marker: Symbol("x")})).toBeNull();
-  });
-
-  test("bails out for circular objects and serializes plain objects", () => {
+  test("ignores every prop outside its keys", () => {
     const circular: Record<string, unknown> = {};
 
     circular.self = circular;
 
-    expect(buildPropsFingerprint(variantKeys, {}, {size: "sm", data: circular})).toBeNull();
-    expect(buildPropsFingerprint(variantKeys, {}, {size: "sm", data: {a: 1}})).not.toBeNull();
+    expect(
+      readBack(variantKeys, {size: "sm", alpha: 1}, {size: "sm", beta: 2, id: "x", data: circular}),
+    ).toBe("hit");
   });
 
-  test("lets slotProps win over props and defaults", () => {
-    const viaSlotProps = buildPropsFingerprint(
-      variantKeys,
-      {size: "sm"},
-      {size: "md"},
-      {size: "lg"},
+  test("distinguishes different values and ignores explicit undefined", () => {
+    expect(readBack(variantKeys, {size: "sm"}, {size: "lg"})).toBe("miss");
+    expect(readBack(variantKeys, {size: "sm"}, {size: "sm", color: undefined})).toBe("hit");
+  });
+
+  test("bails out for function values on its keys only", () => {
+    expect(readBack(variantKeys, {size: "sm"}, {size: "sm", color: () => {}})).toBe("uncacheable");
+    expect(readBack(variantKeys, {size: "sm"}, {size: "sm", onClick: () => {}})).toBe("hit");
+  });
+
+  test("bails out for symbol values on its keys only", () => {
+    expect(readBack(variantKeys, {size: "sm"}, {size: "sm", color: Symbol("x")})).toBe(
+      "uncacheable",
     );
-    const direct = buildPropsFingerprint(variantKeys, {}, {size: "lg"});
-
-    expect(viaSlotProps).toBe(direct);
+    expect(readBack(variantKeys, {size: "sm"}, {size: "sm", marker: Symbol("x")})).toBe("hit");
   });
 
-  test("normalizes boolean and string variant values the same way", () => {
-    const asBoolean = buildPropsFingerprint(["disabled"], {}, {disabled: false});
-    const asString = buildPropsFingerprint(["disabled"], {}, {disabled: "false"});
+  test("never caches object or BigInt values on its keys", () => {
+    const circular: Record<string, unknown> = {};
 
-    expect(asBoolean).toBe(asString);
+    circular.self = circular;
+
+    expect(readBack(variantKeys, {size: "sm"}, {size: circular})).toBe("uncacheable");
+    expect(readBack(variantKeys, {size: "sm"}, {size: {a: 1}})).toBe("uncacheable");
+    expect(readBack(variantKeys, {size: "sm"}, {size: ["sm"]})).toBe("uncacheable");
+    expect(readBack(variantKeys, {size: "0"}, {size: 0n})).toBe("uncacheable");
+  });
+
+  test("normalizes boolean, number and string variant values the same way", () => {
+    expect(readBack(["disabled"], {disabled: false}, {disabled: "false"})).toBe("hit");
+    expect(readBack(["disabled"], {disabled: false}, {disabled: NaN})).toBe("hit");
+    expect(readBack(["level"], {level: 1}, {level: "1"})).toBe("hit");
+    expect(readBack(["level"], {level: Infinity}, {level: "Infinity"})).toBe("hit");
+  });
+
+  test("keeps null apart from 'null', 'NaN' apart from NaN, '' apart from unset", () => {
+    expect(readBack(["tone"], {tone: "null"}, {tone: null})).toBe("miss");
+    expect(readBack(["tone"], {tone: "NaN"}, {tone: NaN})).toBe("miss");
+    expect(readBack(["tone"], {tone: "undefined"}, {tone: undefined})).toBe("miss");
+    expect(readBack(["tone"], {tone: ""}, {})).toBe("miss");
+  });
+
+  test("keeps a value taken from defaults apart from the same value passed explicitly", () => {
+    expect(readBack(["tone"], {}, {tone: "a"}, {tone: "a"})).toBe("miss");
+    expect(readBack(["tone"], {}, {tone: null}, {tone: null})).toBe("miss");
+    expect(readBack(["tone"], {}, {}, {tone: "a"})).toBe("hit");
   });
 });
 
 describe("non-finite number serialization", () => {
-  const variantKeys = ["size"];
-
-  test("bails out for NaN inside object props instead of colliding with null", () => {
-    const nan = buildPropsFingerprint(variantKeys, {}, {size: {level: NaN}});
-    const nullValue = buildPropsFingerprint(variantKeys, {}, {size: {level: null}});
-
-    expect(nan).toBeNull();
-    expect(nullValue).not.toBeNull();
-  });
-
-  test("bails out for Infinity inside nested array props", () => {
-    expect(buildPropsFingerprint(variantKeys, {}, {size: [Infinity]})).toBeNull();
-    expect(buildPropsFingerprint(variantKeys, {}, {size: [null]})).not.toBeNull();
-  });
-
-  test("keeps serializing finite nested values", () => {
-    expect(buildPropsFingerprint(variantKeys, {}, {size: {level: 1}})).not.toBeNull();
-  });
-
-  test("distinguishes array props carrying different objects", () => {
-    const a = buildPropsFingerprint(variantKeys, {}, {size: [{x: 1}]});
-    const b = buildPropsFingerprint(variantKeys, {}, {size: [{y: 2}]});
-
-    expect(a).not.toBeNull();
-    expect(b).not.toBeNull();
-    expect(a).not.toBe(b);
-  });
-
   test("compounds guard bails out for non-finite condition values", () => {
     const nan = [{conditionKeys: ["size"], source: {size: {level: NaN}}}];
     const finite = [{conditionKeys: ["size"], source: {size: {level: 2}}}];
@@ -933,6 +930,23 @@ describe("definition-time static core", () => {
     expect(button({})).toBe("text-lg-edited");
   });
 
+  test("in-place edits of a non-variant condition default refresh the static core", () => {
+    const button = tv({
+      base: "b",
+      variants: {size: {sm: "s"}},
+      compoundVariants: [{tone: "x", class: "cx"} as any],
+      defaultVariants: {tone: "y"} as any,
+    });
+
+    expect(button()).toBe("b");
+    expect(button({id: "a"} as any)).toBe("b");
+
+    (button.defaultVariants as AnyRecord).tone = "x";
+
+    expect(button()).toBe("b cx");
+    expect(button({id: "b"} as any)).toBe("b cx");
+  });
+
   test("in-place compound edits refresh the static core", () => {
     const button = tv({
       variants: {color: {red: "text-red-500"}},
@@ -1024,6 +1038,23 @@ describe("static slot cores", () => {
     expect(card().root()).toBe("root-b r-lg");
   });
 
+  test("in-place edits of a non-variant condition default refresh the static slot cores", () => {
+    const menu = tv({
+      slots: {title: "title"},
+      variants: {size: {sm: {title: "s"}}},
+      compoundSlots: [{slots: ["title"], tone: "x", class: "cx"} as any],
+      defaultVariants: {tone: "y"} as any,
+    });
+
+    expect(menu().title()).toBe("title");
+    expect(menu().title()).toBe("title");
+
+    (menu.defaultVariants as AnyRecord).tone = "x";
+
+    expect(menu().title()).toBe("title cx");
+    expect(menu({id: "a"} as any).title()).toBe("title cx");
+  });
+
   test("compound slot edits refresh the static slot cores", () => {
     const menu = tv({
       slots: {title: "title-base"},
@@ -1097,6 +1128,27 @@ describe.each(entryFactories)("cold and warm compound matching agree (%s)", (_, 
     expect(empty({s: ""})).toBe("f cv");
   });
 
+  test("empty and 'false' strings meet each other's conditions, other strings do not", () => {
+    const c = factory({
+      base: "b",
+      variants: {s: {false: "f", sm: "x"}, z: {a: "za", b: "zb"}},
+      compoundVariants: [
+        {s: "", class: "empty"},
+        {s: "false", class: "false"},
+        {z: ["a", ""], class: "a-or-empty"},
+      ],
+    });
+
+    for (let i = 0; i < 2; i++) {
+      expect(c({s: "", z: "b"})).toBe("b f zb empty false");
+      expect(c({s: "false", z: "b"})).toBe("b f zb empty false");
+      expect(c({s: "sm", z: "b"})).toBe("b x zb");
+      expect(c({s: "sm", z: "a"})).toBe("b x za a-or-empty");
+      expect(c({s: "sm", z: ""})).toBe("b x a-or-empty");
+      expect(c({s: "sm", z: "false"})).toBe("b x a-or-empty");
+    }
+  });
+
   test("dynamic calls agree whichever spelling fills the cache", () => {
     const c = factory({
       base: "b",
@@ -1127,6 +1179,394 @@ describe.each(entryFactories)("cold and warm compound matching agree (%s)", (_, 
     }
     expect(c().base()).toBe("b f cs");
     expect(c({s: "sm"}).base({s: false})).toBe("b f cs");
+  });
+});
+
+describe.each(entryFactories)("props cache keys keep different values apart (%s)", (_, factory) => {
+  // Warms a recipe with `fill`, then expects `probe` to match a fresh recipe.
+  const expectWarmToMatchCold = (options: AnyRecord, fill: AnyRecord, probe: AnyRecord) => {
+    const warm = factory(options);
+
+    warm({s: "y"});
+    warm(fill);
+    warm(fill);
+
+    const cold = factory(options)(probe);
+    const result = warm(probe);
+
+    return {
+      cold: typeof cold === "string" ? cold : cold.base(),
+      warm: typeof result === "string" ? result : result.base(),
+    };
+  };
+
+  const axes = {s: {x: "s-x", y: "s-y"}};
+
+  test("null and the string 'null'", () => {
+    const options = {
+      base: "b",
+      variants: {tone: {null: "tone-null", a: "tone-a"}, ...axes},
+      defaultVariants: {tone: "a"},
+    };
+    const nullFirst = expectWarmToMatchCold(options, {tone: null, s: "x"}, {tone: "null", s: "x"});
+    const stringFirst = expectWarmToMatchCold(
+      options,
+      {tone: "null", s: "x"},
+      {tone: null, s: "x"},
+    );
+
+    expect(nullFirst).toEqual({cold: "b tone-null s-x", warm: "b tone-null s-x"});
+    expect(stringFirst).toEqual({cold: "b s-x", warm: "b s-x"});
+  });
+
+  test("null and the string 'null' in slot recipes", () => {
+    const options = {
+      slots: {base: "b"},
+      variants: {tone: {null: {base: "tone-null"}, a: {base: "tone-a"}}, ...axes},
+      defaultVariants: {tone: "a"},
+    };
+
+    expect(expectWarmToMatchCold(options, {tone: "null", s: "x"}, {tone: null, s: "x"})).toEqual({
+      cold: "b s-x",
+      warm: "b s-x",
+    });
+  });
+
+  test("undefined and the string 'undefined'", () => {
+    const options = {
+      base: "b",
+      variants: {tone: {undefined: "tone-undefined", a: "tone-a"}, ...axes},
+      defaultVariants: {tone: "a"},
+    };
+
+    expect(
+      expectWarmToMatchCold(options, {tone: "undefined", s: "x"}, {tone: undefined, s: "x"}),
+    ).toEqual({cold: "b tone-a s-x", warm: "b tone-a s-x"});
+  });
+
+  test("an explicit null and a null default", () => {
+    const options = {
+      base: "b",
+      variants: {tone: {false: "tone-false"}, ...axes},
+      defaultVariants: {tone: null},
+    };
+
+    expect(expectWarmToMatchCold(options, {s: "x"}, {tone: null, s: "x"})).toEqual({
+      cold: "b s-x",
+      warm: "b s-x",
+    });
+    expect(expectWarmToMatchCold(options, {tone: null, s: "x"}, {s: "x"})).toEqual({
+      cold: "b tone-false s-x",
+      warm: "b tone-false s-x",
+    });
+  });
+
+  test("NaN and the string 'NaN'", () => {
+    const options = {
+      base: "b",
+      variants: axes,
+      compoundVariants: [{n: false, class: "n-false"}],
+    };
+
+    expect(expectWarmToMatchCold(options, {n: "NaN", s: "x"}, {n: NaN, s: "x"})).toEqual({
+      cold: "b s-x n-false",
+      warm: "b s-x n-false",
+    });
+  });
+
+  test("an array and its JSON text", () => {
+    const options = {base: "b", variants: {tone: {'["a"]': "tone-json"}, ...axes}};
+
+    expect(expectWarmToMatchCold(options, {tone: '["a"]', s: "x"}, {tone: ["a"], s: "x"})).toEqual({
+      cold: "b s-x",
+      warm: "b s-x",
+    });
+  });
+
+  test("a compound condition object and an equal copy", () => {
+    const condition = {k: 1};
+    const options = {
+      base: "b",
+      variants: axes,
+      compoundVariants: [{o: condition, class: "o-match"}],
+    };
+
+    expect(expectWarmToMatchCold(options, {o: condition, s: "x"}, {o: {k: 1}, s: "x"})).toEqual({
+      cold: "b s-x",
+      warm: "b s-x",
+    });
+    expect(expectWarmToMatchCold(options, {o: {k: 1}, s: "x"}, {o: condition, s: "x"})).toEqual({
+      cold: "b s-x o-match",
+      warm: "b s-x o-match",
+    });
+  });
+
+  test("a BigInt and its decimal string", () => {
+    const options = {base: "b", variants: {tone: {0: "tone-0", false: "tone-false"}, ...axes}};
+
+    expect(expectWarmToMatchCold(options, {tone: "0", s: "x"}, {tone: 0n, s: "x"})).toEqual({
+      cold: "b tone-false s-x",
+      warm: "b tone-false s-x",
+    });
+  });
+
+  test("values that resolve alike still share an entry", () => {
+    const {tv: countingTV, calls} = createCounting();
+    const box = countingTV({
+      variants: {on: {true: "on", false: "off"}, level: {1: "l1", 2: "l2"}, ...axes},
+      compoundVariants: [{on: false, level: 1, class: "cv"}],
+    });
+
+    box({s: "y"});
+    expect(box({on: false, level: 1, s: "x"})).toBe("off l1 s-x cv");
+
+    const filled = calls();
+
+    expect(box({on: "false", level: "1", s: "x"} as any)).toBe("off l1 s-x cv");
+    expect(box({on: NaN, level: 1, s: "x"} as any)).toBe("off l1 s-x cv");
+    expect(calls()).toBe(filled);
+  });
+});
+
+describe("props cache keys (variant axes and compound condition keys only)", () => {
+  const onClick = () => {};
+
+  test("pass-through props hit the variants cache", () => {
+    const {tv: countingTV, calls} = createCounting();
+    const button = countingTV({
+      base: "btn",
+      variants: {size: {sm: "text-sm", lg: "text-lg"}},
+      defaultVariants: {size: "sm"},
+    });
+
+    button({size: "lg"});
+    expect(button({size: "lg", id: "a"} as any)).toBe("btn text-lg");
+
+    const filled = calls();
+
+    expect(button({size: "lg", id: "b"} as any)).toBe("btn text-lg");
+    expect(button({size: "lg", "aria-label": "close"} as any)).toBe("btn text-lg");
+    expect(button({size: "lg", onClick: () => {}} as any)).toBe("btn text-lg");
+    expect(button({size: "lg", onClick, children: {a: [1, {b: 2}]}} as any)).toBe("btn text-lg");
+    expect(button({size: "lg", children: Symbol("c")} as any)).toBe("btn text-lg");
+    expect(calls()).toBe(filled);
+    expect(button({size: "sm", id: "c"} as any)).toBe("btn text-sm");
+  });
+
+  test("pass-through props hit the slots cache", () => {
+    const card = tv({
+      slots: {root: "root", label: "label"},
+      variants: {size: {sm: {root: "root-sm"}, lg: {root: "root-lg"}}},
+      defaultVariants: {size: "sm"},
+    });
+
+    card({size: "lg"});
+
+    const first = card({size: "lg", id: "a"} as any);
+
+    expect(card({size: "lg", id: "b"} as any)).toBe(first);
+    expect(card({size: "lg", onClick: () => {}} as any)).toBe(first);
+    expect(card({size: "lg", children: {a: [1]}} as any)).toBe(first);
+    expect(first.root()).toBe("root root-lg");
+    expect(first.root({size: "sm"})).toBe("root root-sm");
+  });
+
+  test("a compound condition key outside the variants keeps entries apart", () => {
+    const {tv: countingTV, calls} = createCounting();
+    const menu = countingTV({
+      base: "menu",
+      variants: {color: {red: "red", blue: "blue"}},
+      compoundVariants: [{color: "red", isOpen: true, class: "open"} as any],
+    });
+
+    menu({color: "blue"});
+    expect(menu({color: "red", isOpen: false, id: "a"} as any)).toBe("menu red");
+    expect(menu({color: "red", isOpen: true, id: "b"} as any)).toBe("menu red open");
+    expect(menu({color: "red", id: "c"} as any)).toBe("menu red");
+
+    const filled = calls();
+
+    expect(menu({color: "red", isOpen: true, id: "d", onClick} as any)).toBe("menu red open");
+    expect(menu({color: "red", isOpen: false, id: "e"} as any)).toBe("menu red");
+    expect(calls()).toBe(filled);
+  });
+
+  test("a compound condition key outside the variants keeps slot entries apart", () => {
+    const menu = tv({
+      slots: {root: "root", item: "item"},
+      variants: {color: {red: {root: "red"}, blue: {root: "blue"}}},
+      compoundSlots: [{slots: ["item"], isOpen: true, class: "open"} as any],
+    });
+
+    menu({color: "blue"});
+
+    const closed = menu({color: "red", isOpen: false, id: "a"} as any);
+    const open = menu({color: "red", isOpen: true, id: "b"} as any);
+
+    expect(open).not.toBe(closed);
+    expect(closed.item()).toBe("item");
+    expect(open.item()).toBe("item open");
+    expect(menu({color: "red", isOpen: true, id: "c"} as any)).toBe(open);
+  });
+
+  test("a compound condition key held only in defaultVariants still keys the cache", () => {
+    const menu = tv({
+      base: "menu",
+      variants: {color: {red: "red", blue: "blue"}},
+      compoundVariants: [{color: "red", isOpen: true, class: "open"} as any],
+      defaultVariants: {isOpen: true} as any,
+    });
+
+    menu({color: "blue"});
+    expect(menu({color: "red", id: "a"} as any)).toBe("menu red open");
+
+    (menu.defaultVariants as AnyRecord).isOpen = false;
+
+    expect(menu({color: "red", id: "b"} as any)).toBe("menu red");
+  });
+
+  test("an in-place edit of a non-variant compound condition resets the cache", () => {
+    const options = () => ({
+      base: "menu",
+      variants: {color: {red: "red", blue: "blue"}},
+      compoundVariants: [{color: "red", isOpen: true, class: "open"} as any],
+    });
+    const warm = tv(options());
+
+    warm({color: "blue"});
+    expect(warm({color: "red", isOpen: false, id: "a"} as any)).toBe("menu red");
+    expect(warm({color: "red", isOpen: true, id: "a"} as any)).toBe("menu red open");
+
+    (warm.compoundVariants[0] as AnyRecord).isOpen = false;
+
+    const cold = options();
+
+    cold.compoundVariants[0].isOpen = false;
+
+    for (const props of [{isOpen: false, id: "b"}, {isOpen: true, id: "c"}, {id: "d"}]) {
+      const call = {color: "red", ...props} as any;
+
+      expect(warm(call)).toBe(tv(cold)(call));
+    }
+    expect(warm({color: "red", isOpen: false} as any)).toBe("menu red open");
+  });
+
+  test("a condition key added in place before the first call keys the cache", () => {
+    const menu = tv({
+      base: "menu",
+      variants: {color: {red: "red", blue: "blue"}},
+      compoundVariants: [{color: "red", class: "cv"}],
+    });
+
+    (menu.compoundVariants[0] as AnyRecord).isOpen = true;
+
+    menu({color: "blue"});
+    expect(menu({color: "red", isOpen: false, id: "a"} as any)).toBe("menu red");
+    expect(menu({color: "red", isOpen: true, id: "b"} as any)).toBe("menu red cv");
+    expect(menu({color: "red", isOpen: false, id: "c"} as any)).toBe("menu red");
+  });
+
+  test("a condition key added in place after the first call is ignored, cached or not", () => {
+    const options = () => ({
+      base: "menu",
+      variants: {color: {red: "red", blue: "blue"}},
+      compoundVariants: [{color: "red", class: "cv"} as any],
+    });
+    const mutate = (recipe: any) => {
+      recipe.compoundVariants[0].isOpen = true;
+      recipe.compoundVariants.push({isOpen: false, class: "pushed"});
+    };
+    const probe = {color: "red", isOpen: false, id: "a"} as any;
+    const warm = tv(options());
+
+    warm({color: "blue"});
+    warm(probe);
+    mutate(warm);
+
+    // compiled once: the twin's probe is a cache miss on the same compiled metadata
+    const twin = tv(options());
+
+    twin({color: "blue"});
+    mutate(twin);
+
+    expect(twin(probe)).toBe("menu red cv");
+    expect(warm(probe)).toBe(twin(probe));
+  });
+});
+
+describe("slot overrides on cached slot results", () => {
+  const card = () =>
+    tv(
+      {
+        slots: {base: "flex"},
+        variants: {
+          size: {sm: {base: "h-8"}, md: {base: "h-10"}},
+          tone: {a: {base: "text-red-500"}, b: {base: "text-blue-500"}},
+        },
+        defaultVariants: {size: "md"},
+      },
+      {twMerge: false},
+    );
+
+  test("an in-place default edit does not leak into a cached result's slot override", () => {
+    const warm = card();
+
+    warm({tone: "a"});
+    // cached with `size` taken from the default ("md")
+    warm({tone: "a"});
+    warm.defaultVariants.size = "sm";
+
+    const cold = card();
+
+    cold.defaultVariants.size = "sm";
+
+    const expected = cold({tone: "a", size: "md"}).base({tone: "b"});
+
+    expect(expected).toBe("flex h-10 text-blue-500");
+    expect(warm({tone: "a", size: "md"}).base({tone: "b"})).toBe(expected);
+  });
+
+  test("mutating the props object after the call does not change a cached slot override", () => {
+    const warm = card();
+
+    warm({size: "md"});
+
+    const props = {size: "sm", tone: "a"} as const;
+    const reused: {size: string; tone: string} = {...props};
+
+    warm(reused as any);
+    reused.size = "md";
+
+    const expected = card()(props).base({tone: "b"});
+
+    expect(expected).toBe("flex h-8 text-blue-500");
+    expect(warm(props).base({tone: "b"})).toBe(expected);
+  });
+
+  test("an uncached result keeps the props it was called with", () => {
+    const reused: {size: string; tone: string} = {size: "sm", tone: "a"};
+    const held = card()(reused as any);
+
+    reused.size = "md";
+
+    expect(held.base({tone: "b"})).toBe("flex h-8 text-blue-500");
+  });
+
+  test("held cached and cold results read in-place default edits alike", () => {
+    const warm = card();
+
+    warm({tone: "a"});
+
+    const cached = warm({tone: "a"});
+    const cold = card();
+    const uncached = cold({tone: "a"});
+
+    warm.defaultVariants.size = "sm";
+    cold.defaultVariants.size = "sm";
+
+    expect(uncached.base({tone: "b"})).toBe("flex h-8 text-blue-500");
+    expect(cached.base({tone: "b"})).toBe(uncached.base({tone: "b"}));
+    expect(cached.base()).toBe(uncached.base());
   });
 });
 
