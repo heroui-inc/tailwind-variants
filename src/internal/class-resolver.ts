@@ -20,6 +20,8 @@ import {
   createCompoundsGuard,
   createLazyOverrideMerge,
   createPropsCache,
+  readOwn,
+  resolvePropValue,
   UNCACHEABLE,
 } from "./cache.js";
 import {
@@ -64,45 +66,47 @@ export const getCompleteProps = (
   return result;
 };
 
-// Effective value of one prop: defaults, then props, then slot props.
-const resolvePropValue = (
-  key: string,
-  defaultVariants: AnyRecord,
-  props?: AnyRecord,
-  slotProps?: AnyRecord,
-): unknown => {
-  let value = defaultVariants[key];
+// Option key a variant value selects: false / "false" / "" / unset -> "false",
+// true -> "true", 1 -> "1". Static props and the props cache compare by it.
+const toOptionKey = (value: unknown): string => `${falsyToString(value) || "false"}`;
 
-  if (props && props[key] !== undefined) value = props[key];
-  if (slotProps && slotProps[key] !== undefined) value = slotProps[key];
+const isOptionValue = (value: unknown): boolean => {
+  if (value == null) return true;
 
-  return value;
+  const type = typeof value;
+
+  return type === "string" || type === "boolean" || type === "number";
 };
 
-const isNullishOrFalse = (value: any): boolean => value == null || value === false;
-
-const matchesCompoundValue = (expected: any, actual: any): boolean => {
-  if (!Array.isArray(expected)) {
-    return expected === actual || (isNullishOrFalse(expected) && isNullishOrFalse(actual));
+// Compound conditions compare primitives by option key, like variant lookup.
+const matchesOptionValue = (expected: unknown, actual: unknown): boolean => {
+  if (expected === actual) return true;
+  // A non-empty string is its own option key, so two different ones never
+  // match. Only "" normalizes (to "false"), so it takes the slow path.
+  if (typeof expected === "string" && typeof actual === "string" && expected && actual) {
+    return false;
   }
 
-  for (let i = 0; i < expected.length; i++) {
-    const expectedValue = expected[i];
+  return (
+    isOptionValue(expected) &&
+    isOptionValue(actual) &&
+    toOptionKey(expected) === toOptionKey(actual)
+  );
+};
 
-    if (expectedValue === actual || (isNullishOrFalse(expectedValue) && isNullishOrFalse(actual))) {
-      return true;
-    }
+const matchesCompoundValue = (expected: any, actual: any): boolean => {
+  if (!Array.isArray(expected)) return matchesOptionValue(expected, actual);
+
+  for (let i = 0; i < expected.length; i++) {
+    if (matchesOptionValue(expected[i], actual)) return true;
   }
 
   return false;
 };
 
 // Option key a variant resolves to when its prop is unset (its default).
-const defaultOptionKey = (defaultVariants: AnyRecord, key: string): string => {
-  const option = falsyToString(defaultVariants[key]);
-
-  return `${option || "false"}`;
-};
+const defaultOptionKey = (defaultVariants: AnyRecord, key: string): string =>
+  toOptionKey(readOwn(defaultVariants, key));
 
 // Normalized classes of the option a variant resolves to, or "" when nothing
 // applies. Slot mode may return a per-slot map.
@@ -115,7 +119,7 @@ const getVariantValue = (
 ): NormalizedOption => {
   if (variant.isEmpty) return "";
 
-  const variantProp = slotProps?.[variant.key] ?? props?.[variant.key];
+  const variantProp = readOwn(slotProps, variant.key) ?? readOwn(props, variant.key);
 
   if (variantProp === null) return "";
 
@@ -123,8 +127,8 @@ const getVariantValue = (
 
   if (typeof variantKey === "object") return "";
 
-  const defaultVariantProp = defaultVariants?.[variant.key];
-  const key = variantKey != null ? variantKey : falsyToString(defaultVariantProp);
+  const key =
+    variantKey != null ? variantKey : falsyToString(readOwn(defaultVariants, variant.key));
   const optionKey = (key || "false") as string;
   const raw = variant.values[optionKey];
 
@@ -312,7 +316,8 @@ const STATIC_WITH_OVERRIDE = 2;
 
 type PropsKind = typeof DYNAMIC | typeof STATIC | typeof STATIC_WITH_OVERRIDE;
 
-// Compound condition keys, built on the first call that carries a key outside the variants.
+// Compound condition keys, built on the first call that carries a key outside
+// the variants or needs the props cache keys.
 type ConditionKeys = Record<string, 1>;
 
 const collectConditionKeys = (
@@ -333,6 +338,36 @@ const collectConditionKeys = (
   }
 
   return conditions;
+};
+
+// Prop keys that can change a recipe's classes: the variant axes plus the
+// compound condition keys outside them.
+const collectPropKeys = (variantKeys: string[], conditions: ConditionKeys): string[] => {
+  const keys = variantKeys.slice();
+
+  for (const key in conditions) {
+    if (!keys.includes(key)) keys.push(key);
+  }
+
+  return keys;
+};
+
+// Own copy of the prop values passed for `keys`, taken at call time. A slot
+// result recomputes slot overrides from it, so later edits of the caller's
+// props object cannot reach a held (or cached) result. Defaults are not
+// copied; they stay live like on every other path.
+const snapshotProps = (props: AnyRecord | undefined, keys: string[]): AnyRecord | undefined => {
+  if (props == null) return undefined;
+
+  let snapshot: AnyRecord | undefined;
+
+  for (let i = 0; i < keys.length; i++) {
+    const value = readOwn(props, keys[i]);
+
+    if (value !== undefined) (snapshot ??= Object.create(null))[keys[i]] = value;
+  }
+
+  return snapshot;
 };
 
 // Static props resolve exactly like no props at all: every declared variant is
@@ -357,12 +392,12 @@ const classifyProps = (
       continue;
     }
     if (value === undefined) continue;
-    if (variants[key] === undefined) {
+    if (readOwn(variants, key) === undefined) {
       if (getConditions()[key]) return DYNAMIC;
       continue;
     }
 
-    const fallback = defaultVariants[key];
+    const fallback = readOwn(defaultVariants, key);
 
     if (value === fallback) continue;
     if (value === null) return DYNAMIC;
@@ -375,10 +410,8 @@ const classifyProps = (
       if (value !== "" && fallback !== "") return DYNAMIC;
     }
 
-    const option = falsyToString(value);
-
-    if (typeof option === "object") return DYNAMIC;
-    if (`${option || "false"}` !== defaultOptionKey(defaultVariants, key)) return DYNAMIC;
+    if (typeof value === "object") return DYNAMIC;
+    if (toOptionKey(value) !== toOptionKey(fallback)) return DYNAMIC;
   }
 
   return kind;
@@ -391,14 +424,23 @@ type StaticSnapshot = {
   defaults: unknown[];
   optionKeys: string[];
   options: unknown[];
+  // Defaults of the compound condition keys outside the variant axes.
+  conditionDefaults: unknown[];
 };
 
-const createSnapshot = (): StaticSnapshot => ({defaults: [], optionKeys: [], options: []});
+const createSnapshot = (): StaticSnapshot => ({
+  defaults: [],
+  optionKeys: [],
+  options: [],
+  conditionDefaults: [],
+});
 
+// `propKeys` lists the variant axes first, then the other condition keys.
 const snapshotStatic = (
   variants: CompiledVariant[],
   defaultVariants: AnyRecord,
   snapshot: StaticSnapshot,
+  propKeys: string[],
 ): void => {
   for (let i = 0; i < variants.length; i++) {
     const variant = variants[i];
@@ -408,12 +450,20 @@ const snapshotStatic = (
     snapshot.optionKeys[i] = optionKey;
     snapshot.options[i] = variant.isEmpty ? undefined : variant.values[optionKey];
   }
+
+  const {conditionDefaults} = snapshot;
+
+  conditionDefaults.length = 0;
+  for (let i = variants.length; i < propKeys.length; i++) {
+    conditionDefaults.push(defaultVariants[propKeys[i]]);
+  }
 };
 
 const isStaticFresh = (
   variants: CompiledVariant[],
   defaultVariants: AnyRecord,
   snapshot: StaticSnapshot,
+  propKeys: string[],
 ): boolean => {
   for (let i = 0; i < variants.length; i++) {
     const variant = variants[i];
@@ -422,6 +472,12 @@ const isStaticFresh = (
     if (!variant.isEmpty && variant.values[snapshot.optionKeys[i]] !== snapshot.options[i]) {
       return false;
     }
+  }
+
+  const {conditionDefaults} = snapshot;
+
+  for (let i = 0; i < conditionDefaults.length; i++) {
+    if (defaultVariants[propKeys[variants.length + i]] !== conditionDefaults[i]) return false;
   }
 
   return true;
@@ -457,6 +513,7 @@ const createVariantResolver = (
   let baseClasses = "";
   let hasCompounds = false;
   let conditionKeys: ConditionKeys | null = null;
+  let propKeys: string[] | null = null;
   let cache: ReturnType<typeof createPropsCache<string>> | null = null;
   // Created on the first warm call; cold-only components never allocate it.
   let compoundsGuard: CompoundsGuard | null = null;
@@ -480,6 +537,9 @@ const createVariantResolver = (
 
   const getConditionKeys = (): ConditionKeys =>
     (conditionKeys ??= collectConditionKeys(compiledCompoundVariants!, compiledCompoundSlots));
+
+  const getPropKeys = (): string[] =>
+    (propKeys ??= collectPropKeys(variantKeys, getConditionKeys()));
 
   const computeCore = (props?: AnyRecord) => {
     const list = partsScratch;
@@ -515,6 +575,9 @@ const createVariantResolver = (
 
     if (state === COMPOUNDS_UNSAFE) return false;
 
+    // The edit may change the condition keys, so the cache key set goes too.
+    conditionKeys = null;
+    propKeys = null;
     cache = null;
     staticCore = null;
 
@@ -524,10 +587,15 @@ const createVariantResolver = (
   const getStaticCore = (): string => {
     if (
       staticCore === null ||
-      !isStaticFresh(compiledVariants!, defaultVariants, staticSnapshot!)
+      !isStaticFresh(compiledVariants!, defaultVariants, staticSnapshot!, getPropKeys())
     ) {
       staticCore = computeCore(undefined);
-      snapshotStatic(compiledVariants!, defaultVariants, (staticSnapshot ??= createSnapshot()));
+      snapshotStatic(
+        compiledVariants!,
+        defaultVariants,
+        (staticSnapshot ??= createSnapshot()),
+        getPropKeys(),
+      );
     }
 
     return staticCore;
@@ -568,7 +636,7 @@ const createVariantResolver = (
     } else if (hasCompounds && !syncCompounds()) {
       core = computeCore(props);
     } else {
-      cache ??= createPropsCache<string>(variantKeys);
+      cache ??= createPropsCache<string>(getPropKeys());
 
       const cached = cache.get(defaultVariants, props);
 
@@ -578,7 +646,7 @@ const createVariantResolver = (
         core = cached;
       } else {
         core = computeCore(props);
-        cache.set(defaultVariants, props, undefined, core);
+        cache.set(defaultVariants, props, core);
       }
     }
 
@@ -599,6 +667,7 @@ const createSlotsResolver = (resolved: ResolvedOptions, merge: MergeAdapter): Ru
   let slotComputers: SlotComputer[] | null = null;
   let hasCompounds = false;
   let conditionKeys: ConditionKeys | null = null;
+  let propKeys: string[] | null = null;
   let mergeOverride: ReturnType<typeof createLazyOverrideMerge> | null = null;
   let parentCache: ReturnType<typeof createPropsCache<SlotsResult>> | null = null;
   // Created on the first warm call; cold-only components never allocate it.
@@ -695,11 +764,12 @@ const createSlotsResolver = (resolved: ResolvedOptions, merge: MergeAdapter): Ru
     const computers = slotComputers!;
     const overrideMerge = mergeOverride!;
     const result: SlotsResult = {};
+    // Parent prop values for this result instance (a copy, not the caller's object).
+    const values = snapshotProps(props, getPropKeys());
 
     for (let i = 0; i < slotKeys.length; i++) {
       const compute = computers[i];
-      // Capture parent props for this result instance (not shared mutable state).
-      const core = compute(props, undefined);
+      const core = compute(values, undefined);
 
       result[slotKeys[i]] = (slotProps) => {
         if (slotProps == null) return core;
@@ -718,7 +788,7 @@ const createSlotsResolver = (resolved: ResolvedOptions, merge: MergeAdapter): Ru
           return overrideMerge(core, slotProps);
         }
 
-        return overrideMerge(compute(props, slotProps), slotProps);
+        return overrideMerge(compute(values, slotProps), slotProps);
       };
     }
 
@@ -734,6 +804,9 @@ const createSlotsResolver = (resolved: ResolvedOptions, merge: MergeAdapter): Ru
 
     if (state === COMPOUNDS_UNSAFE) return false;
 
+    // The edit may change the condition keys, so the cache key set goes too.
+    conditionKeys = null;
+    propKeys = null;
     parentCache = null;
     staticResult = null;
 
@@ -743,8 +816,11 @@ const createSlotsResolver = (resolved: ResolvedOptions, merge: MergeAdapter): Ru
   const getConditionKeys = (): ConditionKeys =>
     (conditionKeys ??= collectConditionKeys(compoundVariants!, compoundSlots!));
 
+  const getPropKeys = (): string[] =>
+    (propKeys ??= collectPropKeys(variantKeys, getConditionKeys()));
+
   const isStaticResultFresh = (): boolean => {
-    if (!isStaticFresh(variants!, defaultVariants, staticSnapshot!)) return false;
+    if (!isStaticFresh(variants!, defaultVariants, staticSnapshot!, getPropKeys())) return false;
 
     const slotKeys = keys!;
     const sources = staticSlotSources!;
@@ -759,7 +835,12 @@ const createSlotsResolver = (resolved: ResolvedOptions, merge: MergeAdapter): Ru
   const getStaticResult = (): SlotsResult => {
     if (staticResult === null || !isStaticResultFresh()) {
       staticResult = createSlotsResult(undefined);
-      snapshotStatic(variants!, defaultVariants, (staticSnapshot ??= createSnapshot()));
+      snapshotStatic(
+        variants!,
+        defaultVariants,
+        (staticSnapshot ??= createSnapshot()),
+        getPropKeys(),
+      );
 
       const slotKeys = keys!;
       const sources = (staticSlotSources ??= []);
@@ -805,7 +886,7 @@ const createSlotsResolver = (resolved: ResolvedOptions, merge: MergeAdapter): Ru
 
     if (hasCompounds && !syncCompounds()) return createSlotsResult(props);
 
-    parentCache ??= createPropsCache<SlotsResult>(variantKeys);
+    parentCache ??= createPropsCache<SlotsResult>(getPropKeys());
 
     const cached = parentCache.get(defaultVariants, props);
 
@@ -817,7 +898,7 @@ const createSlotsResolver = (resolved: ResolvedOptions, merge: MergeAdapter): Ru
 
     const next = createSlotsResult(props);
 
-    parentCache.set(defaultVariants, props, undefined, next);
+    parentCache.set(defaultVariants, props, next);
 
     return next;
   }) as RuntimeComponent;

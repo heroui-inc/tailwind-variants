@@ -2,6 +2,7 @@ import type {TVLiteConfig, TwMergeFn} from "./config.js";
 import type {MergeAdapter, MergeAdapterFactory} from "./internal/types.js";
 import type {CnOptions, CnReturn, TVLite} from "./types.js";
 
+import {defineVariants} from "./define-variants.js";
 import {defaultConfig as runtimeDefaultConfig} from "./internal/default-config.js";
 import {getTailwindVariants} from "./internal/tv.js";
 import {cx, normalizeClassString} from "./utils.js";
@@ -119,6 +120,6 @@ export const clsx = function (): string {
   return str;
 } as (...inputs: unknown[]) => string;
 
-export {cx};
+export {cx, defineVariants};
 
 export default clsx;

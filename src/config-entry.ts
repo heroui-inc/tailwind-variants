@@ -13,6 +13,7 @@
 import type {TVCustomConfig} from "./config.js";
 import type {TV} from "./types.js";
 
+import {defineVariants} from "./define-variants.js";
 import {diagnostics} from "./internal/debug/decorate.js";
 import {defaultConfig as runtimeDefaultConfig} from "./internal/default-config.js";
 import {
@@ -96,6 +97,15 @@ export const validators = validatorFunctions;
 export {getDefaultConfig} from "./internal/compile-config/default-config.js";
 export {fromTheme} from "./internal/compile-config/from-theme.js";
 export {mergeConfigs} from "./internal/compile-config/merge-configs.js";
-export {clsx, cn, createTailwindMerge, createTwMerge, extendTailwindMerge, twJoin, twMerge};
+export {
+  clsx,
+  cn,
+  createTailwindMerge,
+  createTwMerge,
+  defineVariants,
+  extendTailwindMerge,
+  twJoin,
+  twMerge,
+};
 
 export default clsx;

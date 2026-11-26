@@ -9,6 +9,7 @@ import type {
 } from "./config.js";
 import type {TV} from "./types.js";
 
+import {defineVariants} from "./define-variants.js";
 import {diagnostics} from "./internal/debug/decorate.js";
 import {defaultConfig as runtimeDefaultConfig} from "./internal/default-config.js";
 import {clsx, twJoin, twMerge} from "./internal/engine-instance.js";
@@ -59,7 +60,7 @@ export const defaultConfig: TVConfig = runtimeDefaultConfig;
  */
 export const cx = runtimeCx;
 
-export {clsx, cn, cnMerge, twJoin, twMerge};
+export {clsx, cn, cnMerge, defineVariants, twJoin, twMerge};
 
 /** `clsx` as the default export, so `import clsx from "clsx"` can alias to this package. */
 export default clsx;
