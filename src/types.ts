@@ -592,9 +592,9 @@ type TVCompoundSlotsOption<
  * The options object `tv()` accepts, validated against its own variants and slots.
  * `compoundSlots` is validation-only: every type parameter it mentions is wrapped
  * in `NoInfer`, so `extend`, `variants`, `slots`, and `base` stay the only
- * inference sites.
+ * inference sites. `CS` lets {@link TVDefineVariants} capture it as written.
  */
-export type TVOptions<
+type TVOptions<
   V extends TVVariantsShape,
   DV,
   CV extends readonly object[],
@@ -603,6 +603,7 @@ export type TVOptions<
   E extends TVReturnTypeLike<any, any> | TVExtendList | undefined,
   EV extends TVVariantsShape = VariantsOfExtend<E>,
   ES extends TVSlots = SlotsOfExtend<E>,
+  CS extends TVCompoundSlotsOption<V, B, S, E, EV> = TVCompoundSlotsOption<V, B, S, E, EV>,
 > = TVOptionsFields<V, DV, CV, B, S, EV, ES> & {
   // Extend merges parent recipes into this definition; child options win.
   // Accepts a single {@link TVReturnTypeLike} or a non-empty list, merged
@@ -612,7 +613,7 @@ export type TVOptions<
   // @see https://www.tailwind-variants.org/docs/composing-components
   extend?: E;
   // Classes applied to multiple slots at once.
-  compoundSlots?: TVCompoundSlotsOption<V, B, S, E, EV>;
+  compoundSlots?: CS;
 };
 
 /**
@@ -638,10 +639,11 @@ type TVDefinedDefaults<
  * variants rather than from `DV`, which is inferred widened (`string`) and would
  * be rejected on the way back in.
  */
-export type TVDefinedVariants<
+type TVDefinedVariants<
   V extends TVVariantsShape,
   DV,
   CV extends readonly object[],
+  CS extends readonly object[],
   B extends ClassValue,
   S extends TVSlots,
   E extends TVReturnTypeLike<any, any> | TVExtendList | undefined,
@@ -652,22 +654,18 @@ export type TVDefinedVariants<
     ([S] extends [undefined] ? {} : {slots: S}) &
     (keyof V extends never ? {} : {variants: V}) &
     (CV extends readonly [] ? {} : {compoundVariants: CV}) &
+    (CS extends readonly [] ? {} : {compoundSlots: CS}) &
     (keyof DV extends never ? {} : {defaultVariants: TVDefinedDefaults<V, DV, S, EV, ES>}) &
-    ([E] extends [undefined] ? {} : {extend: E}) & {
-      compoundSlots?: TVCompoundSlotsOption<V, B, S, E, EV>;
-    }
+    ([E] extends [undefined] ? {} : {extend: E}) &
+    TVDefinedBrand
 >;
 
-/** Anything {@link TVDefineVariants} can return, for `VariantProps` to accept. */
-type TVDefinedVariantsLike = {
-  base?: unknown;
-  slots?: unknown;
-  variants?: unknown;
-  compoundVariants?: unknown;
-  defaultVariants?: unknown;
-  extend?: unknown;
-  compoundSlots?: unknown;
-};
+/**
+ * Type-only marker on what {@link TVDefineVariants} returns (never present at
+ * runtime), so `VariantProps` accepts defined options but still rejects `{}`,
+ * `object`, and hand-typed objects with optional fields.
+ */
+type TVDefinedBrand = {readonly "~tv": "defineVariants"};
 
 /**
  * Identity helper that checks a `tv()` options object where it is written, for
@@ -684,9 +682,10 @@ export interface TVDefineVariants {
     E extends TVReturnTypeLike<any, any> | TVExtendList | undefined = undefined,
     EV extends TVVariantsShape = VariantsOfExtend<E>,
     ES extends TVSlots = SlotsOfExtend<E>,
+    const CS extends TVCompoundSlotsOption<V, B, S, E, EV> = [],
   >(
-    options: TVOptions<V, DV, CV, B, S, E, EV, ES>,
-  ): TVDefinedVariants<V, DV, CV, B, S, E, EV, ES>;
+    options: TVOptions<V, DV, CV, B, S, E, EV, ES, CS>,
+  ): TVDefinedVariants<V, DV, CV, CS, B, S, E, EV, ES>;
 }
 
 // One call signature, not overloads: `E` covers no extend, one parent, or a
@@ -777,7 +776,7 @@ type TVRecipeOf<T> = T extends (...args: any) => any
  * type ButtonProps = VariantProps<typeof button>;
  * type ButtonProps = VariantProps<typeof buttonTheme>; // same type
  */
-export type VariantProps<Component extends ((...args: any) => any) | TVDefinedVariantsLike> = Omit<
+export type VariantProps<Component extends ((...args: any) => any) | TVDefinedBrand> = Omit<
   OmitUndefined<Parameters<TVRecipeOf<Component>>[0]>,
   "class" | "className"
 >;

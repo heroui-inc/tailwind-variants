@@ -212,6 +212,42 @@ const iconButton = tv({ extend: button, base: "gap-2" });
 Variants, slots, defaults, and compounds are deep-merged. If two recipes share a variant key that
 should stay separate, call them individually and join with `cx` / `cn` instead.
 
+## Defining variants apart from `tv()`
+
+Keep options in their own file (a theme, a shared preset) with `defineVariants`. It checks them
+where they are written and keeps the literal types `tv()` needs; a plain object widens
+`compoundVariants` and `defaultVariants` values to `string`, which `tv()` rejects.
+
+```ts
+// button.theme.ts
+import { defineVariants } from "tailwind-variants";
+
+export const buttonTheme = defineVariants({
+  base: "inline-flex items-center rounded-md",
+  variants: {
+    size: { sm: "h-8 px-3 text-sm", lg: "h-12 px-6 text-lg" },
+    disabled: { true: "opacity-50" },
+  },
+  compoundVariants: [{ size: "lg", disabled: true, class: "cursor-not-allowed" }],
+  defaultVariants: { size: "sm" },
+});
+
+// button.ts
+import { tv, type VariantProps } from "tailwind-variants";
+import { buttonTheme } from "./button.theme";
+
+export const button = tv(buttonTheme);
+export type ButtonProps = VariantProps<typeof buttonTheme>; // same as VariantProps<typeof button>
+
+// Override a field, keep the rest:
+export const largeButton = tv({ ...buttonTheme, defaultVariants: { size: "lg" } });
+```
+
+`defineVariants` returns its argument unchanged, so it has no runtime cost. A plain `as const`
+object also works with `tv()` when you don't need errors where the options are written or
+`VariantProps` on the options (it then needs the `tv()` result). `defineVariants` is exported from
+the main, `/lite`, and `/config` entries.
+
 ## Debugging (experimental)
 
 Enable `debug: true` to log how a recipe resolves classes and which ones the merger dropped.

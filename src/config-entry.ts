@@ -13,6 +13,7 @@
 import type {TVCustomConfig} from "./config.js";
 import type {TV} from "./types.js";
 
+import {defineVariants} from "./define-variants.js";
 import {diagnostics} from "./internal/debug/decorate.js";
 import {defaultConfig as runtimeDefaultConfig} from "./internal/default-config.js";
 import {
@@ -26,7 +27,7 @@ import {clsx, twJoin, twMerge} from "./internal/engine-instance.js";
 import {cn} from "./internal/merge-adapter.js";
 import * as validatorFunctions from "./internal/merge-engine/validators.js";
 import {getTailwindVariants} from "./internal/tv.js";
-import {defineVariants, cx as runtimeCx} from "./utils.js";
+import {cx as runtimeCx} from "./utils.js";
 
 export type {
   TVConfig,
