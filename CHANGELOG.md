@@ -1,3 +1,20 @@
+# [4.1.0](https://github.com/heroui-inc/tailwind-variants/compare/v4.0.2...v4.1.0) (2026-11-26)
+
+### ✨ Features
+
+- `defineVariants` helper exported from `.`, `/lite`, and `/config` for defining typed options outside `tv()` and reading them with `VariantProps` ([#325](https://github.com/heroui-inc/tailwind-variants/issues/325), [#326](https://github.com/heroui-inc/tailwind-variants/pull/326))
+
+### ⚡ Performance
+
+- props cache keyed strictly on variant axes and compound condition keys so pass-through props (`id`, `aria-label`, `onClick`, `children`) hit the cache instead of busting or serializing ([#327](https://github.com/heroui-inc/tailwind-variants/pull/327))
+- string fast path for compound variant matching
+
+### 🐛 Fixes
+
+- cold and cached calls agree on compound matching (`false`/`"false"` match `null` or omitted prop with no default; `1` matches `"1"`) and prototype-named variants
+- cached slot results copy effective props so later mutations do not leak into slot overrides
+- cache-key collisions (`null`/`"null"`, `NaN`/`"NaN"`, arrays/objects) and in-place compound default mutations refreshing static results
+
 # [4.0.2](https://github.com/heroui-inc/tailwind-variants/compare/v4.0.1...v4.0.2) (2026-11-10)
 
 ### 🐛 Fixes
